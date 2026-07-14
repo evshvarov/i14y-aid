@@ -1,162 +1,81 @@
-# IRIS Table Stats
+# IRIS Interoperability Production Explainer
 
-`iris-table-stats` is an InterSystems IRIS backend module for exploring persistent classes and measuring how well their fields are populated.
+`esh-i14y-aid` is an installable InterSystems IRIS module that exposes a REST API for deterministic analysis of interoperability productions in the current namespace.
 
-It is intended for data quality and data knowledge use cases:
-- list persistent classes available in the current namespace
-- browse records of a selected class
-- calculate per-column population stats
-- find records where a selected column is empty
+The first implementation increment supports:
 
-The module exposes a REST API under `/iris-table-stats/api`.
+- module health and capabilities;
+- discovery of interoperability productions;
+- production metadata lookup;
+- component extraction from production `XData ProductionDefinition`, with fallback support for `XData Production`;
+- component classification as business service, business process, business operation, or unknown;
+- target extraction from `TargetConfigNames`;
+- adapter and likely protocol extraction where the component exposes an `ADAPTER` parameter;
+- Swagger 2.0 API documentation at `/_spec`.
 
-## What This Repo Provides
+The module does not start, stop, modify, or deploy analysed productions.
 
-After installation, the backend exposes endpoints such as:
-- `GET /iris-table-stats/api/classes`
-- `GET /iris-table-stats/api/classes/{className}/data`
-- `GET /iris-table-stats/api/classes/{className}/stats`
-- `GET /iris-table-stats/api/classes/{className}/empty-records?columnName=...`
-- `GET /iris-table-stats/api/_spec`
+## Package Layout
 
-The `/stats` endpoint is especially useful to understand how complete a table is. For each property of a persistent class, it reports:
-- populated count
-- empty count
-- populated percent
-- empty percent
+- `esh.interoperability.aid.api.*` - REST implementation, Swagger spec, and security setup.
+- `esh.interoperability.aid.service.*` - deterministic production discovery and component extraction.
+- `esh.interoperability.aid.config.*` - module configuration defaults.
+- `esh.interoperability.aid.tests.*` - unit tests and a minimal demo production.
 
-## Typical Use Case
+## REST API
 
-This project is useful when you want to answer questions like:
-- which tables in this namespace are worth exploring
-- which columns are mostly empty
-- which columns are consistently populated
-- which records are missing values in a specific field
+The ZPM module creates a CSP application:
 
-That makes it a good fit for demo environments, imported datasets, discovery projects, and data-quality reviews.
+```text
+/i14y-aid/api
+```
 
-## Install On A Target IRIS With IPM
+Implemented endpoints:
 
-If your target IRIS does not yet have IPM/ZPM installed, install it first.
-
-Then open an IRIS terminal in the target namespace and install the backend package.
+```text
+GET /i14y-aid/api/_spec
+GET /i14y-aid/api/health
+GET /i14y-aid/api/productions
+GET /i14y-aid/api/productions/{productionName}
+GET /i14y-aid/api/productions/{productionName}/components
+```
 
 Example:
 
-```objectscript
-USER>zpm
-USER:zpm>install esh-iris-table-stats
+```sh
+curl http://localhost:57337/i14y-aid/api/health
+curl http://localhost:57337/i14y-aid/api/productions
+curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/components"
 ```
 
+## Build And Test
+
+Build the container:
+
+```sh
+docker compose build --progress=plain
 ```
 
-## Recommended Frontend
+Run tests during build:
 
-Recommended UI:
-- `iris-class-explorer`
-  - GitHub: `https://github.com/evshvarov/iris-class-explorer`
-
-The frontend is intended to work together with this backend and provides a class explorer UI on top of the API.
-
-Install the frontend package with IPM as well:
-
-```objectscript
-USER>zpm
-USER:zpm>install iris-table-stats-frontend
+```sh
+docker compose build --build-arg TESTS=1 --progress=plain
 ```
 
-## Related Dataset Packages
+Start IRIS:
 
-You may find useful the following several demo or sample datasets.
-
-Recommended companion packages:
-- `iris-dataset-countries`
-  - Open Exchange: `https://openexchange.intersystems.com/package/iris-dataset-countries`
-- `Health-Dataset`
-  - Open Exchange: `https://openexchange.intersystems.com/package/Health-Dataset`
-  - Author: Jury
-
-These packages give you realistic persistent classes to inspect through this API and make the population stats endpoints much more meaningful.
-
-Example UI screenshots:
-
-Data view:
-
-![IRIS Explorer data view](./docs/images/iris-explorer-data-view.png)
-
-Stats view:
-
-![IRIS Explorer stats view](./docs/images/iris-explorer-stats-view.png)
-
-A typical setup on a target IRIS looks like this:
-
-```objectscript
-USER>zpm
-USER:zpm>install esh-iris-table-stats
-USER:zpm>install iris-table-stats-frontend
-```
-
-If you also want sample data:
-
-```objectscript
-USER>zpm
-USER:zpm>install iris-dataset-countries
-```
-
-or:
-
-```objectscript
-USER>zpm
-USER:zpm>install Health-Dataset
-```
-
-## API Notes
-
-The backend web application is installed at:
-
-`/iris-table-stats/api`
-
-The OpenAPI spec is available at:
-
-`/iris-table-stats/api/_spec`
-
-Examples:
-
-```text
-/iris-table-stats/api/classes
-/iris-table-stats/api/classes?includeSystem=0&includeMapped=0
-/iris-table-stats/api/classes/Package.Class/data?limit=100&offset=0
-/iris-table-stats/api/classes/Package.Class/stats
-/iris-table-stats/api/classes/Package.Class/empty-records?columnName=SomeProperty
-```
-
-## Local Development
-
-Prerequisites:
-- Docker Desktop
-- Git
-- VS Code with the ObjectScript extension if you want an editor workflow
-
-Build and run locally:
-
-```bash
-docker compose build
+```sh
 docker compose up -d
 ```
 
-Open an IRIS terminal:
-
-```bash
-docker compose exec iris iris session iris -U USER
-```
-
-Run the module tests:
+Run tests from an IRIS terminal:
 
 ```objectscript
-USER>zpm
-USER:zpm>test esh-iris-table-stats
+zpm "test esh-i14y-aid -v -only"
 ```
 
-## Summary
+## Current Scope
 
-Use this repository when you need a small IRIS backend that helps you understand how well persistent class data is populated, especially when paired with sample datasets and the `iris-table-stats-frontend` UI.
+This version analyzes only the current namespace. It reads compiled class metadata and production XData. Runtime message trace analysis, DTL/rule/BPL analysis, graph construction, and payload inspection are intentionally deferred.
+
+Message bodies are not read or returned by this increment.

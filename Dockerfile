@@ -7,7 +7,7 @@ FROM $IMAGE
 WORKDIR /home/irisowner/dev
 
 ARG TESTS=0
-ARG MODULE="esh-iris-table-stats"
+ARG MODULE="esh-i14y-aid"
 ARG NAMESPACE="USER"
 
 
@@ -23,5 +23,5 @@ RUN --mount=type=bind,src=.,dst=. \
     iris stop IRIS quietly
 
 RUN old=http://localhost:52773/crud/_spec && \
-	new=http://localhost:57337/iris-table-stats/api/_spec && \
+	new=http://localhost:57337/i14y-aid/api/_spec && \
     sed -i "s|$old|$new|g" /usr/irissys/csp/swagger-ui/swagger-initializer.js

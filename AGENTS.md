@@ -199,57 +199,97 @@ ClassMethod AddCORS(appname) As %Status
 
 
 
-Here is how you can build query implementations for openapi requests. E.g. here is the impl method to return sales:
+Here is how you can build query implementations for openapi requests. E.g. here is the impl method to return classes:
 
-ClassMethod ListCompanySales(companyId As %String, dateFrom As %String, dateTo As %String, limit As %Integer = 100, offset As %Integer = 0) As %DynamicObject
-{
-    set user=..GetAuthorizedUser() if user="" {return ""}
-    if companyId = "" {
-        d ..%SetStatusCode(400)
-        d ..%SetHeader("X-Error", "companyId required")
-        return {}
+Set limit = ..NormalizeLimit(limit)
+    Set offset = ..NormalizeOffset(offset)
+    Set includeSystem = ..NormalizeBoolean(includeSystem, 1)
+    Set includeMapped = ..NormalizeBoolean(includeMapped, 1)
+    Set result = ..NewPagedResult(limit, offset)
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sql = "SELECT Name, Description, SqlSchemaName, SqlTableName, System, CompileNamespace FROM %Dictionary.CompiledClass WHERE ClassType = ?"
+    If $g(package) '= "" {
+        Set sql = sql _ " AND Name %STARTSWITH ?"
+    }
+    Set sql = sql _ " ORDER BY Name"
+    Set sc = stmt.%Prepare(sql)
+    If $$$ISERR(sc) {
+        Do ..%SetStatusCode(500)
+        Do ..%SetHeader("X-Error", "Status error: "_$System.Status.GetErrorText(sc))
+        Quit result
     }
 
-    set rset = ##class(esh.lcrm.companycabinet).OrdersByCompanyFunc(companyId, dateFrom, dateTo, limit, offset)
-    if rset.%SQLCODE<0 {
-        d ..%SetStatusCode(500)
-        d ..%SetHeader("X-Error", rset.%Message)
-        return "" 
+    If $g(package) '= "" {
+        Set rset = stmt.%Execute("persistent", package)
+    } Else {
+        Set rset = stmt.%Execute("persistent")
+    }
+    If rset.%SQLCODE < 0 {
+        Do ..%SetStatusCode(500)
+        Do ..%SetHeader("X-Error", "SQL error: "_rset.%Message)
+        Quit result
     }
 
-    set dynArray = [].%New()
+    Set skipped = 0
+    Set collected = 0
     While rset.%Next() {
-        //s ^AAA="ID: "_rset.ID1
-        do ##class(gc.orders).%OpenId(rset.ID1).%JSONExportToString(.json)
-        set dynObj = {}.%FromJSON(json)
-        do dynArray.%Push(dynObj)
+        Continue:'..ShouldIncludeClass(rset.%Get("System"), rset.%Get("CompileNamespace"), includeSystem, includeMapped)
+        If skipped < offset {
+            Set skipped = skipped + 1
+            Continue
+        }
+        Quit:collected'<limit
+        Set item = {}
+        Set item.name = rset.%Get("Name")
+        Set item.description = rset.%Get("Description")
+        Set item.sqlSchemaName = rset.%Get("SqlSchemaName")
+        Set item.sqlTableName = rset.%Get("SqlTableName")
+        Do result.items.%Push(item)
+        Set collected = collected + 1
     }
 
-    set result = {}.%New()
-    do result.%Set("items", dynArray)
-    do result.%Set("count", dynArray.%Size())
-    do result.%Set("limit", +limit)
-    do result.%Set("offset", +offset)
-    return result
+    Do result.%Set("count", result.items.%Size())
+    Quit result
 }
 
-Inside it calls OrdersByCompany with Func addition SQL class query, here is how it looks like:
-
-Query OrdersByCompany(companyId As %String, dateFrom As %String = "", dateTo As %String = "", limit As %Integer = 100, offset As %Integer = 0) As %SQLQuery [ SqlProc ]
-{
-    SELECT  o.ID1 as ID1 
-    FROM    gc.orders o 
-    JOIN    esh_lcrm.companycabinet cc
-            ON cc.CabinetId = o.take_cabinet_id
-           AND cc.Company = :companyId
-           AND (cc.StartDate IS NULL OR o.created_at >= cc.StartDate)
-           AND (cc.EndDate IS NULL OR o.created_at <= cc.EndDate)
-    WHERE   (:dateFrom = '' OR o.created_at >= dateFrom)
-      AND   (:dateTo = '' OR o.created_at < :dateTo)
-    ORDER BY o.created_at DESC
-    LIMIT :limit OFFSET :offset
+when you iterate over %Dynamic.Object instance please start cycle from 0, and not from 1. Here is the proper cycle:
+for i = 0:1:roles.%Size() {
+        set ARole = roles.%Get(i)
+        if ARole = "admin" {
+            set isAdmin = 1
+            quit
+        }
 }
+where roles is an instance of %Dynamic.Object with JSON.
 
+When quit a JSON formed with variables use parenthesis for variables, like here:
+quit {"token":(authToken),"user":(respUser)}
+instead of
+quit {"token":authToken,"user":respUser}
+It is ObjectScript "feature".
+
+
+Never use Login() for Methods names - you can rename e.g. to UserLogin() as it is a sacred word in IRIS
+
+
+When you return the result form a method or class method always use return not quit:
+good:
+ return 1
+not good: 
+ quit 1
+
+quit command is good to quit from a cycle and continue the sequence of commands in a method/function
+
+
+when you find properties in JSON/Dynamic obect that contain "_" please use %Get() to obtain the value, e.g.
+instead of
+set value=payload.email_id
+use
+set value=payload.%Get("email_id")
+
+
+
+Don't use class queries elements to query data - use %SQL.Statement class instead
 
 When you set to an object property - a property that refers another instance make sure the value you set is an instance of the object it refers.
 E.g.
@@ -269,3 +309,8 @@ If $$$ISERR(sc) {
     }
 
 if the type is %Date use 0 for start date and $H for End date instead of "" default values
+
+
+In case of creating properties in persistent classes consider %VarString over %String all the times as it doesn't have 50 symbols value length constraint.
+
+Never delete or rename properties for persistent classes for migration purposes. Always add new properties in this case. Properties type change is OK for the majority of cases.
