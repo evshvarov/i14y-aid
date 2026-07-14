@@ -25,6 +25,11 @@ ClassMethod Health() As %DynamicObject
     return result
 }
 
+ClassMethod GetSettings() As %DynamicObject
+{
+    return ##class(esh.interoperability.aid.service.ProductionDiscovery).GetSettings()
+}
+
 ClassMethod ListProductions() As %DynamicObject
 {
     return ##class(esh.interoperability.aid.service.ProductionDiscovery).ListProductions()
@@ -164,6 +169,9 @@ ClassMethod HandleRuntimeResult(result As %DynamicObject) As %DynamicObject [ Pr
         }
         If result.errorCode = "MESSAGE_HEADER_NOT_AVAILABLE" {
             return ..Error(404, "MESSAGE_HEADER_NOT_AVAILABLE", "Ens.MessageHeader is not available in this namespace.")
+        }
+        If result.errorCode = "RUNTIME_MESSAGE_ANALYSIS_DISABLED" {
+            return ..Error(403, "RUNTIME_MESSAGE_ANALYSIS_DISABLED", "Runtime message analysis is disabled by module settings.")
         }
         If result.errorCode = "STATUS_ERROR" {
             return ..Error(500, "STATUS_ERROR", "Runtime message query failed.")

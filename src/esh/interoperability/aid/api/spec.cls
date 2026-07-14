@@ -50,6 +50,20 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "/settings": {
+      "get": {
+        "summary": "Get module analysis settings",
+        "operationId": "GetSettings",
+        "responses": {
+          "200": {
+            "description": "Module analysis settings",
+            "schema": {
+              "$ref": "#/definitions/SettingsResponse"
+            }
+          }
+        }
+      }
+    },
     "/productions": {
       "get": {
         "summary": "List interoperability productions in the current namespace",
@@ -556,6 +570,64 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "SettingsResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/definitions/AnalysisSettings"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "AnalysisSettings": {
+      "type": "object",
+      "properties": {
+        "runtimeMessageAnalysisEnabled": {
+          "type": "boolean"
+        },
+        "payloadInspectionEnabled": {
+          "type": "boolean"
+        },
+        "maxMessagesReturned": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxTraceDepth": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "defaultMessageLookbackDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "fieldRedactionPatterns": {
+          "type": "string"
+        },
+        "classExclusions": {
+          "type": "string"
+        },
+        "productionExclusions": {
+          "type": "string"
+        },
+        "sourceCodeInferenceEnabled": {
+          "type": "boolean"
+        },
+        "explanationVerbosity": {
+          "type": "string"
+        },
+        "aiProviderEnabled": {
+          "type": "boolean"
+        }
+      }
+    },
     "ProductionListResponse": {
       "type": "object",
       "properties": {
@@ -727,6 +799,13 @@ XData OpenAPI [ MimeType = application/json ]
         "payloadReturned": {
           "type": "boolean"
         },
+        "runtimeMessageAnalysisEnabled": {
+          "type": "boolean"
+        },
+        "maxMessagesReturned": {
+          "type": "integer",
+          "format": "int32"
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -854,6 +933,13 @@ XData OpenAPI [ MimeType = application/json ]
         "payloadReturned": {
           "type": "boolean"
         },
+        "runtimeMessageAnalysisEnabled": {
+          "type": "boolean"
+        },
+        "maxMessagesReturned": {
+          "type": "integer",
+          "format": "int32"
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -876,6 +962,9 @@ XData OpenAPI [ MimeType = application/json ]
           "$ref": "#/definitions/MessageHeader"
         },
         "payloadReturned": {
+          "type": "boolean"
+        },
+        "runtimeMessageAnalysisEnabled": {
           "type": "boolean"
         },
         "warnings": {
@@ -924,6 +1013,13 @@ XData OpenAPI [ MimeType = application/json ]
         },
         "payloadReturned": {
           "type": "boolean"
+        },
+        "runtimeMessageAnalysisEnabled": {
+          "type": "boolean"
+        },
+        "maxTraceDepth": {
+          "type": "integer",
+          "format": "int32"
         },
         "warnings": {
           "type": "array",

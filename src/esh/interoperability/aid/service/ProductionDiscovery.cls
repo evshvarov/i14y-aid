@@ -16,6 +16,17 @@ ClassMethod Capabilities() As %DynamicObject
     return capabilities
 }
 
+ClassMethod GetSettings() As %DynamicObject
+{
+    Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.settings = settings
+    Set result.evidence = []
+    Do result.evidence.%Push(..NewEvidence("module-settings", "esh.interoperability.aid.config.Settings", "current", "settings", "Runtime analysis limits and feature flags", "confirmed"))
+    return result
+}
+
 ClassMethod ListProductions() As %DynamicObject
 {
     Set result = ..NewListResult()
@@ -239,9 +250,16 @@ ClassMethod StopProduction(productionName As %VarString, timeout As %Integer = 1
 ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0) As %DynamicObject
 {
     Set result = ..NewListResult()
+    Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
     Do result.%Set("productionName", productionName)
     Do result.%Set("payloadReturned", 0)
-    Set limit = ..NormalizeLimit(limit)
+    Do result.%Set("runtimeMessageAnalysisEnabled", settings.runtimeMessageAnalysisEnabled)
+    Do result.%Set("maxMessagesReturned", settings.maxMessagesReturned)
+    If 'settings.runtimeMessageAnalysisEnabled {
+        Do result.%Set("errorCode", "RUNTIME_MESSAGE_ANALYSIS_DISABLED")
+        return result
+    }
+    Set limit = ..NormalizeLimitWithMaximum(limit, 50, settings.maxMessagesReturned)
     Set offset = ..NormalizeOffset(offset)
     Set errorsOnly = ..NormalizeBoolean(errorsOnly, 0)
     Do result.%Set("limit", limit)
@@ -313,11 +331,18 @@ ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 
 
 ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integer = 500) As %DynamicObject
 {
+    Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
     Set result = {}
     Set result.namespace = $Namespace
     Set result.productionName = productionName
     Set result.payloadReturned = 0
-    Set limit = ..NormalizeFacetLimit(limit)
+    Set result.runtimeMessageAnalysisEnabled = settings.runtimeMessageAnalysisEnabled
+    Set result.maxMessagesReturned = settings.maxMessagesReturned
+    If 'settings.runtimeMessageAnalysisEnabled {
+        Do result.%Set("errorCode", "RUNTIME_MESSAGE_ANALYSIS_DISABLED")
+        return result
+    }
+    Set limit = ..NormalizeLimitWithMaximum(limit, 500, settings.maxMessagesReturned)
     Set result.limit = limit
     Set result.totalCount = 0
     Set result.errorCount = 0
@@ -389,11 +414,18 @@ ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integ
 
 ClassMethod GetMessage(messageId As %Integer) As %DynamicObject
 {
+    Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
     Set result = {}
     Set result.namespace = $Namespace
     Set result.messageId = messageId
     Set result.payloadReturned = 0
+    Set result.runtimeMessageAnalysisEnabled = settings.runtimeMessageAnalysisEnabled
     Set result.warnings = []
+
+    If 'settings.runtimeMessageAnalysisEnabled {
+        Do result.%Set("errorCode", "RUNTIME_MESSAGE_ANALYSIS_DISABLED")
+        return result
+    }
 
     If '..ClassExists("Ens.MessageHeader") {
         Do result.%Set("errorCode", "MESSAGE_HEADER_NOT_AVAILABLE")
@@ -416,14 +448,22 @@ ClassMethod GetMessage(messageId As %Integer) As %DynamicObject
 
 ClassMethod GetMessageTrace(messageId As %Integer) As %DynamicObject
 {
+    Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
     Set result = {}
     Set result.namespace = $Namespace
     Set result.messageId = messageId
     Set result.payloadReturned = 0
+    Set result.runtimeMessageAnalysisEnabled = settings.runtimeMessageAnalysisEnabled
+    Set result.maxTraceDepth = settings.maxTraceDepth
     Set result.steps = []
     Set result.warnings = []
     Set result.evidence = []
     Set result.confidence = "observed"
+
+    If 'settings.runtimeMessageAnalysisEnabled {
+        Do result.%Set("errorCode", "RUNTIME_MESSAGE_ANALYSIS_DISABLED")
+        return result
+    }
 
     If '..ClassExists("Ens.MessageHeader") {
         Do result.%Set("errorCode", "MESSAGE_HEADER_NOT_AVAILABLE")
@@ -444,7 +484,7 @@ ClassMethod GetMessageTrace(messageId As %Integer) As %DynamicObject
     Set result.sessionId = selected.sessionId
     Set result.summary = ..BuildTraceSummary(selected)
     If selected.sessionId '= "" {
-        Do ..AddTraceStepsBySession(selected.sessionId, result.steps, result.evidence)
+        Do ..AddTraceStepsBySession(selected.sessionId, result.steps, result.evidence, settings.maxTraceDepth, result.warnings)
     } Else {
         Do result.steps.%Push(..NewTraceStep(selected, 1))
         Do result.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", selected.messageId, "SessionId", selected.sessionId, "observed"))
@@ -1421,7 +1461,7 @@ ClassMethod GetMessageHeaderById(messageId As %Integer) As %DynamicObject [ Priv
     return header
 }
 
-ClassMethod AddTraceStepsBySession(sessionId As %Integer, steps As %DynamicArray, evidence As %DynamicArray) [ Private ]
+ClassMethod AddTraceStepsBySession(sessionId As %Integer, steps As %DynamicArray, evidence As %DynamicArray, maxTraceDepth As %Integer = 50, warnings As %DynamicArray = "") [ Private ]
 {
     Set stmt = ##class(%SQL.Statement).%New()
     Set sql = "SELECT %ID AS MessageId, SessionId, TimeCreated, TimeProcessed, SourceConfigName, TargetConfigName, MessageBodyClassName, MessageBodyId, Status, IsError, ErrorStatus, Type, Invocation, CorrespondingMessageId FROM Ens.MessageHeader WHERE SessionId = ? ORDER BY TimeCreated, %ID"
@@ -1436,6 +1476,12 @@ ClassMethod AddTraceStepsBySession(sessionId As %Integer, steps As %DynamicArray
     Set sequence = 1
     For {
         Quit:'rset.%Next()
+        If sequence > maxTraceDepth {
+            If $IsObject(warnings) {
+                Do warnings.%Push(..NewWarning("TRACE_DEPTH_LIMIT_REACHED", "Trace reconstruction stopped at the configured maxTraceDepth of "_maxTraceDepth_"."))
+            }
+            Quit
+        }
         Set header = ..NewMessageHeaderFromRow(rset)
         Do steps.%Push(..NewTraceStep(header, sequence))
         Do evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", header.messageId, "SessionId", sessionId, "observed"))
@@ -1902,6 +1948,22 @@ ClassMethod NormalizeLimit(value As %VarString, defaultValue As %Integer = 50) A
     }
     If limit > 100 {
         return 100
+    }
+    return limit
+}
+
+ClassMethod NormalizeLimitWithMaximum(value As %VarString, defaultValue As %Integer, maximum As %Integer) As %Integer [ Private ]
+{
+    Set limit = ..NormalizeInteger(value, defaultValue)
+    Set maximum = ..NormalizeInteger(maximum, defaultValue)
+    If maximum < 1 {
+        Set maximum = defaultValue
+    }
+    If limit < 1 {
+        Set limit = defaultValue
+    }
+    If limit > maximum {
+        return maximum
     }
     return limit
 }
