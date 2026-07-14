@@ -1739,6 +1739,13 @@
           "type": "integer",
           "format": "int32"
         },
+        "productionScoped": {
+          "type": "boolean"
+        },
+        "productionStepCount": {
+          "type": "integer",
+          "format": "int32"
+        },
         "payloadReturned": {
           "type": "boolean"
         },
@@ -1884,6 +1891,18 @@
         },
         "target": {
           "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "sourceInProduction": {
+          "type": "boolean"
+        },
+        "targetInProduction": {
+          "type": "boolean"
+        },
+        "inProduction": {
+          "type": "boolean"
         },
         "messageBodyClassName": {
           "type": "string"

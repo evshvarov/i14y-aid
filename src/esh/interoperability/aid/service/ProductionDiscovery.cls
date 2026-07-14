@@ -671,6 +671,8 @@ ClassMethod GetProductionMessageTrace(productionName As %VarString, messageId As
 
     Set result = ..GetMessageTrace(messageId)
     Do result.%Set("productionName", productionName)
+    Do result.%Set("productionScoped", 1)
+    Do ..AnnotateTraceStepsForProduction(result, productionName)
     return result
 }
 
@@ -1709,6 +1711,69 @@ ClassMethod MessageBelongsToProduction(message As %DynamicObject, productionName
             If (message.sourceConfigName = component.name) || (message.targetConfigName = component.name) {
                 return 1
             }
+        }
+    }
+    return 0
+}
+
+ClassMethod AnnotateTraceStepsForProduction(trace As %DynamicObject, productionName As %VarString) [ Private ]
+{
+    If '$IsObject(trace) {
+        return
+    }
+    If '$IsObject(trace.steps) {
+        return
+    }
+
+    Set componentNames = ..ProductionComponentNames(productionName)
+    Set productionStepCount = 0
+    For index = 0:1:trace.steps.%Size()-1 {
+        Set step = trace.steps.%Get(index)
+        If $IsObject(step) {
+            Set sourceInProduction = ..NameInArray(componentNames, step.source)
+            Set targetInProduction = ..NameInArray(componentNames, step.target)
+            Set inProduction = sourceInProduction || targetInProduction
+            Set step.productionName = productionName
+            Set step.sourceInProduction = sourceInProduction
+            Set step.targetInProduction = targetInProduction
+            Set step.inProduction = inProduction
+            If inProduction {
+                Set productionStepCount = productionStepCount + 1
+            }
+        }
+    }
+    Do trace.%Set("productionStepCount", productionStepCount)
+    If productionStepCount < trace.steps.%Size() {
+        Do trace.warnings.%Push(..NewWarning("TRACE_HAS_EXTERNAL_STEPS", "The selected message belongs to the requested production, but the reconstructed session trace includes steps outside that production."))
+    }
+    return
+}
+
+ClassMethod ProductionComponentNames(productionName As %VarString) As %DynamicArray [ Private ]
+{
+    Set names = []
+    Set componentList = ..ListComponents(productionName)
+    If '$IsObject(componentList.items) {
+        return names
+    }
+
+    For index = 0:1:componentList.items.%Size()-1 {
+        Set component = componentList.items.%Get(index)
+        If $IsObject(component) {
+            Do ..PushUnique(names, component.name)
+        }
+    }
+    return names
+}
+
+ClassMethod NameInArray(names As %DynamicArray, value As %VarString) As %Boolean [ Private ]
+{
+    If value = "" {
+        return 0
+    }
+    For index = 0:1:names.%Size()-1 {
+        If names.%Get(index) = value {
+            return 1
         }
     }
     return 0

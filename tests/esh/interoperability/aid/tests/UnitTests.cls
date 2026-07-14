@@ -250,6 +250,10 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.definitions.%IsDefined("SettingsUpdateResponse"), "Spec must define SettingsUpdateResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("TraceOverview"), "Spec must define TraceOverview")
     Do $$$AssertTrue(spec.definitions.MessageTraceResponse.properties.%IsDefined("traceOverview"), "Trace response must expose traceOverview")
+    Do $$$AssertTrue(spec.definitions.MessageTraceResponse.properties.%IsDefined("productionStepCount"), "Trace response must expose productionStepCount")
+    Do $$$AssertTrue(spec.definitions.TraceStep.properties.%IsDefined("inProduction"), "Trace steps must expose production membership")
+    Do $$$AssertTrue(spec.definitions.TraceStep.properties.%IsDefined("sourceInProduction"), "Trace steps must expose source production membership")
+    Do $$$AssertTrue(spec.definitions.TraceStep.properties.%IsDefined("targetInProduction"), "Trace steps must expose target production membership")
 }
 
 Method TestHealth()

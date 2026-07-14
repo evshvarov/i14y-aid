@@ -1748,6 +1748,13 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "integer",
           "format": "int32"
         },
+        "productionScoped": {
+          "type": "boolean"
+        },
+        "productionStepCount": {
+          "type": "integer",
+          "format": "int32"
+        },
         "payloadReturned": {
           "type": "boolean"
         },
@@ -1893,6 +1900,18 @@ XData OpenAPI [ MimeType = application/json ]
         },
         "target": {
           "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "sourceInProduction": {
+          "type": "boolean"
+        },
+        "targetInProduction": {
+          "type": "boolean"
+        },
+        "inProduction": {
+          "type": "boolean"
         },
         "messageBodyClassName": {
           "type": "string"
