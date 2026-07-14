@@ -801,3 +801,59 @@ Starting IRIS
 08:05:58 2026-07-14 [INFO] ...merged /home/irisowner/dev/merge.cpf
 08:05:58 2026-07-14 [INFO] Copying /home/irisowner/dev/merge.cpf to /usr/irissys/iris.cpf.last_merge...
 08:05:58 2026-07-14 [INFO] ...copied /home/irisowner/dev/merge.cpf to /usr/irissys/iris.cpf.last_merge
+08:24:44 2026-07-14 [INFO] Shutting down InterSystems IRIS instance IRIS...
+08:24:45 2026-07-14 [INFO] Executing command /home/irisowner/irissys/startISCAgent.sh 2188...
+08:24:46 2026-07-14 [INFO] Writing status to file: /home/irisowner/irissys/iscagent.status
+Reading configuration from file: /home/irisowner/irissys/iscagent.conf
+ISCAgent[18]: Starting
+ISCAgent[19]: Starting ApplicationServer on *:2188
+
+08:24:46 2026-07-14 [INFO] ...executed command /home/irisowner/irissys/startISCAgent.sh 2188
+08:24:46 2026-07-14 [INFO] Starting InterSystems IRIS instance IRIS...
+08:24:49 2026-07-14 [INFO] 
+Now attempting WIJ compare, /usr/irissys/mgr/IRIS.WIJ
+log: 07/14/26-08:24:46:184 (430) 0 [Generic.Event] Allocated 102MB shared memory
+
+Allocated 102MB shared memory
+16MB global buffers, 35MB routine buffers
+log: 07/14/26-08:24:46:184 (430) 0 [Generic.Event] 16MB global buffers, 35MB routine buffers, 16MB journal buffers, 2MB buffer descriptors, 16MB heap, 1MB ECP, 14MB miscellaneous
+
+log: 07/14/26-08:24:46:184 (430) 0 [SIMD] SIMD optimization level: DEFAULT
+
+log: 07/14/26-08:24:46:185 (430) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/ (SFN 0) read-write.
+
+log: 07/14/26-08:24:46:187 (430) 1 [Utility.Event] Error opening CPF file to get IRISTEMP and IRISLOCALDATA directories, using defaults
+
+log: 07/14/26-08:24:46:188 (430) 1 [Database.MountedRO] dRO]  opening CPF file to get IRISTEMP and IRISLOCALDATA directories, using defaults...(repeated 1 times)
+
+log: 07/14/26-08:24:46:188 (430) 0 [Database.MountedRO] Mounted database /usr/irissys/mgr/irislib/ (SFN 1) read-only. Database label is marked read-only. 
+
+log: 07/14/26-08:24:46:189 (430) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/irissecurity/ (SFN 2) read-write.
+
+log: 07/14/26-08:24:46:193 (430) 0 [Utility.Event] Merging /home/irisowner/dev/merge.cpf into /usr/irissys/iris.cpf
+
+log: 07/14/26-08:24:46:194 (430) 0 [Utility.Event] Validating CPF file /usr/irissys/iris.cpf_Merge
+
+log: 07/14/26-08:24:46:237 (430) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/irislocaldata/ (SFN 3) read-write.
+
+log: 07/14/26-08:24:46:270 (430) 0 [Utility.Event] No errors found in CPF file /usr/irissys/iris.cpf_Merge
+
+log: 07/14/26-08:24:46:270 (430) 0 [Utility.Event] Reading [Actions] section
+
+
+Now attempting WIJ compare, /usr/irissys/mgr/IRIS.WIJ
+Starting Control Process
+Global buffer setting requires attention.  Auto-selected 25% of total memory.
+Allocated 2677MB shared memory
+1959MB global buffers, 195MB routine buffers
+This copy of InterSystems IRIS has been licensed for use exclusively by:
+InterSystems IRIS Community
+Copyright (c) 1986-2025 by InterSystems Corporation
+Any other use is a violation of your license agreement
+
+1 alert(s) during startup. See messages.log for details.
+Merging IRIS, please wait...
+Starting IRIS
+
+
+08:24:49 2026-07-14 [INFO] ...started InterSystems IRIS instance IRIS

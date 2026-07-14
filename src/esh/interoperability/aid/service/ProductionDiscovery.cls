@@ -128,6 +128,8 @@ ClassMethod StartProduction(productionName As %VarString) As %DynamicObject
         return result
     }
 
+    New $ROLES
+    Do ..EnableRuntimeControlRole()
     Set sc = ##class(Ens.Director).StartProduction(productionName)
     If $$$ISERR(sc) {
         Do result.%Set("errorCode", "START_FAILED")
@@ -165,6 +167,8 @@ ClassMethod StopProduction(productionName As %VarString, timeout As %Integer = 1
         return result
     }
 
+    New $ROLES
+    Do ..EnableRuntimeControlRole()
     Set sc = ##class(Ens.Director).StopProduction(..NormalizeInteger(timeout, 10), +force)
     If $$$ISERR(sc) {
         Do result.%Set("errorCode", "STOP_FAILED")
@@ -489,6 +493,19 @@ ClassMethod NewActionResult(productionName As %VarString, action As %VarString) 
     Set result.action = action
     Set result.changed = 0
     return result
+}
+
+ClassMethod EnableRuntimeControlRole() [ Private ]
+{
+    If ("," _ $ROLES _ ",") [ ",i14yaid," {
+        return
+    }
+    If $ROLES = "" {
+        Set $ROLES = "i14yaid"
+    } Else {
+        Set $ROLES = $ROLES _ ",i14yaid"
+    }
+    return
 }
 
 ClassMethod ClassExists(className As %VarString) As %Boolean [ Private ]
