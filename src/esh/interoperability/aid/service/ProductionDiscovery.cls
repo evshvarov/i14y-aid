@@ -27,6 +27,11 @@ ClassMethod GetSettings() As %DynamicObject
     return result
 }
 
+ClassMethod UpdateSettings(payload As %DynamicObject) As %DynamicObject
+{
+    return ##class(esh.interoperability.aid.config.Settings).UpdateFromPayload(payload)
+}
+
 ClassMethod ListProductions() As %DynamicObject
 {
     Set result = ..NewListResult()
@@ -512,6 +517,96 @@ ClassMethod GetMessage(messageId As %Integer) As %DynamicObject
     }
 
     Set result.message = message
+    Set result.payloadMetadata = ..NewPayloadMetadata(message, settings)
+    return result
+}
+
+ClassMethod GetProductionMessage(productionName As %VarString, messageId As %Integer) As %DynamicObject
+{
+    Set result = {}
+    Do result.%Set("productionName", productionName)
+    Do result.%Set("messageId", messageId)
+
+    If '..IsValidClassName(productionName) {
+        Do result.%Set("errorCode", "INVALID_PRODUCTION_NAME")
+        return result
+    }
+    If '..ClassExtends(productionName, "Ens.Production") {
+        Do result.%Set("errorCode", "PRODUCTION_NOT_FOUND")
+        return result
+    }
+
+    Set result = ..GetMessage(messageId)
+    If result.%IsDefined("errorCode") {
+        Do result.%Set("productionName", productionName)
+        return result
+    }
+
+    If '..MessageBelongsToProduction(result.message, productionName) {
+        Do result.%Set("errorCode", "MESSAGE_NOT_IN_PRODUCTION")
+        Do result.%Set("productionName", productionName)
+        return result
+    }
+
+    Do result.%Set("productionName", productionName)
+    return result
+}
+
+ClassMethod GetMessagePayloadMetadata(messageId As %Integer) As %DynamicObject
+{
+    Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.messageId = messageId
+    Set result.payloadReturned = 0
+    Set result.runtimeMessageAnalysisEnabled = settings.runtimeMessageAnalysisEnabled
+    Set result.payloadInspectionEnabled = settings.payloadInspectionEnabled
+    Set result.payloadInspectionSupported = 0
+    Set result.warnings = []
+    Set result.evidence = []
+
+    If 'settings.runtimeMessageAnalysisEnabled {
+        Do result.%Set("errorCode", "RUNTIME_MESSAGE_ANALYSIS_DISABLED")
+        return result
+    }
+
+    If '..ClassExists("Ens.MessageHeader") {
+        Do result.%Set("errorCode", "MESSAGE_HEADER_NOT_AVAILABLE")
+        return result
+    }
+    If '..IsPositiveInteger(messageId) {
+        Do result.%Set("errorCode", "INVALID_MESSAGE_ID")
+        return result
+    }
+
+    Set message = ..GetMessageHeaderById(messageId)
+    If '$IsObject(message) {
+        Do result.%Set("errorCode", "MESSAGE_NOT_FOUND")
+        return result
+    }
+
+    Set metadata = ..NewPayloadMetadata(message, settings)
+    Set result.metadata = metadata
+    Set result.message = message
+    Set result.messageBodyClassName = metadata.messageBodyClassName
+    Set result.messageBodyId = metadata.messageBodyId
+    Set result.bodyReferenceAvailable = metadata.bodyReferenceAvailable
+    Set result.restricted = metadata.restricted
+    Set result.restrictionReason = metadata.restrictionReason
+    Set result.warnings = metadata.warnings
+    Set result.evidence = metadata.evidence
+    return result
+}
+
+ClassMethod GetProductionMessagePayloadMetadata(productionName As %VarString, messageId As %Integer) As %DynamicObject
+{
+    Set scoped = ..GetProductionMessage(productionName, messageId)
+    If scoped.%IsDefined("errorCode") {
+        return scoped
+    }
+
+    Set result = ..GetMessagePayloadMetadata(messageId)
+    Do result.%Set("productionName", productionName)
     return result
 }
 
@@ -567,6 +662,18 @@ ClassMethod GetMessageTrace(messageId As %Integer) As %DynamicObject
     return result
 }
 
+ClassMethod GetProductionMessageTrace(productionName As %VarString, messageId As %Integer) As %DynamicObject
+{
+    Set scoped = ..GetProductionMessage(productionName, messageId)
+    If scoped.%IsDefined("errorCode") {
+        return scoped
+    }
+
+    Set result = ..GetMessageTrace(messageId)
+    Do result.%Set("productionName", productionName)
+    return result
+}
+
 ClassMethod GetMessageExplanation(messageId As %Integer) As %DynamicObject
 {
     Set trace = ..GetMessageTrace(messageId)
@@ -586,6 +693,18 @@ ClassMethod GetMessageExplanation(messageId As %Integer) As %DynamicObject
     Set result.warnings = trace.warnings
     Set result.evidence = trace.evidence
     Set result.confidence = trace.confidence
+    return result
+}
+
+ClassMethod GetProductionMessageExplanation(productionName As %VarString, messageId As %Integer) As %DynamicObject
+{
+    Set scoped = ..GetProductionMessage(productionName, messageId)
+    If scoped.%IsDefined("errorCode") {
+        return scoped
+    }
+
+    Set result = ..GetMessageExplanation(messageId)
+    Do result.%Set("productionName", productionName)
     return result
 }
 
@@ -1573,6 +1692,28 @@ ClassMethod ShouldIncludeMessageHeader(rset As %SQL.IResultSet, componentNames A
     return 1
 }
 
+ClassMethod MessageBelongsToProduction(message As %DynamicObject, productionName As %VarString) As %Boolean [ Private ]
+{
+    If '$IsObject(message) {
+        return 0
+    }
+
+    Set componentList = ..ListComponents(productionName)
+    If '$IsObject(componentList.items) {
+        return 0
+    }
+
+    For index = 0:1:componentList.items.%Size()-1 {
+        Set component = componentList.items.%Get(index)
+        If $IsObject(component) {
+            If (message.sourceConfigName = component.name) || (message.targetConfigName = component.name) {
+                return 1
+            }
+        }
+    }
+    return 0
+}
+
 ClassMethod NewMessageHeaderFromRow(rset As %SQL.IResultSet) As %DynamicObject [ Private ]
 {
     Set header = {}
@@ -1595,6 +1736,36 @@ ClassMethod NewMessageHeaderFromRow(rset As %SQL.IResultSet) As %DynamicObject [
     Set header.evidence = []
     Do header.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", header.messageId, "MessageBodyClassName", header.messageBodyClassName, "observed"))
     return header
+}
+
+ClassMethod NewPayloadMetadata(message As %DynamicObject, settings As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set metadata = {}
+    Set metadata.messageId = message.messageId
+    Set metadata.messageBodyClassName = message.messageBodyClassName
+    Set metadata.messageBodyId = message.messageBodyId
+    Set metadata.payloadReturned = 0
+    Set metadata.payloadInspectionEnabled = settings.payloadInspectionEnabled
+    Set metadata.payloadInspectionSupported = 0
+    Set metadata.bodyReferenceAvailable = (message.messageBodyClassName '= "") && (message.messageBodyId '= "")
+    Set metadata.bodyClassExists = 0
+    If message.messageBodyClassName '= "" {
+        Set metadata.bodyClassExists = ..ClassExists(message.messageBodyClassName)
+    }
+    Set metadata.restricted = 1
+    Set metadata.restrictionReason = "PAYLOAD_INSPECTION_UNSUPPORTED"
+    Set metadata.fields = []
+    Set metadata.warnings = []
+    Set metadata.evidence = []
+    Do metadata.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", message.messageId, "MessageBodyClassName", message.messageBodyClassName, "observed"))
+    Do metadata.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", message.messageId, "MessageBodyId", message.messageBodyId, "observed"))
+    If 'settings.payloadInspectionEnabled {
+        Set metadata.restrictionReason = "PAYLOAD_INSPECTION_DISABLED"
+        Do metadata.warnings.%Push(..NewWarning("PAYLOAD_INSPECTION_DISABLED", "Payload inspection is disabled by module settings. Message body content was not read or returned."))
+        return metadata
+    }
+    Do metadata.warnings.%Push(..NewWarning("PAYLOAD_INSPECTION_UNSUPPORTED", "Payload metadata inspection is not implemented in this version. Message body content was not read or returned."))
+    return metadata
 }
 
 ClassMethod GetMessageHeaderById(messageId As %Integer) As %DynamicObject [ Private ]

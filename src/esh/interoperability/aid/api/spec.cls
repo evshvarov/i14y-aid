@@ -50,6 +50,20 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "/capabilities": {
+      "get": {
+        "summary": "Get supported analysis capabilities",
+        "operationId": "Capabilities",
+        "responses": {
+          "200": {
+            "description": "Supported analysis capabilities",
+            "schema": {
+              "$ref": "#/definitions/CapabilitiesResponse"
+            }
+          }
+        }
+      }
+    },
     "/settings": {
       "get": {
         "summary": "Get module analysis settings",
@@ -59,6 +73,40 @@ XData OpenAPI [ MimeType = application/json ]
             "description": "Module analysis settings",
             "schema": {
               "$ref": "#/definitions/SettingsResponse"
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update module analysis settings",
+        "operationId": "UpdateSettings",
+        "parameters": [
+          {
+            "name": "settings",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AnalysisSettings"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated module analysis settings",
+            "schema": {
+              "$ref": "#/definitions/SettingsUpdateResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid settings payload",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Settings update failed",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
             }
           }
         }
@@ -201,6 +249,293 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "/productions/{productionName}/messages": {
+      "get": {
+        "summary": "List recent interoperability message headers for a production",
+        "operationId": "ListProductionMessages",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 50
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          {
+            "name": "sourceConfigName",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "targetConfigName",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "messageBodyClassName",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "sessionId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "errorsOnly",
+            "in": "query",
+            "required": false,
+            "type": "boolean",
+            "default": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent production message headers",
+            "schema": {
+              "$ref": "#/definitions/MessageHeaderListResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message headers or production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/productions/{productionName}/messages/facets": {
+      "get": {
+        "summary": "List recent message filter facets for a production",
+        "operationId": "ListProductionMessageFacets",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 500
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent production message filter facets",
+            "schema": {
+              "$ref": "#/definitions/MessageFacetResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message headers or production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/productions/{productionName}/messages/{messageId}": {
+      "get": {
+        "summary": "Get production-scoped message header metadata",
+        "operationId": "GetProductionMessage",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Production-scoped message header metadata",
+            "schema": {
+              "$ref": "#/definitions/MessageDetailResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message or production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/productions/{productionName}/messages/{messageId}/payload": {
+      "get": {
+        "summary": "Get production-scoped safe payload metadata for a message",
+        "operationId": "GetProductionMessagePayloadMetadata",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Production-scoped safe payload metadata without body content",
+            "schema": {
+              "$ref": "#/definitions/MessagePayloadMetadataResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message or production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/productions/{productionName}/messages/{messageId}/trace": {
+      "get": {
+        "summary": "Get production-scoped runtime trace for a message header",
+        "operationId": "GetProductionMessageTrace",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Production-scoped message trace",
+            "schema": {
+              "$ref": "#/definitions/MessageTraceResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message or production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/productions/{productionName}/messages/{messageId}/explanation": {
+      "get": {
+        "summary": "Get production-scoped deterministic explanation for a message trace",
+        "operationId": "GetProductionMessageExplanation",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Production-scoped message trace explanation",
+            "schema": {
+              "$ref": "#/definitions/MessageExplanationResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message or production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/messages/{messageId}": {
       "get": {
         "summary": "Get message header metadata",
@@ -236,6 +571,41 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "/messages/{messageId}/payload": {
+      "get": {
+        "summary": "Get safe payload metadata for a message",
+        "operationId": "GetMessagePayloadMetadata",
+        "parameters": [
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Safe payload metadata without body content",
+            "schema": {
+              "$ref": "#/definitions/MessagePayloadMetadataResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/messages/{messageId}/trace": {
       "get": {
         "summary": "Get runtime trace for a message header",
@@ -254,6 +624,41 @@ XData OpenAPI [ MimeType = application/json ]
             "description": "Message trace",
             "schema": {
               "$ref": "#/definitions/MessageTraceResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/messages/{messageId}/explanation": {
+      "get": {
+        "summary": "Get deterministic explanation for a message trace",
+        "operationId": "GetMessageExplanation",
+        "parameters": [
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message trace explanation",
+            "schema": {
+              "$ref": "#/definitions/MessageExplanationResponse"
             }
           },
           "400": {
@@ -644,6 +1049,38 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "CapabilitiesResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "interoperabilityAvailable": {
+          "type": "boolean"
+        },
+        "currentNamespaceOnly": {
+          "type": "boolean"
+        },
+        "productionDiscovery": {
+          "type": "boolean"
+        },
+        "productionXDataAnalysis": {
+          "type": "boolean"
+        },
+        "productionControl": {
+          "type": "boolean"
+        },
+        "runtimeTraceAnalysis": {
+          "type": "boolean"
+        },
+        "payloadInspection": {
+          "type": "boolean"
+        },
+        "openapiVersion": {
+          "type": "string"
+        }
+      }
+    },
     "SettingsResponse": {
       "type": "object",
       "properties": {
@@ -652,6 +1089,32 @@ XData OpenAPI [ MimeType = application/json ]
         },
         "settings": {
           "$ref": "#/definitions/AnalysisSettings"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "SettingsUpdateResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "changed": {
+          "type": "boolean"
+        },
+        "settings": {
+          "$ref": "#/definitions/AnalysisSettings"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
         },
         "evidence": {
           "type": "array",
@@ -1109,8 +1572,14 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "integer",
           "format": "int64"
         },
+        "productionName": {
+          "type": "string"
+        },
         "message": {
           "$ref": "#/definitions/MessageHeader"
+        },
+        "payloadMetadata": {
+          "$ref": "#/definitions/PayloadMetadata"
         },
         "payloadReturned": {
           "type": "boolean"
@@ -1126,6 +1595,120 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "MessagePayloadMetadataResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "messageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "message": {
+          "$ref": "#/definitions/MessageHeader"
+        },
+        "metadata": {
+          "$ref": "#/definitions/PayloadMetadata"
+        },
+        "messageBodyClassName": {
+          "type": "string"
+        },
+        "messageBodyId": {
+          "type": "string"
+        },
+        "bodyReferenceAvailable": {
+          "type": "boolean"
+        },
+        "restricted": {
+          "type": "boolean"
+        },
+        "restrictionReason": {
+          "type": "string"
+        },
+        "payloadReturned": {
+          "type": "boolean"
+        },
+        "runtimeMessageAnalysisEnabled": {
+          "type": "boolean"
+        },
+        "payloadInspectionEnabled": {
+          "type": "boolean"
+        },
+        "payloadInspectionSupported": {
+          "type": "boolean"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "PayloadMetadata": {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "messageBodyClassName": {
+          "type": "string"
+        },
+        "messageBodyId": {
+          "type": "string"
+        },
+        "payloadReturned": {
+          "type": "boolean"
+        },
+        "payloadInspectionEnabled": {
+          "type": "boolean"
+        },
+        "payloadInspectionSupported": {
+          "type": "boolean"
+        },
+        "bodyReferenceAvailable": {
+          "type": "boolean"
+        },
+        "bodyClassExists": {
+          "type": "boolean"
+        },
+        "restricted": {
+          "type": "boolean"
+        },
+        "restrictionReason": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
     "MessageTraceResponse": {
       "type": "object",
       "properties": {
@@ -1135,6 +1718,9 @@ XData OpenAPI [ MimeType = application/json ]
         "messageId": {
           "type": "integer",
           "format": "int64"
+        },
+        "productionName": {
+          "type": "string"
         },
         "sessionId": {
           "type": "integer",
@@ -1171,6 +1757,56 @@ XData OpenAPI [ MimeType = application/json ]
         "maxTraceDepth": {
           "type": "integer",
           "format": "int32"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        },
+        "confidence": {
+          "type": "string"
+        }
+      }
+    },
+    "MessageExplanationResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "messageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "explanation": {
+          "$ref": "#/definitions/TraceExplanation"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "stepCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "payloadReturned": {
+          "type": "boolean"
+        },
+        "runtimeMessageAnalysisEnabled": {
+          "type": "boolean"
         },
         "warnings": {
           "type": "array",

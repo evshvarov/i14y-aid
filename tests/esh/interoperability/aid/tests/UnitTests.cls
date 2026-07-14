@@ -202,7 +202,10 @@ Method TestGetSpec()
     Do $$$AssertEquals(spec.basePath, "/i14y-aid/api", "Unexpected base path")
     Do $$$AssertTrue(spec.paths.%IsDefined("/_spec"), "Spec must expose /_spec")
     Do $$$AssertTrue(spec.paths.%IsDefined("/health"), "Spec must expose /health")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/capabilities"), "Spec must expose capabilities endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/settings"), "Spec must expose settings endpoint")
+    Do $$$AssertTrue(spec.paths.%Get("/settings").%IsDefined("put"), "Spec must expose settings update endpoint")
+    Do $$$AssertEquals(spec.paths.%Get("/settings").put.operationId, "UpdateSettings", "Settings update operationId mismatch")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions"), "Spec must expose /productions")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}"), "Spec must expose production detail endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/components"), "Spec must expose component endpoint")
@@ -213,10 +216,18 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/status"), "Spec must expose production status endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/start"), "Spec must expose production start endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/stop"), "Spec must expose production stop endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages"), "Spec must expose production messages endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/facets"), "Spec must expose production message facets endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/{messageId}"), "Spec must expose production-scoped message detail endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/{messageId}/payload"), "Spec must expose production-scoped message payload endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/{messageId}/trace"), "Spec must expose production-scoped message trace endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/{messageId}/explanation"), "Spec must expose production-scoped message explanation endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/messages"), "Spec must expose message header endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/messages/facets"), "Spec must expose message facets endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/messages/{messageId}"), "Spec must expose message detail endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/messages/{messageId}/payload"), "Spec must expose message payload metadata endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/messages/{messageId}/trace"), "Spec must expose message trace endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/messages/{messageId}/explanation"), "Spec must expose message explanation endpoint")
     Set messageParameters = spec.paths.%Get("/messages").get.parameters
     Do $$$AssertTrue($IsObject(..FindParameter(messageParameters, "sourceConfigName")), "Spec must expose sourceConfigName filter")
     Do $$$AssertTrue($IsObject(..FindParameter(messageParameters, "targetConfigName")), "Spec must expose targetConfigName filter")
@@ -224,13 +235,19 @@ Method TestGetSpec()
     Do $$$AssertTrue($IsObject(..FindParameter(messageParameters, "sessionId")), "Spec must expose sessionId filter")
     Do $$$AssertTrue($IsObject(..FindParameter(messageParameters, "errorsOnly")), "Spec must expose errorsOnly filter")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageDetailResponse"), "Spec must define MessageDetailResponse")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("MessagePayloadMetadataResponse"), "Spec must define MessagePayloadMetadataResponse")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("PayloadMetadata"), "Spec must define PayloadMetadata")
+    Do $$$AssertTrue(spec.definitions.MessageDetailResponse.properties.%IsDefined("payloadMetadata"), "Message detail response must expose payloadMetadata")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageFacetResponse"), "Spec must define MessageFacetResponse")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("MessageExplanationResponse"), "Spec must define MessageExplanationResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("ComponentDetailResponse"), "Spec must define ComponentDetailResponse")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("CapabilitiesResponse"), "Spec must define CapabilitiesResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("ProductionGraphResponse"), "Spec must define ProductionGraphResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("GraphNode"), "Spec must define GraphNode")
     Do $$$AssertTrue(spec.definitions.%IsDefined("GraphEdge"), "Spec must define GraphEdge")
     Do $$$AssertTrue(spec.definitions.%IsDefined("AnalysisSettings"), "Spec must define AnalysisSettings")
     Do $$$AssertTrue(spec.definitions.%IsDefined("SettingsResponse"), "Spec must define SettingsResponse")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("SettingsUpdateResponse"), "Spec must define SettingsUpdateResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("TraceOverview"), "Spec must define TraceOverview")
     Do $$$AssertTrue(spec.definitions.MessageTraceResponse.properties.%IsDefined("traceOverview"), "Trace response must expose traceOverview")
 }
@@ -249,6 +266,19 @@ Method TestHealth()
     Do $$$AssertTrue(result.capabilities.%IsDefined("runtimeTraceAnalysis"), "Capabilities must include runtime trace flag")
 }
 
+Method TestCapabilities()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).Capabilities()
+    Do $$$AssertTrue($IsObject(result), "Capabilities response must be an object")
+    Do $$$AssertEquals(result.namespace, $Namespace, "Capabilities namespace mismatch")
+    Do $$$AssertEquals(result.openapiVersion, "2.0", "Capabilities OpenAPI version mismatch")
+    Do $$$AssertTrue(result.%IsDefined("interoperabilityAvailable"), "Capabilities must include interoperabilityAvailable")
+    Do $$$AssertTrue(result.%IsDefined("productionDiscovery"), "Capabilities must include productionDiscovery")
+    Do $$$AssertTrue(result.%IsDefined("runtimeTraceAnalysis"), "Capabilities must include runtimeTraceAnalysis")
+    Do $$$AssertEquals(result.payloadInspection, 0, "Payload inspection capability mismatch")
+}
+
 Method TestGetSettings()
 {
     Do ..InitRequestResponse()
@@ -261,6 +291,24 @@ Method TestGetSettings()
     Do $$$AssertEquals(result.settings.maxMessagesReturned, 100, "Max messages default mismatch")
     Do $$$AssertEquals(result.settings.maxTraceDepth, 50, "Max trace depth default mismatch")
     Do $$$AssertTrue($IsObject(result.evidence), "Settings response must include evidence")
+}
+
+Method TestUpdateSettings()
+{
+    Do ..InitRequestResponse()
+    Set payload = {"maxTraceDepth":25,"explanationVerbosity":"brief"}
+    Set result = ##class(esh.interoperability.aid.api.impl).UpdateSettings(payload)
+    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}
+    Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
+    Do $$$AssertTrue($IsObject(result), "Settings update response must be an object")
+    Do $$$AssertEquals(result.namespace, $Namespace, "Settings update namespace mismatch")
+    Do $$$AssertEquals(result.changed, 1, "Settings update should report changed")
+    Do $$$AssertEquals(result.settings.maxTraceDepth, 25, "Settings maxTraceDepth update mismatch")
+    Do $$$AssertEquals(result.settings.explanationVerbosity, "brief", "Settings explanation verbosity update mismatch")
+    Do $$$AssertTrue($IsObject(result.warnings), "Settings update must include warnings")
+    Do $$$AssertTrue($IsObject(result.evidence), "Settings update must include evidence")
+    Do $$$AssertEquals(restored.settings.maxTraceDepth, 50, "Settings restore maxTraceDepth mismatch")
+    Do $$$AssertEquals(restored.settings.explanationVerbosity, "normal", "Settings restore explanation verbosity mismatch")
 }
 
 Method TestListProductions()
@@ -334,6 +382,17 @@ Method TestListMessagesForProduction()
     Do $$$AssertEquals(result.payloadReturned, 0, "Production message list must not return payloads")
 }
 
+Method TestListProductionMessages()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).ListProductionMessages("esh.interoperability.aid.tests.DemoProduction", 5, 0)
+    Do $$$AssertTrue($IsObject(result), "Production-scoped message list response must be an object")
+    Do $$$AssertEquals(result.productionName, "esh.interoperability.aid.tests.DemoProduction", "Production-scoped message list name mismatch")
+    Do $$$AssertEquals(result.limit, 5, "Production-scoped message list limit mismatch")
+    Do $$$AssertEquals(result.offset, 0, "Production-scoped message list offset mismatch")
+    Do $$$AssertEquals(result.payloadReturned, 0, "Production-scoped message list must not return payloads")
+}
+
 Method TestListMessageFacets()
 {
     Do ..InitRequestResponse()
@@ -351,6 +410,21 @@ Method TestListMessageFacets()
     Do $$$AssertTrue($IsObject(result.componentNames), "Message facets must include component names")
 }
 
+Method TestListProductionMessageFacets()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).ListProductionMessageFacets("esh.interoperability.aid.tests.DemoProduction", 25)
+    Do $$$AssertTrue($IsObject(result), "Production-scoped message facets response must be an object")
+    Do $$$AssertEquals(result.productionName, "esh.interoperability.aid.tests.DemoProduction", "Production-scoped message facets production mismatch")
+    Do $$$AssertEquals(result.limit, 25, "Production-scoped message facets limit mismatch")
+    Do $$$AssertEquals(result.payloadReturned, 0, "Production-scoped message facets must not return payloads")
+    Do $$$AssertTrue($IsObject(result.sourceConfigNames), "Production-scoped message facets must include source names")
+    Do $$$AssertTrue($IsObject(result.targetConfigNames), "Production-scoped message facets must include target names")
+    Do $$$AssertTrue($IsObject(result.messageBodyClassNames), "Production-scoped message facets must include body classes")
+    Do $$$AssertTrue($IsObject(result.sessionIds), "Production-scoped message facets must include session ids")
+    Do $$$AssertTrue($IsObject(result.componentNames), "Production-scoped message facets must include component names")
+}
+
 Method TestGetMessageTraceInvalidId()
 {
     Do ..InitRequestResponse()
@@ -360,6 +434,24 @@ Method TestGetMessageTraceInvalidId()
     Do $$$AssertEquals(result.error.code, "INVALID_MESSAGE_ID", "Invalid message id error code mismatch")
 }
 
+Method TestGetMessageExplanationInvalidId()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetMessageExplanation(0)
+    Do $$$AssertTrue($IsObject(result), "Invalid message explanation response must be an object")
+    Do $$$AssertEquals(%response.Status, 400, "Invalid message explanation id should set 400")
+    Do $$$AssertEquals(result.error.code, "INVALID_MESSAGE_ID", "Invalid message explanation error code mismatch")
+}
+
+Method TestGetMessagePayloadMetadataInvalidId()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetMessagePayloadMetadata(0)
+    Do $$$AssertTrue($IsObject(result), "Invalid message payload metadata response must be an object")
+    Do $$$AssertEquals(%response.Status, 400, "Invalid message payload metadata id should set 400")
+    Do $$$AssertEquals(result.error.code, "INVALID_MESSAGE_ID", "Invalid message payload metadata error code mismatch")
+}
+
 Method TestGetMessageInvalidId()
 {
     Do ..InitRequestResponse()
@@ -367,6 +459,42 @@ Method TestGetMessageInvalidId()
     Do $$$AssertTrue($IsObject(result), "Invalid message response must be an object")
     Do $$$AssertEquals(%response.Status, 400, "Invalid message id should set 400")
     Do $$$AssertEquals(result.error.code, "INVALID_MESSAGE_ID", "Invalid message id error code mismatch")
+}
+
+Method TestGetProductionMessageInvalidId()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetProductionMessage("esh.interoperability.aid.tests.DemoProduction", 0)
+    Do $$$AssertTrue($IsObject(result), "Invalid production-scoped message response must be an object")
+    Do $$$AssertEquals(%response.Status, 400, "Invalid production-scoped message id should set 400")
+    Do $$$AssertEquals(result.error.code, "INVALID_MESSAGE_ID", "Invalid production-scoped message id error code mismatch")
+}
+
+Method TestGetProductionMessagePayloadMetadataInvalidId()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetProductionMessagePayloadMetadata("esh.interoperability.aid.tests.DemoProduction", 0)
+    Do $$$AssertTrue($IsObject(result), "Invalid production-scoped message payload response must be an object")
+    Do $$$AssertEquals(%response.Status, 400, "Invalid production-scoped message payload id should set 400")
+    Do $$$AssertEquals(result.error.code, "INVALID_MESSAGE_ID", "Invalid production-scoped message payload id error code mismatch")
+}
+
+Method TestGetProductionMessageTraceInvalidId()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetProductionMessageTrace("esh.interoperability.aid.tests.DemoProduction", 0)
+    Do $$$AssertTrue($IsObject(result), "Invalid production-scoped message trace response must be an object")
+    Do $$$AssertEquals(%response.Status, 400, "Invalid production-scoped message trace id should set 400")
+    Do $$$AssertEquals(result.error.code, "INVALID_MESSAGE_ID", "Invalid production-scoped message trace id error code mismatch")
+}
+
+Method TestGetProductionMessageExplanationInvalidId()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetProductionMessageExplanation("esh.interoperability.aid.tests.DemoProduction", 0)
+    Do $$$AssertTrue($IsObject(result), "Invalid production-scoped message explanation response must be an object")
+    Do $$$AssertEquals(%response.Status, 400, "Invalid production-scoped message explanation id should set 400")
+    Do $$$AssertEquals(result.error.code, "INVALID_MESSAGE_ID", "Invalid production-scoped message explanation id error code mismatch")
 }
 
 Method TestGetProductionAnalysis()
