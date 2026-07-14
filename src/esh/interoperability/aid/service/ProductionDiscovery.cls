@@ -169,6 +169,75 @@ ClassMethod GetProductionSummary(productionName As %VarString) As %DynamicObject
     return result
 }
 
+ClassMethod GetProductionGraph(productionName As %VarString) As %DynamicObject
+{
+    Set analysis = ..GetProductionAnalysis(productionName)
+    If analysis.%IsDefined("errorCode") {
+        return analysis
+    }
+
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.productionName = productionName
+    Set result.nodes = []
+    Set result.edges = []
+    Set result.warnings = analysis.warnings
+    Set result.evidence = analysis.evidence
+    Set result.confidence = analysis.confidence
+
+    Do ..AddGraphNodes(analysis.components, result.nodes)
+    Do ..AddGraphEdges(analysis.connections, analysis.messageTypes, result.edges)
+    return result
+}
+
+ClassMethod GetComponentDetail(productionName As %VarString, componentName As %VarString) As %DynamicObject
+{
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.productionName = productionName
+    Set result.componentName = componentName
+    Set result.connections = []
+    Set result.externalSystems = []
+    Set result.artifacts = []
+    Set result.rules = []
+    Set result.messageTypes = []
+    Set result.transformations = []
+    Set result.businessProcesses = []
+    Set result.warnings = []
+    Set result.evidence = []
+
+    If componentName = "" {
+        Do result.%Set("errorCode", "INVALID_COMPONENT_NAME")
+        return result
+    }
+
+    Set analysis = ..GetProductionAnalysis(productionName)
+    If analysis.%IsDefined("errorCode") {
+        return analysis
+    }
+
+    Set component = ..FindComponentByName(analysis.components, componentName)
+    If '$IsObject(component) {
+        Do result.%Set("errorCode", "COMPONENT_NOT_FOUND")
+        return result
+    }
+
+    Set result.component = component
+    Set result.explanation = ..FindComponentExplanationByName(analysis.componentExplanations, componentName)
+    Set result.confidence = component.confidence
+    Set result.warnings = analysis.warnings
+    Do ..AddConnectionsForComponent(analysis.connections, componentName, result.connections)
+    Do ..AddItemsForComponent(analysis.externalSystems, componentName, result.externalSystems)
+    Do ..AddItemsForComponent(analysis.artifacts, componentName, result.artifacts)
+    Do ..AddItemsForComponent(analysis.rules, componentName, result.rules)
+    Do ..AddItemsForComponent(analysis.messageTypes, componentName, result.messageTypes)
+    Do ..AddItemsForComponent(analysis.transformations, componentName, result.transformations)
+    Do ..AddItemsForComponent(analysis.businessProcesses, componentName, result.businessProcesses)
+    Do ..AddEvidenceFromObject(component, result.evidence)
+    Do ..AddEvidenceFromObject(result.explanation, result.evidence)
+    return result
+}
+
 ClassMethod StartProduction(productionName As %VarString) As %DynamicObject
 {
     Set result = ..NewActionResult(productionName, "start")
@@ -495,6 +564,28 @@ ClassMethod GetMessageTrace(messageId As %Integer) As %DynamicObject
     }
     Set result.traceOverview = ..NewTraceOverview(selected, result.steps)
     Set result.traceExplanation = ..NewTraceExplanation(selected, result.steps)
+    return result
+}
+
+ClassMethod GetMessageExplanation(messageId As %Integer) As %DynamicObject
+{
+    Set trace = ..GetMessageTrace(messageId)
+    If trace.%IsDefined("errorCode") {
+        return trace
+    }
+
+    Set result = {}
+    Set result.namespace = trace.namespace
+    Set result.messageId = trace.messageId
+    Set result.sessionId = trace.sessionId
+    Set result.explanation = trace.traceExplanation
+    Set result.summary = trace.summary
+    Set result.stepCount = trace.stepCount
+    Set result.payloadReturned = trace.payloadReturned
+    Set result.runtimeMessageAnalysisEnabled = trace.runtimeMessageAnalysisEnabled
+    Set result.warnings = trace.warnings
+    Set result.evidence = trace.evidence
+    Set result.confidence = trace.confidence
     return result
 }
 
@@ -1031,6 +1122,70 @@ ClassMethod AddComponentExplanations(components As %DynamicArray, connections As
         Do explanations.%Push(..NewComponentExplanation(component, connections, externalSystems, messageTypes, rules, transformations, businessProcesses))
     }
     return
+}
+
+ClassMethod AddGraphNodes(components As %DynamicArray, nodes As %DynamicArray) [ Private ]
+{
+    For index = 0:1:components.%Size()-1 {
+        Set component = components.%Get(index)
+        Continue:'$IsObject(component)
+        Do nodes.%Push(..NewGraphNode(component))
+    }
+    return
+}
+
+ClassMethod NewGraphNode(component As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set node = {}
+    Set node.id = component.name
+    Set node.label = component.name
+    Set node.type = component.type
+    Set node.className = component.className
+    Set node.enabled = component.enabled
+    Set node.protocol = component.protocol
+    Set node.adapterClass = component.adapterClass
+    Set node.confidence = component.confidence
+    Set node.evidence = component.evidence
+    return node
+}
+
+ClassMethod AddGraphEdges(connections As %DynamicArray, messageTypes As %DynamicArray, edges As %DynamicArray) [ Private ]
+{
+    For index = 0:1:connections.%Size()-1 {
+        Set connection = connections.%Get(index)
+        Continue:'$IsObject(connection)
+        Do edges.%Push(..NewGraphEdge(connection, messageTypes, index))
+    }
+    return
+}
+
+ClassMethod NewGraphEdge(connection As %DynamicObject, messageTypes As %DynamicArray, index As %Integer) As %DynamicObject [ Private ]
+{
+    Set edge = {}
+    Set edge.id = connection.%Get("from")_"->"_connection.%Get("to")_"#"_index
+    Set edge.source = connection.%Get("from")
+    Set edge.target = connection.%Get("to")
+    Set edge.relationship = "sends"
+    Set edge.kind = connection.kind
+    Set edge.messageTypes = ..MessageClassesForGraphEdge(messageTypes, connection.%Get("from"), connection.%Get("to"))
+    If connection.%IsDefined("ruleName") {
+        Set edge.ruleName = connection.ruleName
+    }
+    If connection.%IsDefined("processClass") {
+        Set edge.processClass = connection.processClass
+    }
+    Set edge.confidence = connection.confidence
+    Set edge.evidence = connection.evidence
+    return edge
+}
+
+ClassMethod MessageClassesForGraphEdge(messageTypes As %DynamicArray, sourceName As %VarString, targetName As %VarString) As %DynamicArray [ Private ]
+{
+    Set names = ..MessageClassesForComponent(messageTypes, sourceName, "output")
+    If names.%Size() = 0 {
+        Set names = ..MessageClassesForComponent(messageTypes, targetName, "input")
+    }
+    return names
 }
 
 ClassMethod NewComponentExplanation(component As %DynamicObject, connections As %DynamicArray, externalSystems As %DynamicArray, messageTypes As %DynamicArray, rules As %DynamicArray, transformations As %DynamicArray, businessProcesses As %DynamicArray) As %DynamicObject [ Private ]
@@ -1655,6 +1810,66 @@ ClassMethod FindComponentByName(components As %DynamicArray, componentName As %V
         }
     }
     return found
+}
+
+ClassMethod FindComponentExplanationByName(explanations As %DynamicArray, componentName As %VarString) As %DynamicObject [ Private ]
+{
+    Set found = ""
+    For index = 0:1:explanations.%Size()-1 {
+        Set explanation = explanations.%Get(index)
+        If $IsObject(explanation) {
+            If explanation.component = componentName {
+                Set found = explanation
+                Quit
+            }
+        }
+    }
+    return found
+}
+
+ClassMethod AddConnectionsForComponent(connections As %DynamicArray, componentName As %VarString, resultArray As %DynamicArray) [ Private ]
+{
+    For index = 0:1:connections.%Size()-1 {
+        Set connection = connections.%Get(index)
+        Continue:'$IsObject(connection)
+        If connection.%Get("from") = componentName {
+            Do resultArray.%Push(connection)
+            Continue
+        }
+        If connection.%Get("to") = componentName {
+            Do resultArray.%Push(connection)
+        }
+    }
+    return
+}
+
+ClassMethod AddItemsForComponent(items As %DynamicArray, componentName As %VarString, resultArray As %DynamicArray) [ Private ]
+{
+    For index = 0:1:items.%Size()-1 {
+        Set item = items.%Get(index)
+        Continue:'$IsObject(item)
+        If item.component = componentName {
+            Do resultArray.%Push(item)
+        }
+    }
+    return
+}
+
+ClassMethod AddEvidenceFromObject(item As %DynamicObject, resultArray As %DynamicArray) [ Private ]
+{
+    If '$IsObject(item) {
+        return
+    }
+    If '$IsObject(item.evidence) {
+        return
+    }
+    For index = 0:1:item.evidence.%Size()-1 {
+        Set evidence = item.evidence.%Get(index)
+        If $IsObject(evidence) {
+            Do resultArray.%Push(evidence)
+        }
+    }
+    return
 }
 
 ClassMethod BuildProductionSummary(production As %DynamicObject, connections As %DynamicArray, externalSystems As %DynamicArray, artifacts As %DynamicArray, messageTypes As %DynamicArray, transformations As %DynamicArray, businessProcesses As %DynamicArray) As %VarString [ Private ]

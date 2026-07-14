@@ -56,6 +56,38 @@ Method FindConnection(items As %DynamicArray, fromName As %VarString, toName As 
     return found
 }
 
+Method FindGraphNode(items As %DynamicArray, nodeId As %VarString) As %DynamicObject [ Private ]
+{
+    Set found = ""
+    For index = 0:1:items.%Size()-1 {
+        Set item = items.%Get(index)
+        If $IsObject(item) {
+            If item.id = nodeId {
+                Set found = item
+                Quit
+            }
+        }
+    }
+    return found
+}
+
+Method FindGraphEdge(items As %DynamicArray, sourceName As %VarString, targetName As %VarString, kind As %VarString = "") As %DynamicObject [ Private ]
+{
+    Set found = ""
+    For index = 0:1:items.%Size()-1 {
+        Set item = items.%Get(index)
+        If $IsObject(item) {
+            If (item.source = sourceName) && (item.target = targetName) {
+                If (kind = "") || (item.kind = kind) {
+                    Set found = item
+                    Quit
+                }
+            }
+        }
+    }
+    return found
+}
+
 Method FindArtifact(items As %DynamicArray, kind As %VarString, name As %VarString) As %DynamicObject [ Private ]
 {
     Set found = ""
@@ -174,8 +206,10 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions"), "Spec must expose /productions")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}"), "Spec must expose production detail endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/components"), "Spec must expose component endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/components/{componentName}"), "Spec must expose component detail endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/analysis"), "Spec must expose production analysis endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/summary"), "Spec must expose production summary endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/graph"), "Spec must expose production graph endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/status"), "Spec must expose production status endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/start"), "Spec must expose production start endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/stop"), "Spec must expose production stop endpoint")
@@ -191,6 +225,10 @@ Method TestGetSpec()
     Do $$$AssertTrue($IsObject(..FindParameter(messageParameters, "errorsOnly")), "Spec must expose errorsOnly filter")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageDetailResponse"), "Spec must define MessageDetailResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageFacetResponse"), "Spec must define MessageFacetResponse")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("ComponentDetailResponse"), "Spec must define ComponentDetailResponse")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("ProductionGraphResponse"), "Spec must define ProductionGraphResponse")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("GraphNode"), "Spec must define GraphNode")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("GraphEdge"), "Spec must define GraphEdge")
     Do $$$AssertTrue(spec.definitions.%IsDefined("AnalysisSettings"), "Spec must define AnalysisSettings")
     Do $$$AssertTrue(spec.definitions.%IsDefined("SettingsResponse"), "Spec must define SettingsResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("TraceOverview"), "Spec must define TraceOverview")
@@ -447,6 +485,30 @@ Method TestGetProductionSummary()
     Do $$$AssertEquals(result.confidence, "confirmed", "Summary confidence mismatch")
 }
 
+Method TestGetProductionGraph()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetProductionGraph("esh.interoperability.aid.tests.DemoProduction")
+    Do $$$AssertTrue($IsObject(result), "Graph response must be an object")
+    Do $$$AssertEquals(result.productionName, "esh.interoperability.aid.tests.DemoProduction", "Graph production name mismatch")
+    Do $$$AssertEquals(result.nodes.%Size(), 4, "Graph node count mismatch")
+    Do $$$AssertEquals(result.edges.%Size(), 5, "Graph edge count mismatch")
+    Set node = ..FindGraphNode(result.nodes, "Patient Router")
+    Do $$$AssertTrue($IsObject(node), "Graph should include Patient Router node")
+    If $IsObject(node) {
+        Do $$$AssertEquals(node.type, "business-process", "Graph node type mismatch")
+        Do $$$AssertEquals(node.label, "Patient Router", "Graph node label mismatch")
+    }
+    Set edge = ..FindGraphEdge(result.edges, "Patient Router", "FHIR Operation", "routing-rule")
+    Do $$$AssertTrue($IsObject(edge), "Graph should include routing-rule edge")
+    If $IsObject(edge) {
+        Do $$$AssertEquals(edge.relationship, "sends", "Graph edge relationship mismatch")
+        Do $$$AssertEquals(edge.ruleName, "esh.interoperability.aid.tests.DemoRoutingRule", "Graph edge rule mismatch")
+        Do $$$AssertTrue($IsObject(edge.messageTypes), "Graph edge should include messageTypes")
+    }
+    Do $$$AssertEquals(result.confidence, "confirmed", "Graph confidence mismatch")
+}
+
 Method TestStartProductionInvalidName()
 {
     Do ..InitRequestResponse()
@@ -488,6 +550,34 @@ Method TestListComponents()
     Do $$$AssertTrue($IsObject(disabledOperation), "Disabled operation should be present")
     Do $$$AssertEquals(disabledOperation.type, "business-operation", "Operation type mismatch")
     Do $$$AssertEquals(disabledOperation.enabled, 0, "Disabled operation enabled flag mismatch")
+}
+
+Method TestGetComponentDetail()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetComponentDetail("esh.interoperability.aid.tests.DemoProduction", "Patient Router")
+    Do $$$AssertTrue($IsObject(result), "Component detail response must be an object")
+    Do $$$AssertEquals(result.productionName, "esh.interoperability.aid.tests.DemoProduction", "Component detail production mismatch")
+    Do $$$AssertEquals(result.componentName, "Patient Router", "Component detail name mismatch")
+    Do $$$AssertTrue($IsObject(result.component), "Component detail must include component")
+    Do $$$AssertEquals(result.component.type, "business-process", "Component detail type mismatch")
+    Do $$$AssertTrue($IsObject(result.explanation), "Component detail must include explanation")
+    Do $$$AssertTrue(result.explanation.text["esh.interoperability.aid.tests.DemoRoutingRule", "Component detail explanation should mention rule")
+    Do $$$AssertTrue(result.connections.%Size() > 0, "Component detail should include related connections")
+    Do $$$AssertEquals(result.rules.%Size(), 1, "Component detail rule count mismatch")
+    Do $$$AssertEquals(result.transformations.%Size(), 1, "Component detail transformation count mismatch")
+    Do $$$AssertEquals(result.businessProcesses.%Size(), 1, "Component detail BPL count mismatch")
+    Do $$$AssertTrue(result.messageTypes.%Size() > 0, "Component detail should include message signatures")
+    Do $$$AssertTrue($IsObject(result.evidence), "Component detail must include evidence")
+}
+
+Method TestGetComponentDetailMissingComponent()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetComponentDetail("esh.interoperability.aid.tests.DemoProduction", "Missing Component")
+    Do $$$AssertTrue($IsObject(result), "Missing component response must be an object")
+    Do $$$AssertEquals(%response.Status, 404, "Missing component should set 404")
+    Do $$$AssertEquals(result.error.code, "COMPONENT_NOT_FOUND", "Missing component error code mismatch")
 }
 
 Method TestInvalidProductionName()

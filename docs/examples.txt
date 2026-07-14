@@ -1,0 +1,17 @@
+Set dir = "/home/irisowner/irisdev/in/"
+Set file = dir _ "data1.csv"
+
+Do ##class(%File).CreateDirectoryChain(dir)
+
+Set stream = ##class(%Stream.FileCharacter).%New()
+Set stream.Filename = file
+
+Do stream.WriteLine("day,fahrenheit")
+Do stream.WriteLine("1,68")
+Do stream.WriteLine("2,72")
+Do stream.WriteLine("3,75")
+Do stream.WriteLine("4,70")
+Do stream.WriteLine("5,66")
+
+Set sc = stream.%Save()
+Write $System.Status.GetErrorText(sc), !

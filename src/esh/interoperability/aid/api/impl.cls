@@ -55,6 +55,12 @@ ClassMethod ListComponents(productionName As %VarString) As %DynamicObject
     return ..HandleProductionResult(result)
 }
 
+ClassMethod GetComponentDetail(productionName As %VarString, componentName As %VarString) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetComponentDetail(productionName, componentName)
+    return ..HandleProductionResult(result)
+}
+
 ClassMethod GetProductionAnalysis(productionName As %VarString) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionAnalysis(productionName)
@@ -64,6 +70,12 @@ ClassMethod GetProductionAnalysis(productionName As %VarString) As %DynamicObjec
 ClassMethod GetProductionSummary(productionName As %VarString) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionSummary(productionName)
+    return ..HandleProductionResult(result)
+}
+
+ClassMethod GetProductionGraph(productionName As %VarString) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionGraph(productionName)
     return ..HandleProductionResult(result)
 }
 
@@ -147,6 +159,12 @@ ClassMethod HandleProductionResult(result As %DynamicObject) As %DynamicObject [
         }
         If result.errorCode = "PRODUCTION_NOT_FOUND" {
             return ..Error(404, "PRODUCTION_NOT_FOUND", "The requested interoperability production was not found.")
+        }
+        If result.errorCode = "INVALID_COMPONENT_NAME" {
+            return ..Error(400, "INVALID_COMPONENT_NAME", "Invalid componentName.")
+        }
+        If result.errorCode = "COMPONENT_NOT_FOUND" {
+            return ..Error(404, "COMPONENT_NOT_FOUND", "The requested production component was not found.")
         }
     }
     return result

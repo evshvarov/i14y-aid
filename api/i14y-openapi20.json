@@ -330,6 +330,46 @@
         }
       }
     },
+    "/productions/{productionName}/components/{componentName}": {
+      "get": {
+        "summary": "Get production component detail",
+        "operationId": "GetComponentDetail",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "componentName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Production component detail",
+            "schema": {
+              "$ref": "#/definitions/ComponentDetailResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production or component not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/productions/{productionName}/analysis": {
       "get": {
         "summary": "Get static production analysis model",
@@ -381,6 +421,40 @@
             "description": "Deterministic production summary",
             "schema": {
               "$ref": "#/definitions/ProductionSummaryResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/productions/{productionName}/graph": {
+      "get": {
+        "summary": "Get frontend-neutral production graph",
+        "operationId": "GetProductionGraph",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Production graph",
+            "schema": {
+              "$ref": "#/definitions/ProductionGraphResponse"
             }
           },
           "400": {
@@ -739,6 +813,83 @@
           "items": {
             "$ref": "#/definitions/Warning"
           }
+        }
+      }
+    },
+    "ComponentDetailResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "componentName": {
+          "type": "string"
+        },
+        "component": {
+          "$ref": "#/definitions/Component"
+        },
+        "explanation": {
+          "$ref": "#/definitions/ComponentExplanation"
+        },
+        "connections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Connection"
+          }
+        },
+        "externalSystems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExternalSystem"
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AnalysisArtifact"
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RuleDetail"
+          }
+        },
+        "messageTypes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessageType"
+          }
+        },
+        "transformations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TransformationDetail"
+          }
+        },
+        "businessProcesses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BusinessProcessDetail"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        },
+        "confidence": {
+          "type": "string"
         }
       }
     },
@@ -1267,6 +1418,120 @@
           "type": "array",
           "items": {
             "$ref": "#/definitions/Warning"
+          }
+        }
+      }
+    },
+    "ProductionGraphResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/GraphNode"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/GraphEdge"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        },
+        "confidence": {
+          "type": "string"
+        }
+      }
+    },
+    "GraphNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "className": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "protocol": {
+          "type": "string"
+        },
+        "adapterClass": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "GraphEdge": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "relationship": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "messageTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ruleName": {
+          "type": "string"
+        },
+        "processClass": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
           }
         }
       }

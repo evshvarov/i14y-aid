@@ -53,8 +53,10 @@ GET /i14y-aid/api/messages/{messageId}/trace
 GET /i14y-aid/api/productions
 GET /i14y-aid/api/productions/{productionName}
 GET /i14y-aid/api/productions/{productionName}/components
+GET /i14y-aid/api/productions/{productionName}/components/{componentName}
 GET /i14y-aid/api/productions/{productionName}/analysis
 GET /i14y-aid/api/productions/{productionName}/summary
+GET /i14y-aid/api/productions/{productionName}/graph
 GET /i14y-aid/api/productions/{productionName}/status
 POST /i14y-aid/api/productions/{productionName}/start
 POST /i14y-aid/api/productions/{productionName}/stop
@@ -70,6 +72,7 @@ curl http://localhost:57337/i14y-aid/api/productions
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/components"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/analysis"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/summary"
+curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/graph"
 ```
 
 ## Build And Test
