@@ -131,6 +131,147 @@ XData OpenAPI [ MimeType = application/json ]
           }
         }
       }
+    },
+    "/productions/{productionName}/status": {
+      "get": {
+        "summary": "Get production runtime status",
+        "operationId": "GetProductionStatus",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Production runtime status",
+            "schema": {
+              "$ref": "#/definitions/ProductionRuntimeResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/productions/{productionName}/start": {
+      "post": {
+        "summary": "Start production",
+        "operationId": "StartProduction",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Production start result",
+            "schema": {
+              "$ref": "#/definitions/ProductionActionResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Production conflict",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Start failed",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/productions/{productionName}/stop": {
+      "post": {
+        "summary": "Stop production",
+        "operationId": "StopProduction",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 10
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "type": "boolean",
+            "default": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Production stop result",
+            "schema": {
+              "$ref": "#/definitions/ProductionActionResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Production conflict",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Stop failed",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {
@@ -194,6 +335,15 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "integer",
           "format": "int32"
         },
+        "runtime": {
+          "$ref": "#/definitions/ProductionRuntime"
+        },
+        "isRunning": {
+          "type": "boolean"
+        },
+        "runtimeState": {
+          "type": "string"
+        },
         "evidence": {
           "type": "array",
           "items": {
@@ -217,6 +367,15 @@ XData OpenAPI [ MimeType = application/json ]
         "componentCount": {
           "type": "integer",
           "format": "int32"
+        },
+        "runtime": {
+          "$ref": "#/definitions/ProductionRuntime"
+        },
+        "isRunning": {
+          "type": "boolean"
+        },
+        "runtimeState": {
+          "type": "string"
         },
         "components": {
           "type": "array",
@@ -256,6 +415,73 @@ XData OpenAPI [ MimeType = application/json ]
           "items": {
             "$ref": "#/definitions/Warning"
           }
+        }
+      }
+    },
+    "ProductionRuntime": {
+      "type": "object",
+      "properties": {
+        "requestedProduction": {
+          "type": "string"
+        },
+        "currentProduction": {
+          "type": "string"
+        },
+        "state": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "stateLabel": {
+          "type": "string"
+        },
+        "isCurrent": {
+          "type": "boolean"
+        },
+        "isRunning": {
+          "type": "boolean"
+        },
+        "statusText": {
+          "type": "string"
+        }
+      }
+    },
+    "ProductionRuntimeResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "runtime": {
+          "$ref": "#/definitions/ProductionRuntime"
+        },
+        "isRunning": {
+          "type": "boolean"
+        },
+        "runtimeState": {
+          "type": "string"
+        }
+      }
+    },
+    "ProductionActionResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "changed": {
+          "type": "boolean"
+        },
+        "runtime": {
+          "$ref": "#/definitions/ProductionRuntime"
         }
       }
     },

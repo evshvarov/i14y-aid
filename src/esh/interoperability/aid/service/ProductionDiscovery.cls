@@ -9,6 +9,7 @@ ClassMethod Capabilities() As %DynamicObject
     Set capabilities.currentNamespaceOnly = 1
     Set capabilities.productionDiscovery = capabilities.interoperabilityAvailable
     Set capabilities.productionXDataAnalysis = capabilities.interoperabilityAvailable
+    Set capabilities.productionControl = capabilities.interoperabilityAvailable
     Set capabilities.runtimeTraceAnalysis = 0
     Set capabilities.payloadInspection = 0
     Set capabilities.openapiVersion = "2.0"
@@ -44,6 +45,9 @@ ClassMethod ListProductions() As %DynamicObject
         Set item.namespace = $Namespace
         Set item.description = rset.%Get("Description")
         Set item.componentCount = ..ListComponents(className).items.%Size()
+        Set item.runtime = ..GetRuntimeStatus(className)
+        Set item.isRunning = item.runtime.isRunning
+        Set item.runtimeState = item.runtime.stateLabel
         Set item.evidence = []
         Do item.evidence.%Push(..NewEvidence("class-metadata", "%Dictionary.CompiledClass", className, "Super", "Ens.Production", "confirmed"))
         Do result.items.%Push(item)
@@ -69,10 +73,108 @@ ClassMethod GetProduction(productionName As %VarString) As %DynamicObject
     }
 
     Set result.description = ..GetClassDescription(productionName)
+    Set result.runtime = ..GetRuntimeStatus(productionName)
+    Set result.isRunning = result.runtime.isRunning
+    Set result.runtimeState = result.runtime.stateLabel
     Set result.components = ..ListComponents(productionName).items
     Set result.componentCount = result.components.%Size()
     Set result.evidence = []
     Do result.evidence.%Push(..NewEvidence("class-metadata", "%Dictionary.CompiledClass", productionName, "Super", "Ens.Production", "confirmed"))
+    return result
+}
+
+ClassMethod GetProductionRuntimeStatus(productionName As %VarString) As %DynamicObject
+{
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.name = productionName
+
+    If '..IsValidClassName(productionName) {
+        Do result.%Set("errorCode", "INVALID_PRODUCTION_NAME")
+        return result
+    }
+    If '..ClassExtends(productionName, "Ens.Production") {
+        Do result.%Set("errorCode", "PRODUCTION_NOT_FOUND")
+        return result
+    }
+
+    Set result.runtime = ..GetRuntimeStatus(productionName)
+    Set result.isRunning = result.runtime.isRunning
+    Set result.runtimeState = result.runtime.stateLabel
+    return result
+}
+
+ClassMethod StartProduction(productionName As %VarString) As %DynamicObject
+{
+    Set result = ..NewActionResult(productionName, "start")
+    If '..IsValidClassName(productionName) {
+        Do result.%Set("errorCode", "INVALID_PRODUCTION_NAME")
+        return result
+    }
+    If '..ClassExtends(productionName, "Ens.Production") {
+        Do result.%Set("errorCode", "PRODUCTION_NOT_FOUND")
+        return result
+    }
+
+    Set before = ..GetRuntimeStatus(productionName)
+    If (before.isRunning = 1) && (before.currentProduction = productionName) {
+        Set result.changed = 0
+        Set result.runtime = before
+        return result
+    }
+    If (before.state = 1) && (before.currentProduction '= "") && (before.currentProduction '= productionName) {
+        Do result.%Set("errorCode", "PRODUCTION_ALREADY_RUNNING")
+        Set result.runtime = before
+        return result
+    }
+
+    Set sc = ##class(Ens.Director).StartProduction(productionName)
+    If $$$ISERR(sc) {
+        Do result.%Set("errorCode", "START_FAILED")
+        Do result.%Set("statusText", $System.Status.GetErrorText(sc))
+        Set result.runtime = ..GetRuntimeStatus(productionName)
+        return result
+    }
+
+    Set result.changed = 1
+    Set result.runtime = ..GetRuntimeStatus(productionName)
+    return result
+}
+
+ClassMethod StopProduction(productionName As %VarString, timeout As %Integer = 10, force As %Boolean = 0) As %DynamicObject
+{
+    Set result = ..NewActionResult(productionName, "stop")
+    If '..IsValidClassName(productionName) {
+        Do result.%Set("errorCode", "INVALID_PRODUCTION_NAME")
+        return result
+    }
+    If '..ClassExtends(productionName, "Ens.Production") {
+        Do result.%Set("errorCode", "PRODUCTION_NOT_FOUND")
+        return result
+    }
+
+    Set before = ..GetRuntimeStatus(productionName)
+    If before.isRunning '= 1 {
+        Set result.changed = 0
+        Set result.runtime = before
+        return result
+    }
+    If before.currentProduction '= productionName {
+        Do result.%Set("errorCode", "PRODUCTION_NOT_ACTIVE")
+        Set result.runtime = before
+        return result
+    }
+
+    Set sc = ##class(Ens.Director).StopProduction(..NormalizeInteger(timeout, 10), +force)
+    If $$$ISERR(sc) {
+        Do result.%Set("errorCode", "STOP_FAILED")
+        Do result.%Set("statusText", $System.Status.GetErrorText(sc))
+        Set result.runtime = ..GetRuntimeStatus(productionName)
+        return result
+    }
+
+    Set result.changed = 1
+    Set result.runtime = ..GetRuntimeStatus(productionName)
     return result
 }
 
@@ -345,6 +447,48 @@ ClassMethod NormalizeInteger(value As %VarString, defaultValue As %Integer = 0) 
         return defaultValue
     }
     return +value
+}
+
+ClassMethod GetRuntimeStatus(productionName As %VarString = "") As %DynamicObject [ Private ]
+{
+    Set status = {}
+    Set currentProduction = ""
+    Set state = ""
+    Set sc = ##class(Ens.Director).GetProductionStatus(.currentProduction, .state)
+    Set status.requestedProduction = productionName
+    Set status.currentProduction = currentProduction
+    Set status.state = +state
+    Set status.stateLabel = ..RuntimeStateLabel(+state)
+    Set status.isCurrent = $Select((productionName '= "") && (currentProduction = productionName):1, 1:0)
+    Set status.isRunning = $Select((+state = 1) && ((productionName = "") || (currentProduction = productionName)):1, 1:0)
+    If $$$ISERR(sc) {
+        Do status.%Set("statusText", $System.Status.GetErrorText(sc))
+    }
+    return status
+}
+
+ClassMethod RuntimeStateLabel(state As %Integer) As %VarString [ Private ]
+{
+    If state = 1 {
+        return "running"
+    }
+    If state = 2 {
+        return "stopped"
+    }
+    If state = 0 {
+        return "unknown"
+    }
+    return "state-"_state
+}
+
+ClassMethod NewActionResult(productionName As %VarString, action As %VarString) As %DynamicObject [ Private ]
+{
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.productionName = productionName
+    Set result.action = action
+    Set result.changed = 0
+    return result
 }
 
 ClassMethod ClassExists(className As %VarString) As %Boolean [ Private ]

@@ -51,6 +51,9 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions"), "Spec must expose /productions")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}"), "Spec must expose production detail endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/components"), "Spec must expose component endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/status"), "Spec must expose production status endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/start"), "Spec must expose production start endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/stop"), "Spec must expose production stop endpoint")
 }
 
 Method TestHealth()
@@ -63,6 +66,7 @@ Method TestHealth()
     Do $$$AssertEquals(result.namespace, $Namespace, "Namespace mismatch")
     Do $$$AssertTrue($IsObject(result.capabilities), "Capabilities must be an object")
     Do $$$AssertEquals(result.capabilities.openapiVersion, "2.0", "OpenAPI version mismatch")
+    Do $$$AssertEquals(result.capabilities.productionControl, 1, "Production control capability mismatch")
 }
 
 Method TestListProductions()
@@ -76,6 +80,8 @@ Method TestListProductions()
     Set production = ..FindProduction(result.items, "esh.interoperability.aid.tests.DemoProduction")
     Do $$$AssertTrue($IsObject(production), "Demo production should be listed")
     Do $$$AssertEquals(production.componentCount, 4, "Demo production component count mismatch")
+    Do $$$AssertTrue($IsObject(production.runtime), "Production summary must include runtime status")
+    Do $$$AssertTrue(production.runtime.%IsDefined("stateLabel"), "Production summary runtime status must include state label")
 }
 
 Method TestGetProduction()
@@ -86,7 +92,38 @@ Method TestGetProduction()
     Do $$$AssertEquals(result.name, "esh.interoperability.aid.tests.DemoProduction", "Production name mismatch")
     Do $$$AssertEquals(result.namespace, $Namespace, "Namespace mismatch")
     Do $$$AssertEquals(result.componentCount, 4, "Component count mismatch")
+    Do $$$AssertTrue($IsObject(result.runtime), "Production detail must include runtime status")
+    Do $$$AssertTrue(result.runtime.%IsDefined("isRunning"), "Production detail runtime status must include isRunning")
     Do $$$AssertTrue($IsObject(result.evidence), "Evidence must be an array")
+}
+
+Method TestGetProductionStatus()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetProductionStatus("esh.interoperability.aid.tests.DemoProduction")
+    Do $$$AssertTrue($IsObject(result), "Runtime status response must be an object")
+    Do $$$AssertEquals(result.name, "esh.interoperability.aid.tests.DemoProduction", "Runtime status production name mismatch")
+    Do $$$AssertTrue($IsObject(result.runtime), "Runtime status must include runtime object")
+    Do $$$AssertTrue(result.runtime.%IsDefined("state"), "Runtime status must include raw state")
+    Do $$$AssertTrue(result.runtime.%IsDefined("stateLabel"), "Runtime status must include state label")
+}
+
+Method TestStartProductionInvalidName()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).StartProduction("bad production name")
+    Do $$$AssertTrue($IsObject(result), "Start error response must be an object")
+    Do $$$AssertEquals(%response.Status, 400, "Invalid start name should set 400")
+    Do $$$AssertEquals(result.error.code, "INVALID_PRODUCTION_NAME", "Invalid start error code mismatch")
+}
+
+Method TestStopProductionMissingProduction()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).StopProduction("esh.interoperability.aid.tests.DoesNotExist")
+    Do $$$AssertTrue($IsObject(result), "Stop error response must be an object")
+    Do $$$AssertEquals(%response.Status, 404, "Missing stop production should set 404")
+    Do $$$AssertEquals(result.error.code, "PRODUCTION_NOT_FOUND", "Missing stop production error code mismatch")
 }
 
 Method TestListComponents()

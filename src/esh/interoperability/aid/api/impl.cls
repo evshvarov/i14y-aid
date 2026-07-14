@@ -58,6 +58,62 @@ ClassMethod ListComponents(productionName As %VarString) As %DynamicObject
     return result
 }
 
+ClassMethod GetProductionStatus(productionName As %VarString) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionRuntimeStatus(productionName)
+    return ..HandleProductionResult(result)
+}
+
+ClassMethod StartProduction(productionName As %VarString) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).StartProduction(productionName)
+    return ..HandleProductionActionResult(result)
+}
+
+ClassMethod StopProduction(productionName As %VarString, timeout As %Integer = 10, force As %Boolean = 0) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).StopProduction(productionName, timeout, force)
+    return ..HandleProductionActionResult(result)
+}
+
+ClassMethod HandleProductionResult(result As %DynamicObject) As %DynamicObject [ Private ]
+{
+    If result.%IsDefined("errorCode") {
+        If result.errorCode = "INVALID_PRODUCTION_NAME" {
+            return ..Error(400, "INVALID_PRODUCTION_NAME", "Invalid productionName.")
+        }
+        If result.errorCode = "PRODUCTION_NOT_FOUND" {
+            return ..Error(404, "PRODUCTION_NOT_FOUND", "The requested interoperability production was not found.")
+        }
+    }
+    return result
+}
+
+ClassMethod HandleProductionActionResult(result As %DynamicObject) As %DynamicObject [ Private ]
+{
+    If result.%IsDefined("errorCode") {
+        If result.errorCode = "INVALID_PRODUCTION_NAME" {
+            return ..Error(400, "INVALID_PRODUCTION_NAME", "Invalid productionName.")
+        }
+        If result.errorCode = "PRODUCTION_NOT_FOUND" {
+            return ..Error(404, "PRODUCTION_NOT_FOUND", "The requested interoperability production was not found.")
+        }
+        If result.errorCode = "PRODUCTION_ALREADY_RUNNING" {
+            return ..Error(409, "PRODUCTION_ALREADY_RUNNING", "Another interoperability production is already running.")
+        }
+        If result.errorCode = "PRODUCTION_NOT_ACTIVE" {
+            return ..Error(409, "PRODUCTION_NOT_ACTIVE", "The requested production is not the active running production.")
+        }
+        If result.errorCode = "START_FAILED" {
+            return ..Error(500, "START_FAILED", result.%Get("statusText"))
+        }
+        If result.errorCode = "STOP_FAILED" {
+            return ..Error(500, "STOP_FAILED", result.%Get("statusText"))
+        }
+    }
+    return result
+}
+
 ClassMethod Error(status As %Integer, code As %VarString, message As %VarString) As %DynamicObject [ Private ]
 {
     Do ..%SetStatusCode(status)
