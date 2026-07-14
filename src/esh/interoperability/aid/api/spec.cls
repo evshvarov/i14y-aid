@@ -64,6 +64,199 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "/messages": {
+      "get": {
+        "summary": "List recent interoperability message headers",
+        "operationId": "ListMessages",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 50
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          {
+            "name": "sourceConfigName",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "targetConfigName",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "messageBodyClassName",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "sessionId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "errorsOnly",
+            "in": "query",
+            "required": false,
+            "type": "boolean",
+            "default": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent message headers",
+            "schema": {
+              "$ref": "#/definitions/MessageHeaderListResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message headers or production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/messages/facets": {
+      "get": {
+        "summary": "List recent message filter facets",
+        "operationId": "ListMessageFacets",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 500
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent message filter facets",
+            "schema": {
+              "$ref": "#/definitions/MessageFacetResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message headers or production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/messages/{messageId}": {
+      "get": {
+        "summary": "Get message header metadata",
+        "operationId": "GetMessage",
+        "parameters": [
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message header metadata",
+            "schema": {
+              "$ref": "#/definitions/MessageDetailResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/messages/{messageId}/trace": {
+      "get": {
+        "summary": "Get runtime trace for a message header",
+        "operationId": "GetMessageTrace",
+        "parameters": [
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message trace",
+            "schema": {
+              "$ref": "#/definitions/MessageTraceResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/productions/{productionName}": {
       "get": {
         "summary": "Get production metadata",
@@ -115,6 +308,74 @@ XData OpenAPI [ MimeType = application/json ]
             "description": "Production components",
             "schema": {
               "$ref": "#/definitions/ComponentListResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/productions/{productionName}/analysis": {
+      "get": {
+        "summary": "Get static production analysis model",
+        "operationId": "GetProductionAnalysis",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Static production analysis model",
+            "schema": {
+              "$ref": "#/definitions/ProductionAnalysisResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/productions/{productionName}/summary": {
+      "get": {
+        "summary": "Get deterministic production summary",
+        "operationId": "GetProductionSummary",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deterministic production summary",
+            "schema": {
+              "$ref": "#/definitions/ProductionSummaryResponse"
             }
           },
           "400": {
@@ -414,6 +675,856 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "array",
           "items": {
             "$ref": "#/definitions/Warning"
+          }
+        }
+      }
+    },
+    "MessageHeaderListResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessageHeader"
+          }
+        },
+        "count": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "limit": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "offset": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "sourceConfigName": {
+          "type": "string"
+        },
+        "targetConfigName": {
+          "type": "string"
+        },
+        "messageBodyClassName": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "errorsOnly": {
+          "type": "boolean"
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "payloadReturned": {
+          "type": "boolean"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        }
+      }
+    },
+    "MessageHeader": {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "sessionId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "timeCreated": {
+          "type": "string"
+        },
+        "timeProcessed": {
+          "type": "string"
+        },
+        "sourceConfigName": {
+          "type": "string"
+        },
+        "targetConfigName": {
+          "type": "string"
+        },
+        "messageBodyClassName": {
+          "type": "string"
+        },
+        "messageBodyId": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "isError": {
+          "type": "boolean"
+        },
+        "errorStatus": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "invocation": {
+          "type": "string"
+        },
+        "correspondingMessageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "payloadReturned": {
+          "type": "boolean"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "MessageFacetResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "errorCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "sourceConfigNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "targetConfigNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "messageBodyClassNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sessionIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "componentNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "payloadReturned": {
+          "type": "boolean"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        }
+      }
+    },
+    "MessageDetailResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "messageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "message": {
+          "$ref": "#/definitions/MessageHeader"
+        },
+        "payloadReturned": {
+          "type": "boolean"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        }
+      }
+    },
+    "MessageTraceResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "messageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "sessionId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "selectedMessage": {
+          "$ref": "#/definitions/MessageHeader"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "traceOverview": {
+          "$ref": "#/definitions/TraceOverview"
+        },
+        "traceExplanation": {
+          "$ref": "#/definitions/TraceExplanation"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TraceStep"
+          }
+        },
+        "stepCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "payloadReturned": {
+          "type": "boolean"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        },
+        "confidence": {
+          "type": "string"
+        }
+      }
+    },
+    "TraceOverview": {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "sessionId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "stepCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "errorCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "firstSeen": {
+          "type": "string"
+        },
+        "lastSeen": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "finalTarget": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "participants": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "TraceStep": {
+      "type": "object",
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "messageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "sessionId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "timeCreated": {
+          "type": "string"
+        },
+        "timeProcessed": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "messageBodyClassName": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "isError": {
+          "type": "boolean"
+        },
+        "invocation": {
+          "type": "string"
+        },
+        "correspondingMessageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "payloadReturned": {
+          "type": "boolean"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "TraceExplanation": {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "sessionId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "text": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "ProductionAnalysisResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "production": {
+          "$ref": "#/definitions/ProductionDetailResponse"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Component"
+          }
+        },
+        "connections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Connection"
+          }
+        },
+        "externalSystems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExternalSystem"
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AnalysisArtifact"
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RuleDetail"
+          }
+        },
+        "messageTypes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessageType"
+          }
+        },
+        "transformations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TransformationDetail"
+          }
+        },
+        "businessProcesses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BusinessProcessDetail"
+          }
+        },
+        "componentExplanations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ComponentExplanation"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        },
+        "confidence": {
+          "type": "string"
+        }
+      }
+    },
+    "ProductionSummaryResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        }
+      }
+    },
+    "Connection": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "ruleName": {
+          "type": "string"
+        },
+        "processClass": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "ExternalSystem": {
+      "type": "object",
+      "properties": {
+        "component": {
+          "type": "string"
+        },
+        "componentType": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "AnalysisArtifact": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "component": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "RuleDetail": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "component": {
+          "type": "string"
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RuleCondition"
+          }
+        },
+        "sends": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RuleSend"
+          }
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "RuleCondition": {
+      "type": "object",
+      "properties": {
+        "condition": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "sends": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RuleSend"
+          }
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "RuleSend": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "transform": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "MessageType": {
+      "type": "object",
+      "properties": {
+        "component": {
+          "type": "string"
+        },
+        "componentType": {
+          "type": "string"
+        },
+        "className": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "parameter": {
+          "type": "string"
+        },
+        "direction": {
+          "type": "string"
+        },
+        "messageClass": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "TransformationDetail": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "component": {
+          "type": "string"
+        },
+        "sourceKind": {
+          "type": "string"
+        },
+        "sourceClass": {
+          "type": "string"
+        },
+        "targetClass": {
+          "type": "string"
+        },
+        "create": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "actions": {
+          "type": "object"
+        },
+        "assignments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TransformationAssignment"
+          }
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "TransformationAssignment": {
+      "type": "object",
+      "properties": {
+        "property": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "BusinessProcessDetail": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "component": {
+          "type": "string"
+        },
+        "requestClass": {
+          "type": "string"
+        },
+        "responseClass": {
+          "type": "string"
+        },
+        "contextClass": {
+          "type": "string"
+        },
+        "actions": {
+          "type": "object"
+        },
+        "calls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BusinessProcessCall"
+          }
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "BusinessProcessCall": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "async": {
+          "type": "boolean"
+        },
+        "timeout": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "ComponentExplanation": {
+      "type": "object",
+      "properties": {
+        "component": {
+          "type": "string"
+        },
+        "componentType": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
           }
         }
       }

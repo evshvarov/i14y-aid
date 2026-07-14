@@ -47,15 +47,19 @@ ClassMethod GetProduction(productionName As %VarString) As %DynamicObject
 ClassMethod ListComponents(productionName As %VarString) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListComponents(productionName)
-    If result.%IsDefined("errorCode") {
-        If result.errorCode = "INVALID_PRODUCTION_NAME" {
-            return ..Error(400, "INVALID_PRODUCTION_NAME", "Invalid productionName.")
-        }
-        If result.errorCode = "PRODUCTION_NOT_FOUND" {
-            return ..Error(404, "PRODUCTION_NOT_FOUND", "The requested interoperability production was not found.")
-        }
-    }
-    return result
+    return ..HandleProductionResult(result)
+}
+
+ClassMethod GetProductionAnalysis(productionName As %VarString) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionAnalysis(productionName)
+    return ..HandleProductionResult(result)
+}
+
+ClassMethod GetProductionSummary(productionName As %VarString) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionSummary(productionName)
+    return ..HandleProductionResult(result)
 }
 
 ClassMethod GetProductionStatus(productionName As %VarString) As %DynamicObject
@@ -76,6 +80,60 @@ ClassMethod StopProduction(productionName As %VarString, timeout As %Integer = 1
     return ..HandleProductionActionResult(result)
 }
 
+ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0) As %DynamicObject
+{
+    If '$Data(productionName) {
+        Set productionName = ""
+    }
+    If '$Data(limit) {
+        Set limit = 50
+    }
+    If '$Data(offset) {
+        Set offset = 0
+    }
+    If '$Data(sourceConfigName) {
+        Set sourceConfigName = ""
+    }
+    If '$Data(targetConfigName) {
+        Set targetConfigName = ""
+    }
+    If '$Data(messageBodyClassName) {
+        Set messageBodyClassName = ""
+    }
+    If '$Data(sessionId) {
+        Set sessionId = ""
+    }
+    If '$Data(errorsOnly) {
+        Set errorsOnly = 0
+    }
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListMessages(productionName, limit, offset, sourceConfigName, targetConfigName, messageBodyClassName, sessionId, errorsOnly)
+    return ..HandleRuntimeResult(result)
+}
+
+ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integer = 500) As %DynamicObject
+{
+    If '$Data(productionName) {
+        Set productionName = ""
+    }
+    If '$Data(limit) {
+        Set limit = 500
+    }
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListMessageFacets(productionName, limit)
+    return ..HandleRuntimeResult(result)
+}
+
+ClassMethod GetMessage(messageId As %Integer) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetMessage(messageId)
+    return ..HandleRuntimeResult(result)
+}
+
+ClassMethod GetMessageTrace(messageId As %Integer) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetMessageTrace(messageId)
+    return ..HandleRuntimeResult(result)
+}
+
 ClassMethod HandleProductionResult(result As %DynamicObject) As %DynamicObject [ Private ]
 {
     If result.%IsDefined("errorCode") {
@@ -84,6 +142,31 @@ ClassMethod HandleProductionResult(result As %DynamicObject) As %DynamicObject [
         }
         If result.errorCode = "PRODUCTION_NOT_FOUND" {
             return ..Error(404, "PRODUCTION_NOT_FOUND", "The requested interoperability production was not found.")
+        }
+    }
+    return result
+}
+
+ClassMethod HandleRuntimeResult(result As %DynamicObject) As %DynamicObject [ Private ]
+{
+    If result.%IsDefined("errorCode") {
+        If result.errorCode = "INVALID_PRODUCTION_NAME" {
+            return ..Error(400, "INVALID_PRODUCTION_NAME", "Invalid productionName.")
+        }
+        If result.errorCode = "PRODUCTION_NOT_FOUND" {
+            return ..Error(404, "PRODUCTION_NOT_FOUND", "The requested interoperability production was not found.")
+        }
+        If result.errorCode = "INVALID_MESSAGE_ID" {
+            return ..Error(400, "INVALID_MESSAGE_ID", "Invalid messageId.")
+        }
+        If result.errorCode = "MESSAGE_NOT_FOUND" {
+            return ..Error(404, "MESSAGE_NOT_FOUND", "The requested interoperability message header was not found.")
+        }
+        If result.errorCode = "MESSAGE_HEADER_NOT_AVAILABLE" {
+            return ..Error(404, "MESSAGE_HEADER_NOT_AVAILABLE", "Ens.MessageHeader is not available in this namespace.")
+        }
+        If result.errorCode = "STATUS_ERROR" {
+            return ..Error(500, "STATUS_ERROR", "Runtime message query failed.")
         }
     }
     return result
