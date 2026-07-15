@@ -135,24 +135,38 @@ ClassMethod GetProductionAnalysis(productionName As %VarString) As %DynamicObjec
     Set result.components = production.components
     Set result.connections = []
     Set result.externalSystems = []
+    Set result.externalSystemExplanations = []
     Set result.artifacts = []
+    Set result.artifactExplanations = []
     Set result.rules = []
+    Set result.ruleExplanations = []
     Set result.messageTypes = []
     Set result.transformations = []
+    Set result.transformationExplanations = []
     Set result.businessProcesses = []
+    Set result.businessProcessExplanations = []
     Set result.componentExplanations = []
+    Set result.connectionExplanations = []
+    Set result.messageTypeExplanations = []
     Set result.warnings = []
     Set result.evidence = []
     Set result.confidence = "confirmed"
 
     Do ..AddConnections(productionName, result.components, result.connections, result.warnings)
     Do ..AddRoutingRuleAnalysis(productionName, result.components, result.connections, result.artifacts, result.rules, result.warnings)
+    Do ..AddRuleExplanations(result.rules, result.ruleExplanations)
     Do ..AddExternalSystems(productionName, result.components, result.externalSystems)
+    Do ..AddExternalSystemExplanations(result.externalSystems, result.externalSystemExplanations)
     Do ..AddArtifacts(productionName, result.components, result.artifacts)
     Do ..AddMessageTypes(productionName, result.components, result.messageTypes, result.warnings)
     Do ..AddTransformationAnalysis(productionName, result.artifacts, result.transformations, result.warnings)
+    Do ..AddTransformationExplanations(result.transformations, result.transformationExplanations)
     Do ..AddBPLAnalysis(productionName, result.components, result.connections, result.artifacts, result.businessProcesses, result.warnings)
+    Do ..AddArtifactExplanations(result.artifacts, result.artifactExplanations)
+    Do ..AddBusinessProcessExplanations(result.businessProcesses, result.businessProcessExplanations)
     Do ..AddComponentExplanations(result.components, result.connections, result.externalSystems, result.messageTypes, result.rules, result.transformations, result.businessProcesses, result.componentExplanations)
+    Do ..AddConnectionExplanations(result.connections, result.messageTypes, result.connectionExplanations)
+    Do ..AddMessageTypeExplanations(result.messageTypes, result.messageTypeExplanations)
     Set result.summary = ..BuildProductionSummary(production, result.connections, result.externalSystems, result.artifacts, result.messageTypes, result.transformations, result.businessProcesses)
     Do result.evidence.%Push(..NewEvidence("analysis", productionName, productionName, "ProductionDefinition", "Static analysis model", "confirmed"))
     return result
@@ -192,7 +206,7 @@ ClassMethod GetProductionGraph(productionName As %VarString) As %DynamicObject
     Set result.confidence = analysis.confidence
 
     Do ..AddGraphNodes(analysis.components, result.nodes)
-    Do ..AddGraphEdges(analysis.connections, analysis.messageTypes, result.edges)
+    Do ..AddGraphEdges(analysis.connections, analysis.messageTypes, analysis.connectionExplanations, result.edges)
     return result
 }
 
@@ -203,12 +217,19 @@ ClassMethod GetComponentDetail(productionName As %VarString, componentName As %V
     Set result.productionName = productionName
     Set result.componentName = componentName
     Set result.connections = []
+    Set result.connectionExplanations = []
     Set result.externalSystems = []
+    Set result.externalSystemExplanations = []
     Set result.artifacts = []
+    Set result.artifactExplanations = []
     Set result.rules = []
+    Set result.ruleExplanations = []
     Set result.messageTypes = []
+    Set result.messageTypeExplanations = []
     Set result.transformations = []
+    Set result.transformationExplanations = []
     Set result.businessProcesses = []
+    Set result.businessProcessExplanations = []
     Set result.warnings = []
     Set result.evidence = []
 
@@ -233,12 +254,19 @@ ClassMethod GetComponentDetail(productionName As %VarString, componentName As %V
     Set result.confidence = component.confidence
     Set result.warnings = analysis.warnings
     Do ..AddConnectionsForComponent(analysis.connections, componentName, result.connections)
+    Do ..AddConnectionsForComponent(analysis.connectionExplanations, componentName, result.connectionExplanations)
     Do ..AddItemsForComponent(analysis.externalSystems, componentName, result.externalSystems)
+    Do ..AddItemsForComponent(analysis.externalSystemExplanations, componentName, result.externalSystemExplanations)
     Do ..AddItemsForComponent(analysis.artifacts, componentName, result.artifacts)
+    Do ..AddItemsForComponent(analysis.artifactExplanations, componentName, result.artifactExplanations)
     Do ..AddItemsForComponent(analysis.rules, componentName, result.rules)
+    Do ..AddItemsForComponent(analysis.ruleExplanations, componentName, result.ruleExplanations)
     Do ..AddItemsForComponent(analysis.messageTypes, componentName, result.messageTypes)
+    Do ..AddItemsForComponent(analysis.messageTypeExplanations, componentName, result.messageTypeExplanations)
     Do ..AddItemsForComponent(analysis.transformations, componentName, result.transformations)
+    Do ..AddItemsForComponent(analysis.transformationExplanations, componentName, result.transformationExplanations)
     Do ..AddItemsForComponent(analysis.businessProcesses, componentName, result.businessProcesses)
+    Do ..AddItemsForComponent(analysis.businessProcessExplanations, componentName, result.businessProcessExplanations)
     Do ..AddEvidenceFromObject(component, result.evidence)
     Do ..AddEvidenceFromObject(result.explanation, result.evidence)
     return result
@@ -753,9 +781,13 @@ ClassMethod GetProductionMessageTrace(productionName As %VarString, messageId As
     }
 
     Set result = ..GetMessageTrace(messageId)
+    If result.%IsDefined("errorCode") {
+        return result
+    }
     Do result.%Set("productionName", productionName)
     Do result.%Set("productionScoped", 1)
     Do ..AnnotateTraceStepsForProduction(result, productionName)
+    Set result.traceExplanation = ..NewProductionTraceExplanation(result, productionName)
     return result
 }
 
@@ -1405,6 +1437,77 @@ ClassMethod AddComponentExplanations(components As %DynamicArray, connections As
     return
 }
 
+ClassMethod AddConnectionExplanations(connections As %DynamicArray, messageTypes As %DynamicArray, explanations As %DynamicArray) [ Private ]
+{
+    For index = 0:1:connections.%Size()-1 {
+        Set connection = connections.%Get(index)
+        Continue:'$IsObject(connection)
+        Do explanations.%Push(..NewConnectionExplanation(connection, messageTypes))
+    }
+    return
+}
+
+ClassMethod AddMessageTypeExplanations(messageTypes As %DynamicArray, explanations As %DynamicArray) [ Private ]
+{
+    For index = 0:1:messageTypes.%Size()-1 {
+        Set messageType = messageTypes.%Get(index)
+        Continue:'$IsObject(messageType)
+        Continue:'..ShouldIncludeMessageClass(messageType.messageClass)
+        Do explanations.%Push(..NewMessageTypeExplanation(messageType))
+    }
+    return
+}
+
+ClassMethod AddExternalSystemExplanations(externalSystems As %DynamicArray, explanations As %DynamicArray) [ Private ]
+{
+    For index = 0:1:externalSystems.%Size()-1 {
+        Set external = externalSystems.%Get(index)
+        Continue:'$IsObject(external)
+        Do explanations.%Push(..NewExternalSystemExplanation(external))
+    }
+    return
+}
+
+ClassMethod AddArtifactExplanations(artifacts As %DynamicArray, explanations As %DynamicArray) [ Private ]
+{
+    For index = 0:1:artifacts.%Size()-1 {
+        Set artifact = artifacts.%Get(index)
+        Continue:'$IsObject(artifact)
+        Do explanations.%Push(..NewArtifactExplanation(artifact))
+    }
+    return
+}
+
+ClassMethod AddTransformationExplanations(transformations As %DynamicArray, explanations As %DynamicArray) [ Private ]
+{
+    For index = 0:1:transformations.%Size()-1 {
+        Set transformation = transformations.%Get(index)
+        Continue:'$IsObject(transformation)
+        Do explanations.%Push(..NewTransformationExplanation(transformation))
+    }
+    return
+}
+
+ClassMethod AddRuleExplanations(rules As %DynamicArray, explanations As %DynamicArray) [ Private ]
+{
+    For index = 0:1:rules.%Size()-1 {
+        Set rule = rules.%Get(index)
+        Continue:'$IsObject(rule)
+        Do explanations.%Push(..NewRuleExplanation(rule))
+    }
+    return
+}
+
+ClassMethod AddBusinessProcessExplanations(businessProcesses As %DynamicArray, explanations As %DynamicArray) [ Private ]
+{
+    For index = 0:1:businessProcesses.%Size()-1 {
+        Set process = businessProcesses.%Get(index)
+        Continue:'$IsObject(process)
+        Do explanations.%Push(..NewBusinessProcessExplanation(process))
+    }
+    return
+}
+
 ClassMethod AddGraphNodes(components As %DynamicArray, nodes As %DynamicArray) [ Private ]
 {
     For index = 0:1:components.%Size()-1 {
@@ -1430,17 +1533,17 @@ ClassMethod NewGraphNode(component As %DynamicObject) As %DynamicObject [ Privat
     return node
 }
 
-ClassMethod AddGraphEdges(connections As %DynamicArray, messageTypes As %DynamicArray, edges As %DynamicArray) [ Private ]
+ClassMethod AddGraphEdges(connections As %DynamicArray, messageTypes As %DynamicArray, connectionExplanations As %DynamicArray, edges As %DynamicArray) [ Private ]
 {
     For index = 0:1:connections.%Size()-1 {
         Set connection = connections.%Get(index)
         Continue:'$IsObject(connection)
-        Do edges.%Push(..NewGraphEdge(connection, messageTypes, index))
+        Do edges.%Push(..NewGraphEdge(connection, messageTypes, connectionExplanations, index))
     }
     return
 }
 
-ClassMethod NewGraphEdge(connection As %DynamicObject, messageTypes As %DynamicArray, index As %Integer) As %DynamicObject [ Private ]
+ClassMethod NewGraphEdge(connection As %DynamicObject, messageTypes As %DynamicArray, connectionExplanations As %DynamicArray, index As %Integer) As %DynamicObject [ Private ]
 {
     Set edge = {}
     Set edge.id = connection.%Get("from")_"->"_connection.%Get("to")_"#"_index
@@ -1455,16 +1558,35 @@ ClassMethod NewGraphEdge(connection As %DynamicObject, messageTypes As %DynamicA
     If connection.%IsDefined("processClass") {
         Set edge.processClass = connection.processClass
     }
+    Set explanation = ..FindConnectionExplanationForGraphEdge(connectionExplanations, connection)
+    If $IsObject(explanation) {
+        Set edge.text = explanation.text
+    }
     Set edge.confidence = connection.confidence
     Set edge.evidence = connection.evidence
     return edge
 }
 
+ClassMethod FindConnectionExplanationForGraphEdge(connectionExplanations As %DynamicArray, connection As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set found = ""
+    For index = 0:1:connectionExplanations.%Size()-1 {
+        Set explanation = connectionExplanations.%Get(index)
+        Continue:'$IsObject(explanation)
+        If (explanation.%Get("from") = connection.%Get("from")) && (explanation.%Get("to") = connection.%Get("to")) && (explanation.kind = connection.kind) {
+            Set found = explanation
+            Quit
+        }
+    }
+    return found
+}
+
 ClassMethod MessageClassesForGraphEdge(messageTypes As %DynamicArray, sourceName As %VarString, targetName As %VarString) As %DynamicArray [ Private ]
 {
     Set names = ..MessageClassesForComponent(messageTypes, sourceName, "output")
-    If names.%Size() = 0 {
-        Set names = ..MessageClassesForComponent(messageTypes, targetName, "input")
+    Set targetNames = ..MessageClassesForComponent(messageTypes, targetName, "input")
+    For index = 0:1:targetNames.%Size()-1 {
+        Do ..PushUnique(names, targetNames.%Get(index))
     }
     return names
 }
@@ -1486,6 +1608,353 @@ ClassMethod NewComponentExplanation(component As %DynamicObject, connections As 
         }
     }
     return explanation
+}
+
+ClassMethod NewRuleExplanation(rule As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set explanation = {}
+    Set explanation.name = rule.name
+    Set explanation.component = rule.component
+    Set explanation.conditionCount = 0
+    If $IsObject(rule.conditions) {
+        Set explanation.conditionCount = rule.conditions.%Size()
+    }
+    Set explanation.targets = ..TargetsForRule(rule)
+    Set explanation.transforms = ..TransformsForRule(rule)
+    Set explanation.targetCount = explanation.targets.%Size()
+    Set explanation.transformCount = explanation.transforms.%Size()
+    Set explanation.text = ..BuildRuleExplanationText(rule, explanation.conditionCount, explanation.targets, explanation.transforms)
+    Set explanation.confidence = rule.confidence
+    Set explanation.evidence = []
+    If $IsObject(rule.evidence) {
+        For evidenceIndex = 0:1:rule.evidence.%Size()-1 {
+            Set evidence = rule.evidence.%Get(evidenceIndex)
+            If $IsObject(evidence) {
+                Do explanation.evidence.%Push(evidence)
+            }
+        }
+    }
+    return explanation
+}
+
+ClassMethod BuildRuleExplanationText(rule As %DynamicObject, conditionCount As %Integer, targets As %DynamicArray, transforms As %DynamicArray) As %VarString [ Private ]
+{
+    Set text = rule.name_" routes messages for component "_rule.component
+    If conditionCount > 0 {
+        Set text = text_" using "_conditionCount_" condition"_..Plural(conditionCount)
+    }
+    If targets.%Size() > 0 {
+        Set text = text_" to "_..JoinArray(targets)
+    }
+    If transforms.%Size() > 0 {
+        Set text = text_" and applies "_..JoinArray(transforms)
+    }
+    Set text = text_"."
+    return text
+}
+
+ClassMethod TargetsForRule(rule As %DynamicObject) As %DynamicArray [ Private ]
+{
+    Set targets = []
+    If '$IsObject(rule.sends) {
+        return targets
+    }
+    For index = 0:1:rule.sends.%Size()-1 {
+        Set send = rule.sends.%Get(index)
+        Continue:'$IsObject(send)
+        Continue:(send.target = "")
+        Do ..PushUnique(targets, send.target)
+    }
+    return targets
+}
+
+ClassMethod TransformsForRule(rule As %DynamicObject) As %DynamicArray [ Private ]
+{
+    Set transforms = []
+    If '$IsObject(rule.sends) {
+        return transforms
+    }
+    For index = 0:1:rule.sends.%Size()-1 {
+        Set send = rule.sends.%Get(index)
+        Continue:'$IsObject(send)
+        Continue:(send.transform = "")
+        Do ..PushUnique(transforms, send.transform)
+    }
+    return transforms
+}
+
+ClassMethod NewConnectionExplanation(connection As %DynamicObject, messageTypes As %DynamicArray) As %DynamicObject [ Private ]
+{
+    Set explanation = {}
+    Do explanation.%Set("from", connection.%Get("from"))
+    Do explanation.%Set("to", connection.%Get("to"))
+    Set explanation.kind = connection.kind
+    If connection.%IsDefined("ruleName") {
+        Set explanation.ruleName = connection.ruleName
+    }
+    If connection.%IsDefined("processClass") {
+        Set explanation.processClass = connection.processClass
+    }
+    Set explanation.messageClasses = ..MessageClassesForGraphEdge(messageTypes, connection.%Get("from"), connection.%Get("to"))
+    Set explanation.text = ..BuildConnectionExplanationText(connection, explanation.messageClasses)
+    Set explanation.confidence = connection.confidence
+    Set explanation.evidence = []
+    If $IsObject(connection.evidence) {
+        For evidenceIndex = 0:1:connection.evidence.%Size()-1 {
+            Set evidence = connection.evidence.%Get(evidenceIndex)
+            If $IsObject(evidence) {
+                Do explanation.evidence.%Push(evidence)
+            }
+        }
+    }
+    return explanation
+}
+
+ClassMethod BuildConnectionExplanationText(connection As %DynamicObject, messageClasses As %DynamicArray) As %VarString [ Private ]
+{
+    Set text = connection.%Get("from")_" sends messages to "_connection.%Get("to")
+    If connection.kind '= "" {
+        Set text = text_" through a "_connection.kind_" connection"
+    }
+    If connection.%IsDefined("ruleName") {
+        Set text = text_" controlled by routing rule "_connection.ruleName
+    }
+    If connection.%IsDefined("processClass") {
+        Set text = text_" implemented by BPL process "_connection.processClass
+    }
+    If messageClasses.%Size() > 0 {
+        Set text = text_". Message signatures include "_..JoinArray(messageClasses)
+    }
+    Set text = text_"."
+    return text
+}
+
+ClassMethod NewMessageTypeExplanation(messageType As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set explanation = {}
+    Set explanation.component = messageType.component
+    Set explanation.componentType = messageType.componentType
+    Set explanation.className = messageType.className
+    Set explanation.method = messageType.method
+    Set explanation.parameter = messageType.parameter
+    Set explanation.direction = messageType.direction
+    Set explanation.messageClass = messageType.messageClass
+    Set explanation.text = ..BuildMessageTypeExplanationText(messageType)
+    Set explanation.confidence = messageType.confidence
+    Set explanation.evidence = []
+    If $IsObject(messageType.evidence) {
+        For evidenceIndex = 0:1:messageType.evidence.%Size()-1 {
+            Set evidence = messageType.evidence.%Get(evidenceIndex)
+            If $IsObject(evidence) {
+                Do explanation.evidence.%Push(evidence)
+            }
+        }
+    }
+    return explanation
+}
+
+ClassMethod BuildMessageTypeExplanationText(messageType As %DynamicObject) As %VarString [ Private ]
+{
+    Set directionText = $Select(messageType.direction="input":"accepts",messageType.direction="output":"returns",1:"uses")
+    Set text = messageType.component_" "_directionText_" "_messageType.messageClass
+    If messageType.parameter '= "" {
+        Set text = text_" as parameter "_messageType.parameter
+    }
+    If messageType.method '= "" {
+        Set text = text_" in "_messageType.className_"."_messageType.method
+    } Else {
+        Set text = text_" in "_messageType.className
+    }
+    Set text = text_"."
+    return text
+}
+
+ClassMethod NewExternalSystemExplanation(external As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set explanation = {}
+    Set explanation.component = external.component
+    Set explanation.componentType = external.componentType
+    Set explanation.kind = external.kind
+    Set explanation.value = external.value
+    Set explanation.text = ..BuildExternalSystemExplanationText(external)
+    Set explanation.confidence = external.confidence
+    Set explanation.evidence = []
+    If $IsObject(external.evidence) {
+        For evidenceIndex = 0:1:external.evidence.%Size()-1 {
+            Set evidence = external.evidence.%Get(evidenceIndex)
+            If $IsObject(evidence) {
+                Do explanation.evidence.%Push(evidence)
+            }
+        }
+    }
+    return explanation
+}
+
+ClassMethod BuildExternalSystemExplanationText(external As %DynamicObject) As %VarString [ Private ]
+{
+    Set kindText = $Select(external.kind="file-path":"file path",external.kind="url":"URL",external.kind="http-server":"HTTP server",external.kind="port":"network port",1:external.kind)
+    Set actionText = $Select(external.componentType="business-service":"receives from",external.componentType="business-operation":"sends to",1:"references")
+    Set text = external.component_" "_actionText_" external "_kindText_" "_external.value_"."
+    return text
+}
+
+ClassMethod NewArtifactExplanation(artifact As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set explanation = {}
+    Set explanation.kind = artifact.kind
+    Set explanation.name = artifact.name
+    Set explanation.component = artifact.component
+    Set explanation.label = ..ArtifactKindText(artifact.kind)
+    Set explanation.text = ..BuildArtifactExplanationText(artifact)
+    Set explanation.confidence = artifact.confidence
+    Set explanation.evidence = []
+    If $IsObject(artifact.evidence) {
+        For evidenceIndex = 0:1:artifact.evidence.%Size()-1 {
+            Set evidence = artifact.evidence.%Get(evidenceIndex)
+            If $IsObject(evidence) {
+                Do explanation.evidence.%Push(evidence)
+            }
+        }
+    }
+    return explanation
+}
+
+ClassMethod BuildArtifactExplanationText(artifact As %DynamicObject) As %VarString [ Private ]
+{
+    Set label = ..ArtifactKindText(artifact.kind)
+    Set text = artifact.component_" references "_label_" "_artifact.name
+    If artifact.kind = "rule-transformation" {
+        Set text = artifact.component_" applies rule transformation "_artifact.name
+    }
+    If artifact.kind = "bpl-process" {
+        Set text = artifact.component_" implements BPL process "_artifact.name
+    }
+    Set text = text_"."
+    return text
+}
+
+ClassMethod ArtifactKindText(kind As %VarString) As %VarString [ Private ]
+{
+    If kind = "routing-rule" {
+        return "routing rule"
+    }
+    If kind = "rule-transformation" {
+        return "rule transformation"
+    }
+    If kind = "transformation" {
+        return "transformation"
+    }
+    If kind = "bpl-process" {
+        return "BPL process"
+    }
+    If kind = "record-map" {
+        return "record map"
+    }
+    return "artifact"
+}
+
+ClassMethod NewTransformationExplanation(transformation As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set explanation = {}
+    Set explanation.name = transformation.name
+    Set explanation.component = transformation.component
+    Set explanation.sourceKind = transformation.sourceKind
+    Set explanation.sourceClass = transformation.sourceClass
+    Set explanation.targetClass = transformation.targetClass
+    Set explanation.assignmentCount = 0
+    If $IsObject(transformation.assignments) {
+        Set explanation.assignmentCount = transformation.assignments.%Size()
+    }
+    Set explanation.text = ..BuildTransformationExplanationText(transformation, explanation.assignmentCount)
+    Set explanation.confidence = transformation.confidence
+    Set explanation.evidence = []
+    If $IsObject(transformation.evidence) {
+        For evidenceIndex = 0:1:transformation.evidence.%Size()-1 {
+            Set evidence = transformation.evidence.%Get(evidenceIndex)
+            If $IsObject(evidence) {
+                Do explanation.evidence.%Push(evidence)
+            }
+        }
+    }
+    return explanation
+}
+
+ClassMethod BuildTransformationExplanationText(transformation As %DynamicObject, assignmentCount As %Integer) As %VarString [ Private ]
+{
+    Set text = transformation.name_" maps "_$Select(transformation.sourceClass'="":transformation.sourceClass,1:"an unknown source class")_" to "_$Select(transformation.targetClass'="":transformation.targetClass,1:"an unknown target class")
+    If transformation.component '= "" {
+        Set text = text_" for component "_transformation.component
+    }
+    If assignmentCount > 0 {
+        Set text = text_" using "_assignmentCount_" assignment"_..Plural(assignmentCount)
+    }
+    Set text = text_"."
+    return text
+}
+
+ClassMethod NewBusinessProcessExplanation(process As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set explanation = {}
+    Set explanation.name = process.name
+    Set explanation.component = process.component
+    Set explanation.requestClass = process.requestClass
+    Set explanation.responseClass = process.responseClass
+    Set explanation.contextClass = process.contextClass
+    Set explanation.callTargets = ..CallTargetsForBusinessProcess(process)
+    Set explanation.callCount = explanation.callTargets.%Size()
+    Set explanation.assignCount = 0
+    If $IsObject(process.actions) {
+        Set explanation.assignCount = process.actions.assign
+    }
+    Set explanation.text = ..BuildBusinessProcessExplanationText(process, explanation.callTargets, explanation.assignCount)
+    Set explanation.confidence = process.confidence
+    Set explanation.evidence = []
+    If $IsObject(process.evidence) {
+        For evidenceIndex = 0:1:process.evidence.%Size()-1 {
+            Set evidence = process.evidence.%Get(evidenceIndex)
+            If $IsObject(evidence) {
+                Do explanation.evidence.%Push(evidence)
+            }
+        }
+    }
+    return explanation
+}
+
+ClassMethod BuildBusinessProcessExplanationText(process As %DynamicObject, callTargets As %DynamicArray, assignCount As %Integer) As %VarString [ Private ]
+{
+    Set text = process.name_" defines BPL process logic"
+    If process.component '= "" {
+        Set text = text_" for component "_process.component
+    }
+    If process.requestClass '= "" {
+        Set text = text_" accepting "_process.requestClass
+    }
+    If process.responseClass '= "" {
+        Set text = text_" and returning "_process.responseClass
+    }
+    Set text = text_"."
+    If callTargets.%Size() > 0 {
+        Set text = text_" It calls "_..JoinArray(callTargets)_"."
+    }
+    If assignCount > 0 {
+        Set text = text_" It performs "_assignCount_" assignment"_..Plural(assignCount)_"."
+    }
+    return text
+}
+
+ClassMethod CallTargetsForBusinessProcess(process As %DynamicObject) As %DynamicArray [ Private ]
+{
+    Set targets = []
+    If '$IsObject(process.calls) {
+        return targets
+    }
+    For index = 0:1:process.calls.%Size()-1 {
+        Set call = process.calls.%Get(index)
+        Continue:'$IsObject(call)
+        Continue:(call.target = "")
+        Do ..PushUnique(targets, call.target)
+    }
+    return targets
 }
 
 ClassMethod BuildComponentExplanationText(component As %DynamicObject, connections As %DynamicArray, externalSystems As %DynamicArray, messageTypes As %DynamicArray, rules As %DynamicArray, transformations As %DynamicArray, businessProcesses As %DynamicArray) As %VarString [ Private ]
@@ -1581,10 +2050,32 @@ ClassMethod MessageClassesForComponent(messageTypes As %DynamicArray, componentN
         Set message = messageTypes.%Get(index)
         Continue:'$IsObject(message)
         If (message.component = componentName) && (message.direction = direction) {
+            Continue:'..ShouldIncludeMessageClass(message.messageClass)
             Do ..PushUnique(names, message.messageClass)
         }
     }
     return names
+}
+
+ClassMethod ShouldIncludeMessageClass(messageClass As %VarString) As %Boolean [ Private ]
+{
+    If messageClass = "" {
+        return 0
+    }
+    Set normalized = $ZConvert(messageClass, "L")
+    If (normalized = "%persistent") || (normalized = "%registeredobject") || (normalized = "%serialobject") {
+        return 0
+    }
+    If (normalized = "%library.persistent") || (normalized = "%library.registeredobject") || (normalized = "%library.serialobject") {
+        return 0
+    }
+    If (normalized = "%string") || (normalized = "%varstring") || (normalized = "%integer") || (normalized = "%boolean") || (normalized = "%status") {
+        return 0
+    }
+    If (normalized = "%library.string") || (normalized = "%library.varstring") || (normalized = "%library.integer") || (normalized = "%library.boolean") || (normalized = "%library.status") {
+        return 0
+    }
+    return 1
 }
 
 ClassMethod ExternalValuesForComponent(externalSystems As %DynamicArray, componentName As %VarString) As %DynamicArray [ Private ]
@@ -1886,6 +2377,7 @@ ClassMethod AnnotateTraceStepsForProduction(trace As %DynamicObject, productionN
     }
 
     Set componentNames = ..ProductionComponentNames(productionName)
+    Set analysis = ..GetProductionAnalysis(productionName)
     Set productionStepCount = 0
     For index = 0:1:trace.steps.%Size()-1 {
         Set step = trace.steps.%Get(index)
@@ -1897,6 +2389,9 @@ ClassMethod AnnotateTraceStepsForProduction(trace As %DynamicObject, productionN
             Set step.sourceInProduction = sourceInProduction
             Set step.targetInProduction = targetInProduction
             Set step.inProduction = inProduction
+            If $IsObject(analysis) {
+                Do ..AnnotateTraceStepWithStaticContext(step, analysis)
+            }
             If inProduction {
                 Set productionStepCount = productionStepCount + 1
             }
@@ -1907,6 +2402,122 @@ ClassMethod AnnotateTraceStepsForProduction(trace As %DynamicObject, productionN
         Do trace.warnings.%Push(..NewWarning("TRACE_HAS_EXTERNAL_STEPS", "The selected message belongs to the requested production, but the reconstructed session trace includes steps outside that production."))
     }
     return
+}
+
+ClassMethod AnnotateTraceStepWithStaticContext(step As %DynamicObject, analysis As %DynamicObject) [ Private ]
+{
+    If '$IsObject(step) {
+        return
+    }
+    If '$IsObject(analysis.connections) {
+        return
+    }
+
+    Set connection = ..FindConnectionForTraceStep(analysis.connections, step.source, step.target)
+    If '$IsObject(connection) {
+        return
+    }
+
+    Set step.staticConnectionKind = connection.kind
+    Set step.staticConnectionConfidence = connection.confidence
+    If connection.%IsDefined("ruleName") {
+        Set step.staticRuleName = connection.ruleName
+        Set transformNames = ..TransformNamesForTraceRule(analysis.rules, connection.ruleName, step.target)
+        If transformNames.%Size() > 0 {
+            Set step.staticTransformNames = transformNames
+        }
+    }
+    If connection.%IsDefined("processClass") {
+        Set step.staticProcessClass = connection.processClass
+    }
+    Set step.explanation = ..BuildTraceStepStaticText(step, connection)
+    Do step.evidence.%Push(..NewEvidence("static-connection", analysis.productionName, step.source, "connection", step.target, connection.confidence))
+    return
+}
+
+ClassMethod TransformNamesForTraceRule(rules As %DynamicArray, ruleName As %VarString, target As %VarString) As %DynamicArray [ Private ]
+{
+    Set names = []
+    If '$IsObject(rules) {
+        return names
+    }
+
+    For ruleIndex = 0:1:rules.%Size()-1 {
+        Set rule = rules.%Get(ruleIndex)
+        Continue:'$IsObject(rule)
+        Continue:(rule.name '= ruleName)
+        Do ..AddTransformNamesFromRuleSends(rule.sends, target, names)
+        For conditionIndex = 0:1:rule.conditions.%Size()-1 {
+            Set condition = rule.conditions.%Get(conditionIndex)
+            Continue:'$IsObject(condition)
+            Do ..AddTransformNamesFromRuleSends(condition.sends, target, names)
+        }
+    }
+    return names
+}
+
+ClassMethod AddTransformNamesFromRuleSends(sends As %DynamicArray, target As %VarString, names As %DynamicArray) [ Private ]
+{
+    If '$IsObject(sends) {
+        return
+    }
+    For sendIndex = 0:1:sends.%Size()-1 {
+        Set send = sends.%Get(sendIndex)
+        Continue:'$IsObject(send)
+        Continue:(send.transform = "")
+        If (target = "") || (send.target = "") || (send.target = target) {
+            Do ..PushUnique(names, send.transform)
+        }
+    }
+    return
+}
+
+ClassMethod FindConnectionForTraceStep(connections As %DynamicArray, source As %VarString, target As %VarString) As %DynamicObject [ Private ]
+{
+    If (source = "") || (target = "") {
+        return ""
+    }
+
+    Set fallback = ""
+    For index = 0:1:connections.%Size()-1 {
+        Set connection = connections.%Get(index)
+        Continue:'$IsObject(connection)
+        Continue:(connection.%Get("from") '= source)
+        Continue:(connection.%Get("to") '= target)
+        If '$IsObject(fallback) {
+            Set fallback = connection
+        }
+        If connection.kind '= "target-config" {
+            return connection
+        }
+    }
+    return fallback
+}
+
+ClassMethod BuildTraceStepStaticText(step As %DynamicObject, connection As %DynamicObject) As %VarString [ Private ]
+{
+    Set text = "Step "_step.sequence_" observed message "_step.messageId
+    If step.messageBodyClassName '= "" {
+        Set text = text_" with body class "_step.messageBodyClassName
+    }
+    Set text = text_" moving from "_$Select(step.source'="":step.source,1:"unknown source")_" to "_$Select(step.target'="":step.target,1:"unknown target")
+    Set text = text_". This hop matches the production's "_connection.kind_" static connection"
+    If connection.%IsDefined("ruleName") {
+        Set text = text_" controlled by routing rule "_connection.ruleName
+    }
+    If step.%IsDefined("staticTransformNames"),step.staticTransformNames.%Size() > 0 {
+        Set text = text_" using "_..JoinArray(step.staticTransformNames)
+    }
+    If connection.%IsDefined("processClass") {
+        Set text = text_" from BPL process "_connection.processClass
+    }
+    If step.isError {
+        Set text = text_". The message header is marked as an error"
+    } Else {
+        Set text = text_". The message header is not marked as an error"
+    }
+    Set text = text_". Payload body content was not returned."
+    return text
 }
 
 ClassMethod ProductionComponentNames(productionName As %VarString) As %DynamicArray [ Private ]
@@ -1969,11 +2580,57 @@ ClassMethod NewMessageSessionSummaryFromTrace(trace As %DynamicObject, productio
     Set summary.payloadPolicy.payloadInspectionSupported = 0
     Set summary.payloadPolicy.bodyContentReturned = 0
     Set summary.payloadPolicy.summary = "Payload body content was not returned."
+    Set summary.staticContext = ..NewTraceStaticContext(trace)
     Set summary.text = ..BuildMessageSessionSummaryText(summary)
     Set summary.warnings = trace.warnings
     Set summary.evidence = trace.evidence
     Set summary.confidence = trace.confidence
     return summary
+}
+
+ClassMethod NewTraceStaticContext(trace As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set context = {}
+    Set context.connectionKinds = []
+    Set context.ruleNames = []
+    Set context.transformNames = []
+    Set context.processClasses = []
+    Set context.matchedStepCount = 0
+
+    If '$IsObject(trace) {
+        return context
+    }
+    If '$IsObject(trace.steps) {
+        return context
+    }
+
+    For index = 0:1:trace.steps.%Size()-1 {
+        Set step = trace.steps.%Get(index)
+        Continue:'$IsObject(step)
+        Set matched = 0
+        If step.%IsDefined("staticConnectionKind") {
+            Do ..PushUnique(context.connectionKinds, step.staticConnectionKind)
+            Set matched = 1
+        }
+        If step.%IsDefined("staticRuleName") {
+            Do ..PushUnique(context.ruleNames, step.staticRuleName)
+            Set matched = 1
+        }
+        If step.%IsDefined("staticProcessClass") {
+            Do ..PushUnique(context.processClasses, step.staticProcessClass)
+            Set matched = 1
+        }
+        If step.%IsDefined("staticTransformNames"),$IsObject(step.staticTransformNames) {
+            For transformIndex = 0:1:step.staticTransformNames.%Size()-1 {
+                Do ..PushUnique(context.transformNames, step.staticTransformNames.%Get(transformIndex))
+                Set matched = 1
+            }
+        }
+        If matched {
+            Set context.matchedStepCount = context.matchedStepCount + 1
+        }
+    }
+    return context
 }
 
 ClassMethod BuildMessageSessionSummaryText(summary As %DynamicObject) As %VarString [ Private ]
@@ -1988,6 +2645,15 @@ ClassMethod BuildMessageSessionSummaryText(summary As %DynamicObject) As %VarStr
     }
     If summary.errorCount > 0 {
         Set text = text_". "_summary.errorCount_" step"_..Plural(summary.errorCount)_" marked as error"
+    }
+    If $IsObject(summary.staticContext),summary.staticContext.matchedStepCount > 0 {
+        Set text = text_". Static analysis matched "_summary.staticContext.matchedStepCount_" step"_..Plural(summary.staticContext.matchedStepCount)
+        If summary.staticContext.ruleNames.%Size() > 0 {
+            Set text = text_" with routing rule"_..Plural(summary.staticContext.ruleNames.%Size())_" "_..JoinArray(summary.staticContext.ruleNames)
+        }
+        If summary.staticContext.transformNames.%Size() > 0 {
+            Set text = text_" and transformation"_..Plural(summary.staticContext.transformNames.%Size())_" "_..JoinArray(summary.staticContext.transformNames)
+        }
     }
     Set text = text_". Payload body content was not returned."
     return text
@@ -2228,6 +2894,79 @@ ClassMethod NewTraceExplanation(selected As %DynamicObject, steps As %DynamicArr
     Set explanation.evidence = []
     Do explanation.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", selected.messageId, "SessionId", selected.sessionId, "observed"))
     return explanation
+}
+
+ClassMethod NewProductionTraceExplanation(trace As %DynamicObject, productionName As %VarString) As %DynamicObject [ Private ]
+{
+    Set explanation = {}
+    Set selected = trace.selectedMessage
+    Set explanation.messageId = trace.messageId
+    Set explanation.sessionId = trace.sessionId
+    Set explanation.productionName = productionName
+    Set explanation.confidence = "observed"
+    Set explanation.text = ..BuildProductionTraceExplanationText(trace, productionName)
+    Set explanation.evidence = []
+    If $IsObject(selected) {
+        Do explanation.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", selected.messageId, "SessionId", selected.sessionId, "observed"))
+    }
+    Do explanation.evidence.%Push(..NewEvidence("static-analysis", productionName, productionName, "TraceStaticContext", "Production-scoped trace matched against static analysis", "confirmed"))
+    return explanation
+}
+
+ClassMethod BuildProductionTraceExplanationText(trace As %DynamicObject, productionName As %VarString) As %VarString [ Private ]
+{
+    Set selected = trace.selectedMessage
+    Set text = "Message "_trace.messageId
+    If $IsObject(selected),selected.messageBodyClassName '= "" {
+        Set text = text_" is an observed "_selected.messageBodyClassName_" message"
+    } Else {
+        Set text = text_" is an observed interoperability message"
+    }
+    If trace.sessionId '= "" {
+        Set text = text_" in session "_trace.sessionId
+    }
+    Set text = text_" for production "_productionName
+    If trace.stepCount > 0 {
+        Set text = text_". The reconstructed trace has "_trace.stepCount_" step"_..Plural(trace.stepCount)_", with "_trace.productionStepCount_" step"_..Plural(trace.productionStepCount)_" in this production"
+    }
+
+    Set connectionKinds = []
+    Set ruleNames = []
+    Set transformNames = []
+    Set processClasses = []
+    For index = 0:1:trace.steps.%Size()-1 {
+        Set step = trace.steps.%Get(index)
+        Continue:'$IsObject(step)
+        If step.%IsDefined("staticConnectionKind") {
+            Do ..PushUnique(connectionKinds, step.staticConnectionKind)
+        }
+        If step.%IsDefined("staticRuleName") {
+            Do ..PushUnique(ruleNames, step.staticRuleName)
+        }
+        If step.%IsDefined("staticProcessClass") {
+            Do ..PushUnique(processClasses, step.staticProcessClass)
+        }
+        If step.%IsDefined("staticTransformNames"),$IsObject(step.staticTransformNames) {
+            For transformIndex = 0:1:step.staticTransformNames.%Size()-1 {
+                Do ..PushUnique(transformNames, step.staticTransformNames.%Get(transformIndex))
+            }
+        }
+    }
+
+    If connectionKinds.%Size() > 0 {
+        Set text = text_". Static analysis matched "_connectionKinds.%Size()_" connection kind"_..Plural(connectionKinds.%Size())_": "_..JoinArray(connectionKinds)
+    }
+    If ruleNames.%Size() > 0 {
+        Set text = text_". Routing rule"_..Plural(ruleNames.%Size())_" involved: "_..JoinArray(ruleNames)
+    }
+    If transformNames.%Size() > 0 {
+        Set text = text_". Transformation"_..Plural(transformNames.%Size())_" involved: "_..JoinArray(transformNames)
+    }
+    If processClasses.%Size() > 0 {
+        Set text = text_". BPL process"_..Plural(processClasses.%Size())_" involved: "_..JoinArray(processClasses)
+    }
+    Set text = text_". Payload body content was not returned."
+    return text
 }
 
 ClassMethod NewTraceOverview(selected As %DynamicObject, steps As %DynamicArray) As %DynamicObject [ Private ]

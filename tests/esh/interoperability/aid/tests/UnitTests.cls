@@ -56,6 +56,68 @@ Method FindConnection(items As %DynamicArray, fromName As %VarString, toName As 
     return found
 }
 
+Method FindConnectionExplanation(items As %DynamicArray, fromName As %VarString, toName As %VarString, kind As %VarString = "") As %DynamicObject [ Private ]
+{
+    Set found = ""
+    For index = 0:1:items.%Size()-1 {
+        Set item = items.%Get(index)
+        If $IsObject(item) {
+            If (item.%Get("from") = fromName) && (item.%Get("to") = toName) {
+                If (kind = "") || (item.kind = kind) {
+                    Set found = item
+                    Quit
+                }
+            }
+        }
+    }
+    return found
+}
+
+Method FindMessageTypeExplanation(items As %DynamicArray, componentName As %VarString, methodName As %VarString, parameterName As %VarString) As %DynamicObject [ Private ]
+{
+    Set found = ""
+    For index = 0:1:items.%Size()-1 {
+        Set item = items.%Get(index)
+        If $IsObject(item) {
+            If (item.component = componentName) && (item.method = methodName) && (item.parameter = parameterName) {
+                Set found = item
+                Quit
+            }
+        }
+    }
+    return found
+}
+
+Method FindExternalSystemExplanation(items As %DynamicArray, componentName As %VarString, kind As %VarString) As %DynamicObject [ Private ]
+{
+    Set found = ""
+    For index = 0:1:items.%Size()-1 {
+        Set item = items.%Get(index)
+        If $IsObject(item) {
+            If (item.component = componentName) && (item.kind = kind) {
+                Set found = item
+                Quit
+            }
+        }
+    }
+    return found
+}
+
+Method FindTransformationExplanation(items As %DynamicArray, transformName As %VarString) As %DynamicObject [ Private ]
+{
+    Set found = ""
+    For index = 0:1:items.%Size()-1 {
+        Set item = items.%Get(index)
+        If $IsObject(item) {
+            If item.name = transformName {
+                Set found = item
+                Quit
+            }
+        }
+    }
+    return found
+}
+
 Method FindGraphNode(items As %DynamicArray, nodeId As %VarString) As %DynamicObject [ Private ]
 {
     Set found = ""
@@ -103,7 +165,37 @@ Method FindArtifact(items As %DynamicArray, kind As %VarString, name As %VarStri
     return found
 }
 
+Method FindArtifactExplanation(items As %DynamicArray, kind As %VarString, name As %VarString) As %DynamicObject [ Private ]
+{
+    Set found = ""
+    For index = 0:1:items.%Size()-1 {
+        Set item = items.%Get(index)
+        If $IsObject(item) {
+            If (item.kind = kind) && (item.name = name) {
+                Set found = item
+                Quit
+            }
+        }
+    }
+    return found
+}
+
 Method FindRule(items As %DynamicArray, ruleName As %VarString) As %DynamicObject [ Private ]
+{
+    Set found = ""
+    For index = 0:1:items.%Size()-1 {
+        Set item = items.%Get(index)
+        If $IsObject(item) {
+            If item.name = ruleName {
+                Set found = item
+                Quit
+            }
+        }
+    }
+    return found
+}
+
+Method FindRuleExplanation(items As %DynamicArray, ruleName As %VarString) As %DynamicObject [ Private ]
 {
     Set found = ""
     For index = 0:1:items.%Size()-1 {
@@ -208,6 +300,21 @@ Method FindBusinessProcess(items As %DynamicArray, processName As %VarString) As
     return found
 }
 
+Method FindBusinessProcessExplanation(items As %DynamicArray, processName As %VarString) As %DynamicObject [ Private ]
+{
+    Set found = ""
+    For index = 0:1:items.%Size()-1 {
+        Set item = items.%Get(index)
+        If $IsObject(item) {
+            If item.name = processName {
+                Set found = item
+                Quit
+            }
+        }
+    }
+    return found
+}
+
 Method FindComponentExplanation(items As %DynamicArray, componentName As %VarString) As %DynamicObject [ Private ]
 {
     Set found = ""
@@ -225,6 +332,11 @@ Method FindComponentExplanation(items As %DynamicArray, componentName As %VarStr
 
 Method CreatePayloadPreviewMessage() As %DynamicObject [ Private ]
 {
+    return ..CreateRuntimeMessage("CSV Patient Service", "Patient Router")
+}
+
+Method CreateRuntimeMessage(sourceConfigName As %VarString, targetConfigName As %VarString) As %DynamicObject [ Private ]
+{
     Set result = {}
     Set body = ##class(esh.interoperability.aid.tests.DemoMessage).%New()
     Set body.EventType = "ADT"
@@ -238,8 +350,8 @@ Method CreatePayloadPreviewMessage() As %DynamicObject [ Private ]
 
     Set header = ##class(Ens.MessageHeader).%New()
     Set header.SessionId = $Random(1000000)+1000000
-    Set header.SourceConfigName = "CSV Patient Service"
-    Set header.TargetConfigName = "Patient Router"
+    Set header.SourceConfigName = sourceConfigName
+    Set header.TargetConfigName = targetConfigName
     Set header.MessageBodyClassName = "esh.interoperability.aid.tests.DemoMessage"
     Set header.MessageBodyId = body.%Id()
     Set header.Status = 1
@@ -317,20 +429,49 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.definitions.MessageResendResponse.properties.%IsDefined("statusText"), "Message resend response must expose statusText")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageExplanationResponse"), "Spec must define MessageExplanationResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("ComponentDetailResponse"), "Spec must define ComponentDetailResponse")
+    Do $$$AssertTrue(spec.definitions.ComponentDetailResponse.properties.%IsDefined("connectionExplanations"), "Component detail must expose connection explanations")
+    Do $$$AssertTrue(spec.definitions.ComponentDetailResponse.properties.%IsDefined("artifactExplanations"), "Component detail must expose artifact explanations")
+    Do $$$AssertTrue(spec.definitions.ComponentDetailResponse.properties.%IsDefined("ruleExplanations"), "Component detail must expose rule explanations")
+    Do $$$AssertTrue(spec.definitions.ComponentDetailResponse.properties.%IsDefined("messageTypeExplanations"), "Component detail must expose message type explanations")
+    Do $$$AssertTrue(spec.definitions.ComponentDetailResponse.properties.%IsDefined("transformationExplanations"), "Component detail must expose transformation explanations")
+    Do $$$AssertTrue(spec.definitions.ComponentDetailResponse.properties.%IsDefined("businessProcessExplanations"), "Component detail must expose business process explanations")
     Do $$$AssertTrue(spec.definitions.%IsDefined("CapabilitiesResponse"), "Spec must define CapabilitiesResponse")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("ArtifactExplanation"), "Spec must define ArtifactExplanation")
+    Do $$$AssertTrue(spec.definitions.ProductionAnalysisResponse.properties.%IsDefined("artifactExplanations"), "Analysis response must expose artifact explanations")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("ConnectionExplanation"), "Spec must define ConnectionExplanation")
+    Do $$$AssertTrue(spec.definitions.ProductionAnalysisResponse.properties.%IsDefined("connectionExplanations"), "Analysis response must expose connection explanations")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("RuleExplanation"), "Spec must define RuleExplanation")
+    Do $$$AssertTrue(spec.definitions.ProductionAnalysisResponse.properties.%IsDefined("ruleExplanations"), "Analysis response must expose rule explanations")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("MessageTypeExplanation"), "Spec must define MessageTypeExplanation")
+    Do $$$AssertTrue(spec.definitions.ProductionAnalysisResponse.properties.%IsDefined("messageTypeExplanations"), "Analysis response must expose message type explanations")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("ExternalSystemExplanation"), "Spec must define ExternalSystemExplanation")
+    Do $$$AssertTrue(spec.definitions.ProductionAnalysisResponse.properties.%IsDefined("externalSystemExplanations"), "Analysis response must expose external system explanations")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("TransformationExplanation"), "Spec must define TransformationExplanation")
+    Do $$$AssertTrue(spec.definitions.ProductionAnalysisResponse.properties.%IsDefined("transformationExplanations"), "Analysis response must expose transformation explanations")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("BusinessProcessExplanation"), "Spec must define BusinessProcessExplanation")
+    Do $$$AssertTrue(spec.definitions.ProductionAnalysisResponse.properties.%IsDefined("businessProcessExplanations"), "Analysis response must expose business process explanations")
     Do $$$AssertTrue(spec.definitions.%IsDefined("ProductionGraphResponse"), "Spec must define ProductionGraphResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("GraphNode"), "Spec must define GraphNode")
     Do $$$AssertTrue(spec.definitions.%IsDefined("GraphEdge"), "Spec must define GraphEdge")
+    Do $$$AssertTrue(spec.definitions.GraphEdge.properties.%IsDefined("text"), "Graph edge must expose explanation text")
     Do $$$AssertTrue(spec.definitions.%IsDefined("AnalysisSettings"), "Spec must define AnalysisSettings")
     Do $$$AssertTrue(spec.definitions.AnalysisSettings.properties.%IsDefined("messageResendEnabled"), "Spec settings must expose messageResendEnabled")
     Do $$$AssertTrue(spec.definitions.%IsDefined("SettingsResponse"), "Spec must define SettingsResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("SettingsUpdateResponse"), "Spec must define SettingsUpdateResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("TraceOverview"), "Spec must define TraceOverview")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("TraceStaticContext"), "Spec must define TraceStaticContext")
     Do $$$AssertTrue(spec.definitions.MessageTraceResponse.properties.%IsDefined("traceOverview"), "Trace response must expose traceOverview")
     Do $$$AssertTrue(spec.definitions.MessageTraceResponse.properties.%IsDefined("productionStepCount"), "Trace response must expose productionStepCount")
+    Do $$$AssertTrue(spec.definitions.MessageSessionSummaryResponse.properties.%IsDefined("staticContext"), "Session summary must expose static context")
+    Do $$$AssertTrue(spec.definitions.TraceExplanation.properties.%IsDefined("productionName"), "Trace explanation must expose production name")
     Do $$$AssertTrue(spec.definitions.TraceStep.properties.%IsDefined("inProduction"), "Trace steps must expose production membership")
     Do $$$AssertTrue(spec.definitions.TraceStep.properties.%IsDefined("sourceInProduction"), "Trace steps must expose source production membership")
     Do $$$AssertTrue(spec.definitions.TraceStep.properties.%IsDefined("targetInProduction"), "Trace steps must expose target production membership")
+    Do $$$AssertTrue(spec.definitions.TraceStep.properties.%IsDefined("staticConnectionKind"), "Trace steps must expose static connection kind")
+    Do $$$AssertTrue(spec.definitions.TraceStep.properties.%IsDefined("staticConnectionConfidence"), "Trace steps must expose static connection confidence")
+    Do $$$AssertTrue(spec.definitions.TraceStep.properties.%IsDefined("staticRuleName"), "Trace steps must expose static rule name")
+    Do $$$AssertTrue(spec.definitions.TraceStep.properties.%IsDefined("staticTransformNames"), "Trace steps must expose static transform names")
+    Do $$$AssertTrue(spec.definitions.TraceStep.properties.%IsDefined("staticProcessClass"), "Trace steps must expose static process class")
 }
 
 Method TestHealth()
@@ -523,6 +664,41 @@ Method TestGetMessageTraceInvalidId()
     Do $$$AssertEquals(result.error.code, "INVALID_MESSAGE_ID", "Invalid message id error code mismatch")
 }
 
+Method TestGetProductionMessageTraceStaticContext()
+{
+    Do ..InitRequestResponse()
+    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}
+    Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
+    Set fixture = ..CreateRuntimeMessage("Patient Router", "FHIR Operation")
+    Do $$$AssertTrue('fixture.%IsDefined("errorCode"), "Trace fixture should save successfully")
+
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetProductionMessageTrace("esh.interoperability.aid.tests.DemoProduction", fixture.messageId)
+    Do ##class(Ens.MessageHeader).%DeleteId(fixture.messageId)
+    Do ##class(esh.interoperability.aid.tests.DemoMessage).%DeleteId(fixture.bodyId)
+
+    Do $$$AssertTrue($IsObject(result), "Production-scoped trace response must be an object")
+    Do $$$AssertEquals(result.productionName, "esh.interoperability.aid.tests.DemoProduction", "Trace production mismatch")
+    Do $$$AssertEquals(result.productionStepCount, 1, "Trace production step count mismatch")
+    Do $$$AssertEquals(result.steps.%Size(), 1, "Trace step count mismatch")
+    Set step = result.steps.%Get(0)
+    Do $$$AssertTrue($IsObject(step), "Trace step must be an object")
+    Do $$$AssertEquals(step.inProduction, 1, "Trace step should be in production")
+    Do $$$AssertEquals(step.staticConnectionKind, "routing-rule", "Trace step static connection kind mismatch")
+    Do $$$AssertEquals(step.staticConnectionConfidence, "confirmed", "Trace step static confidence mismatch")
+    Do $$$AssertEquals(step.staticRuleName, "esh.interoperability.aid.tests.DemoRoutingRule", "Trace step static rule mismatch")
+    Do $$$AssertTrue($IsObject(step.staticTransformNames), "Trace step static transforms must be an array")
+    Do $$$AssertEquals(step.staticTransformNames.%Size(), 1, "Trace step static transform count mismatch")
+    Do $$$AssertEquals(step.staticTransformNames.%Get(0), "esh.interoperability.aid.tests.DemoTransform", "Trace step static transform mismatch")
+    Do $$$AssertTrue($Find(step.explanation, "routing rule") > 0, "Trace step explanation should mention routing rule")
+    Do $$$AssertTrue($Find(step.explanation, "static connection") > 0, "Trace step explanation should mention static connection")
+    Do $$$AssertTrue($Find(step.explanation, "DemoTransform") > 0, "Trace step explanation should mention transformation")
+    Do $$$AssertTrue($IsObject(result.traceExplanation), "Trace should include aggregate explanation")
+    Do $$$AssertEquals(result.traceExplanation.productionName, "esh.interoperability.aid.tests.DemoProduction", "Trace explanation production mismatch")
+    Do $$$AssertTrue($Find(result.traceExplanation.text, "DemoRoutingRule") > 0, "Trace explanation should mention routing rule")
+    Do $$$AssertTrue($Find(result.traceExplanation.text, "DemoTransform") > 0, "Trace explanation should mention transformation")
+}
+
 Method TestGetMessageExplanationInvalidId()
 {
     Do ..InitRequestResponse()
@@ -648,6 +824,31 @@ Method TestGetProductionMessageSessionSummaryInvalidId()
     Do $$$AssertEquals(result.error.code, "INVALID_MESSAGE_ID", "Invalid production-scoped message session id error code mismatch")
 }
 
+Method TestGetProductionMessageSessionSummaryStaticContext()
+{
+    Do ..InitRequestResponse()
+    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}
+    Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
+    Set fixture = ..CreateRuntimeMessage("Patient Router", "FHIR Operation")
+    Do $$$AssertTrue('fixture.%IsDefined("errorCode"), "Session fixture should save successfully")
+
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetProductionMessageSessionSummary("esh.interoperability.aid.tests.DemoProduction", fixture.messageId)
+    Do ##class(Ens.MessageHeader).%DeleteId(fixture.messageId)
+    Do ##class(esh.interoperability.aid.tests.DemoMessage).%DeleteId(fixture.bodyId)
+
+    Do $$$AssertTrue($IsObject(result), "Production-scoped session response must be an object")
+    Do $$$AssertEquals(result.productionName, "esh.interoperability.aid.tests.DemoProduction", "Session production mismatch")
+    Do $$$AssertTrue($IsObject(result.staticContext), "Session static context must be an object")
+    Do $$$AssertEquals(result.staticContext.matchedStepCount, 1, "Session static matched step count mismatch")
+    Do $$$AssertEquals(result.staticContext.ruleNames.%Size(), 1, "Session static rule count mismatch")
+    Do $$$AssertEquals(result.staticContext.ruleNames.%Get(0), "esh.interoperability.aid.tests.DemoRoutingRule", "Session static rule mismatch")
+    Do $$$AssertEquals(result.staticContext.transformNames.%Size(), 1, "Session static transform count mismatch")
+    Do $$$AssertEquals(result.staticContext.transformNames.%Get(0), "esh.interoperability.aid.tests.DemoTransform", "Session static transform mismatch")
+    Do $$$AssertTrue($Find(result.text, "DemoRoutingRule") > 0, "Session summary should mention routing rule")
+    Do $$$AssertTrue($Find(result.text, "DemoTransform") > 0, "Session summary should mention transformation")
+}
+
 Method TestResendProductionMessageInvalidId()
 {
     Do ..InitRequestResponse()
@@ -687,10 +888,46 @@ Method TestGetProductionAnalysis()
         Do $$$AssertEquals(bplConnection.processClass, "esh.interoperability.aid.tests.DemoProcess", "BPL call connection process class mismatch")
     }
     Do $$$AssertEquals(result.externalSystems.%Size(), 2, "Analysis external endpoint count mismatch")
+    Do $$$AssertEquals(result.externalSystemExplanations.%Size(), 2, "Analysis external endpoint explanation count mismatch")
+    Set endpointExplanation = ..FindExternalSystemExplanation(result.externalSystemExplanations, "CSV Patient Service", "file-path")
+    Do $$$AssertTrue($IsObject(endpointExplanation), "File path endpoint explanation should be present")
+    If $IsObject(endpointExplanation) {
+        Do $$$AssertTrue(endpointExplanation.text["CSV Patient Service", "Endpoint explanation should mention component")
+        Do $$$AssertTrue(endpointExplanation.text["file path", "Endpoint explanation should mention kind")
+        Do $$$AssertTrue($IsObject(endpointExplanation.evidence), "Endpoint explanation must include evidence")
+    }
     Do $$$AssertTrue($IsObject(..FindArtifact(result.artifacts, "routing-rule", "esh.interoperability.aid.tests.DemoRoutingRule")), "Routing rule artifact should be present")
     Do $$$AssertTrue($IsObject(..FindArtifact(result.artifacts, "rule-transformation", "esh.interoperability.aid.tests.DemoTransform")), "Rule transform artifact should be present")
     Do $$$AssertTrue($IsObject(..FindArtifact(result.artifacts, "bpl-process", "esh.interoperability.aid.tests.DemoProcess")), "BPL artifact should be present")
+    Do $$$AssertEquals(result.artifactExplanations.%Size(), result.artifacts.%Size(), "Analysis artifact explanation count mismatch")
+    Set artifactExplanation = ..FindArtifactExplanation(result.artifactExplanations, "routing-rule", "esh.interoperability.aid.tests.DemoRoutingRule")
+    Do $$$AssertTrue($IsObject(artifactExplanation), "Routing rule artifact explanation should be present")
+    If $IsObject(artifactExplanation) {
+        Do $$$AssertEquals(artifactExplanation.label, "routing rule", "Artifact explanation label mismatch")
+        Do $$$AssertTrue(artifactExplanation.text["Patient Router", "Artifact explanation should mention component")
+        Do $$$AssertTrue(artifactExplanation.text["DemoRoutingRule", "Artifact explanation should mention artifact")
+        Do $$$AssertTrue($IsObject(artifactExplanation.evidence), "Artifact explanation must include evidence")
+    }
     Do $$$AssertEquals(result.componentExplanations.%Size(), 4, "Analysis component explanation count mismatch")
+    Do $$$AssertEquals(result.connectionExplanations.%Size(), 5, "Analysis connection explanation count mismatch")
+    Set connectionExplanation = ..FindConnectionExplanation(result.connectionExplanations, "Patient Router", "FHIR Operation", "routing-rule")
+    Do $$$AssertTrue($IsObject(connectionExplanation), "Routing rule connection explanation should be present")
+    If $IsObject(connectionExplanation) {
+        Do $$$AssertEquals(connectionExplanation.ruleName, "esh.interoperability.aid.tests.DemoRoutingRule", "Connection explanation rule mismatch")
+        Do $$$AssertTrue(connectionExplanation.text["DemoRoutingRule", "Connection explanation should mention routing rule")
+        Do $$$AssertTrue(connectionExplanation.text["Patient Router", "Connection explanation should mention source")
+        Do $$$AssertTrue(connectionExplanation.text["FHIR Operation", "Connection explanation should mention target")
+        Do $$$AssertTrue($IsObject(connectionExplanation.evidence), "Connection explanation must include evidence")
+    }
+    Do $$$AssertTrue(result.messageTypeExplanations.%Size() > 0, "Analysis message type explanations should be present")
+    Set messageExplanation = ..FindMessageTypeExplanation(result.messageTypeExplanations, "CSV Patient Service", "OnProcessInput", "pInput")
+    Do $$$AssertTrue($IsObject(messageExplanation), "Service input message explanation should be present")
+    If $IsObject(messageExplanation) {
+        Do $$$AssertEquals(messageExplanation.messageClass, "esh.interoperability.aid.tests.DemoMessage", "Message explanation class mismatch")
+        Do $$$AssertTrue(messageExplanation.text["CSV Patient Service", "Message explanation should mention component")
+        Do $$$AssertTrue(messageExplanation.text["DemoMessage", "Message explanation should mention message class")
+        Do $$$AssertTrue($IsObject(messageExplanation.evidence), "Message explanation must include evidence")
+    }
     Set serviceExplanation = ..FindComponentExplanation(result.componentExplanations, "CSV Patient Service")
     Do $$$AssertTrue($IsObject(serviceExplanation), "Service explanation should be present")
     If $IsObject(serviceExplanation) {
@@ -705,6 +942,7 @@ Method TestGetProductionAnalysis()
         Do $$$AssertTrue(routerExplanation.text["esh.interoperability.aid.tests.DemoProcess", "Router explanation should mention BPL process")
     }
     Do $$$AssertEquals(result.rules.%Size(), 1, "Analysis rule count mismatch")
+    Do $$$AssertEquals(result.ruleExplanations.%Size(), 1, "Analysis rule explanation count mismatch")
     Set rule = ..FindRule(result.rules, "esh.interoperability.aid.tests.DemoRoutingRule")
     Do $$$AssertTrue($IsObject(rule), "Rule detail should be present")
     Do $$$AssertEquals(rule.component, "Patient Router", "Rule component mismatch")
@@ -715,7 +953,20 @@ Method TestGetProductionAnalysis()
     Set send = condition.sends.%Get(0)
     Do $$$AssertEquals(send.target, "FHIR Operation", "Rule send target mismatch")
     Do $$$AssertEquals(send.transform, "esh.interoperability.aid.tests.DemoTransform", "Rule send transform mismatch")
+    Set ruleExplanation = ..FindRuleExplanation(result.ruleExplanations, "esh.interoperability.aid.tests.DemoRoutingRule")
+    Do $$$AssertTrue($IsObject(ruleExplanation), "Rule explanation should be present")
+    If $IsObject(ruleExplanation) {
+        Do $$$AssertEquals(ruleExplanation.conditionCount, 1, "Rule explanation condition count mismatch")
+        Do $$$AssertEquals(ruleExplanation.targetCount, 1, "Rule explanation target count mismatch")
+        Do $$$AssertEquals(ruleExplanation.transformCount, 1, "Rule explanation transform count mismatch")
+        Do $$$AssertEquals(ruleExplanation.targets.%Get(0), "FHIR Operation", "Rule explanation target mismatch")
+        Do $$$AssertEquals(ruleExplanation.transforms.%Get(0), "esh.interoperability.aid.tests.DemoTransform", "Rule explanation transform mismatch")
+        Do $$$AssertTrue(ruleExplanation.text["DemoRoutingRule", "Rule explanation should mention rule")
+        Do $$$AssertTrue(ruleExplanation.text["FHIR Operation", "Rule explanation should mention target")
+        Do $$$AssertTrue($IsObject(ruleExplanation.evidence), "Rule explanation must include evidence")
+    }
     Do $$$AssertEquals(result.transformations.%Size(), 1, "Analysis transformation count mismatch")
+    Do $$$AssertEquals(result.transformationExplanations.%Size(), 1, "Analysis transformation explanation count mismatch")
     Set transformation = ..FindTransformation(result.transformations, "esh.interoperability.aid.tests.DemoTransform")
     Do $$$AssertTrue($IsObject(transformation), "Transformation detail should be present")
     If $IsObject(transformation) {
@@ -728,7 +979,16 @@ Method TestGetProductionAnalysis()
         Do $$$AssertEquals(assignment.property, "target.EventType", "Transformation first assignment target mismatch")
         Do $$$AssertEquals(assignment.value, "source.EventType", "Transformation first assignment value mismatch")
     }
+    Set transformationExplanation = ..FindTransformationExplanation(result.transformationExplanations, "esh.interoperability.aid.tests.DemoTransform")
+    Do $$$AssertTrue($IsObject(transformationExplanation), "Transformation explanation should be present")
+    If $IsObject(transformationExplanation) {
+        Do $$$AssertEquals(transformationExplanation.assignmentCount, 2, "Transformation explanation assignment count mismatch")
+        Do $$$AssertTrue(transformationExplanation.text["DemoTransform", "Transformation explanation should mention transform")
+        Do $$$AssertTrue(transformationExplanation.text["DemoMessage", "Transformation explanation should mention message class")
+        Do $$$AssertTrue($IsObject(transformationExplanation.evidence), "Transformation explanation must include evidence")
+    }
     Do $$$AssertEquals(result.businessProcesses.%Size(), 1, "Analysis BPL process count mismatch")
+    Do $$$AssertEquals(result.businessProcessExplanations.%Size(), 1, "Analysis BPL process explanation count mismatch")
     Set bplProcess = ..FindBusinessProcess(result.businessProcesses, "esh.interoperability.aid.tests.DemoProcess")
     Do $$$AssertTrue($IsObject(bplProcess), "BPL process detail should be present")
     If $IsObject(bplProcess) {
@@ -743,12 +1003,23 @@ Method TestGetProductionAnalysis()
         Do $$$AssertEquals(call.name, "SendToFHIR", "BPL call name mismatch")
         Do $$$AssertEquals(call.target, "FHIR Operation", "BPL call target mismatch")
     }
+    Set bplExplanation = ..FindBusinessProcessExplanation(result.businessProcessExplanations, "esh.interoperability.aid.tests.DemoProcess")
+    Do $$$AssertTrue($IsObject(bplExplanation), "BPL process explanation should be present")
+    If $IsObject(bplExplanation) {
+        Do $$$AssertEquals(bplExplanation.callCount, 1, "BPL process explanation call count mismatch")
+        Do $$$AssertEquals(bplExplanation.assignCount, 2, "BPL process explanation assign count mismatch")
+        Do $$$AssertEquals(bplExplanation.callTargets.%Size(), 1, "BPL process explanation target count mismatch")
+        Do $$$AssertEquals(bplExplanation.callTargets.%Get(0), "FHIR Operation", "BPL process explanation target mismatch")
+        Do $$$AssertTrue(bplExplanation.text["DemoProcess", "BPL process explanation should mention process")
+        Do $$$AssertTrue(bplExplanation.text["FHIR Operation", "BPL process explanation should mention call target")
+        Do $$$AssertTrue($IsObject(bplExplanation.evidence), "BPL process explanation must include evidence")
+    }
     Do $$$AssertTrue(result.messageTypes.%Size() > 0, "Analysis message types should be present")
     Set serviceInput = ..FindMessageType(result.messageTypes, "CSV Patient Service", "OnProcessInput", "pInput")
     Do $$$AssertTrue($IsObject(serviceInput), "Service input message type should be present")
     If $IsObject(serviceInput) {
         Do $$$AssertEquals(serviceInput.direction, "input", "Service input message direction mismatch")
-        Do $$$AssertEquals(serviceInput.messageClass, "%RegisteredObject", "Service input message class mismatch")
+        Do $$$AssertEquals(serviceInput.messageClass, "esh.interoperability.aid.tests.DemoMessage", "Service input message class mismatch")
     }
     Set processResponse = ..FindMessageType(result.messageTypes, "Patient Router", "OnRequest", "pResponse")
     Do $$$AssertTrue($IsObject(processResponse), "Process response message type should be present")
@@ -802,6 +1073,7 @@ Method TestGetProductionGraph()
         Do $$$AssertEquals(edge.relationship, "sends", "Graph edge relationship mismatch")
         Do $$$AssertEquals(edge.ruleName, "esh.interoperability.aid.tests.DemoRoutingRule", "Graph edge rule mismatch")
         Do $$$AssertTrue($IsObject(edge.messageTypes), "Graph edge should include messageTypes")
+        Do $$$AssertTrue(edge.text["DemoRoutingRule", "Graph edge explanation should mention routing rule")
     }
     Do $$$AssertEquals(result.confidence, "confirmed", "Graph confidence mismatch")
 }
@@ -865,6 +1137,12 @@ Method TestGetComponentDetail()
     Do $$$AssertEquals(result.transformations.%Size(), 1, "Component detail transformation count mismatch")
     Do $$$AssertEquals(result.businessProcesses.%Size(), 1, "Component detail BPL count mismatch")
     Do $$$AssertTrue(result.messageTypes.%Size() > 0, "Component detail should include message signatures")
+    Do $$$AssertTrue(result.connectionExplanations.%Size() > 0, "Component detail should include connection explanations")
+    Do $$$AssertTrue(result.artifactExplanations.%Size() > 0, "Component detail should include artifact explanations")
+    Do $$$AssertEquals(result.ruleExplanations.%Size(), 1, "Component detail rule explanation count mismatch")
+    Do $$$AssertTrue($IsObject(result.messageTypeExplanations), "Component detail must include message type explanations array")
+    Do $$$AssertEquals(result.transformationExplanations.%Size(), 1, "Component detail transformation explanation count mismatch")
+    Do $$$AssertEquals(result.businessProcessExplanations.%Size(), 1, "Component detail BPL explanation count mismatch")
     Do $$$AssertTrue($IsObject(result.evidence), "Component detail must include evidence")
 }
 

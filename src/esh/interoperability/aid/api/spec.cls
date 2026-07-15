@@ -1482,10 +1482,22 @@ XData OpenAPI [ MimeType = application/json ]
             "$ref": "#/definitions/Connection"
           }
         },
+        "connectionExplanations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConnectionExplanation"
+          }
+        },
         "externalSystems": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/ExternalSystem"
+          }
+        },
+        "externalSystemExplanations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExternalSystemExplanation"
           }
         },
         "artifacts": {
@@ -1494,10 +1506,22 @@ XData OpenAPI [ MimeType = application/json ]
             "$ref": "#/definitions/AnalysisArtifact"
           }
         },
+        "artifactExplanations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ArtifactExplanation"
+          }
+        },
         "rules": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/RuleDetail"
+          }
+        },
+        "ruleExplanations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RuleExplanation"
           }
         },
         "messageTypes": {
@@ -1506,16 +1530,34 @@ XData OpenAPI [ MimeType = application/json ]
             "$ref": "#/definitions/MessageType"
           }
         },
+        "messageTypeExplanations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessageTypeExplanation"
+          }
+        },
         "transformations": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/TransformationDetail"
           }
         },
+        "transformationExplanations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TransformationExplanation"
+          }
+        },
         "businessProcesses": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/BusinessProcessDetail"
+          }
+        },
+        "businessProcessExplanations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BusinessProcessExplanation"
           }
         },
         "warnings": {
@@ -2121,6 +2163,9 @@ XData OpenAPI [ MimeType = application/json ]
             }
           }
         },
+        "staticContext": {
+          "$ref": "#/definitions/TraceStaticContext"
+        },
         "text": {
           "type": "string"
         },
@@ -2342,6 +2387,24 @@ XData OpenAPI [ MimeType = application/json ]
         "inProduction": {
           "type": "boolean"
         },
+        "staticConnectionKind": {
+          "type": "string"
+        },
+        "staticConnectionConfidence": {
+          "type": "string"
+        },
+        "staticRuleName": {
+          "type": "string"
+        },
+        "staticTransformNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "staticProcessClass": {
+          "type": "string"
+        },
         "messageBodyClassName": {
           "type": "string"
         },
@@ -2375,6 +2438,39 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "TraceStaticContext": {
+      "type": "object",
+      "properties": {
+        "connectionKinds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ruleNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "transformNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "processClasses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "matchedStepCount": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
     "TraceExplanation": {
       "type": "object",
       "properties": {
@@ -2385,6 +2481,9 @@ XData OpenAPI [ MimeType = application/json ]
         "sessionId": {
           "type": "integer",
           "format": "int64"
+        },
+        "productionName": {
+          "type": "string"
         },
         "text": {
           "type": "string"
@@ -2439,10 +2538,22 @@ XData OpenAPI [ MimeType = application/json ]
             "$ref": "#/definitions/AnalysisArtifact"
           }
         },
+        "artifactExplanations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ArtifactExplanation"
+          }
+        },
         "rules": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/RuleDetail"
+          }
+        },
+        "ruleExplanations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RuleExplanation"
           }
         },
         "messageTypes": {
@@ -2463,10 +2574,40 @@ XData OpenAPI [ MimeType = application/json ]
             "$ref": "#/definitions/BusinessProcessDetail"
           }
         },
+        "businessProcessExplanations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BusinessProcessExplanation"
+          }
+        },
         "componentExplanations": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/ComponentExplanation"
+          }
+        },
+        "connectionExplanations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConnectionExplanation"
+          }
+        },
+        "externalSystemExplanations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExternalSystemExplanation"
+          }
+        },
+        "messageTypeExplanations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessageTypeExplanation"
+          }
+        },
+        "transformationExplanations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TransformationExplanation"
           }
         },
         "warnings": {
@@ -2618,6 +2759,9 @@ XData OpenAPI [ MimeType = application/json ]
         "processClass": {
           "type": "string"
         },
+        "text": {
+          "type": "string"
+        },
         "confidence": {
           "type": "string"
         },
@@ -2684,6 +2828,35 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "ExternalSystemExplanation": {
+      "type": "object",
+      "properties": {
+        "component": {
+          "type": "string"
+        },
+        "componentType": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
     "AnalysisArtifact": {
       "type": "object",
       "properties": {
@@ -2694,6 +2867,35 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "string"
         },
         "component": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "ArtifactExplanation": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "component": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "text": {
           "type": "string"
         },
         "confidence": {
@@ -2727,6 +2929,53 @@ XData OpenAPI [ MimeType = application/json ]
           "items": {
             "$ref": "#/definitions/RuleSend"
           }
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "RuleExplanation": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "component": {
+          "type": "string"
+        },
+        "conditionCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "transforms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "targetCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "transformCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "text": {
+          "type": "string"
         },
         "confidence": {
           "type": "string"
@@ -2864,6 +3113,42 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "TransformationExplanation": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "component": {
+          "type": "string"
+        },
+        "sourceKind": {
+          "type": "string"
+        },
+        "sourceClass": {
+          "type": "string"
+        },
+        "targetClass": {
+          "type": "string"
+        },
+        "assignmentCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "text": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
     "TransformationAssignment": {
       "type": "object",
       "properties": {
@@ -2925,6 +3210,52 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "BusinessProcessExplanation": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "component": {
+          "type": "string"
+        },
+        "requestClass": {
+          "type": "string"
+        },
+        "responseClass": {
+          "type": "string"
+        },
+        "contextClass": {
+          "type": "string"
+        },
+        "callTargets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "callCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "assignCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "text": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
     "BusinessProcessCall": {
       "type": "object",
       "properties": {
@@ -2959,6 +3290,82 @@ XData OpenAPI [ MimeType = application/json ]
         },
         "componentType": {
           "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "MessageTypeExplanation": {
+      "type": "object",
+      "properties": {
+        "component": {
+          "type": "string"
+        },
+        "componentType": {
+          "type": "string"
+        },
+        "className": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "parameter": {
+          "type": "string"
+        },
+        "direction": {
+          "type": "string"
+        },
+        "messageClass": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "ConnectionExplanation": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "ruleName": {
+          "type": "string"
+        },
+        "processClass": {
+          "type": "string"
+        },
+        "messageClasses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "text": {
           "type": "string"
