@@ -107,9 +107,6 @@ ClassMethod UpdateFromPayload(payload As %DynamicObject) As %DynamicObject
             Set result.changed = 1
         }
         Set settings.PayloadInspectionEnabled = value
-        If value {
-            Do result.warnings.%Push(..NewWarning("PAYLOAD_INSPECTION_UNSUPPORTED", "Payload inspection can be enabled in settings, but payload body inspection is not implemented in this version."))
-        }
     }
     If payload.%IsDefined("messageResendEnabled") {
         Set value = ..NormalizeBooleanValue(payload.%Get("messageResendEnabled"), before.messageResendEnabled)
@@ -117,9 +114,6 @@ ClassMethod UpdateFromPayload(payload As %DynamicObject) As %DynamicObject
             Set result.changed = 1
         }
         Set settings.MessageResendEnabled = value
-        If value {
-            Do result.warnings.%Push(..NewWarning("MESSAGE_RESEND_UNSUPPORTED", "Message resend can be enabled in settings, but resend execution is not implemented in this version."))
-        }
     }
     If payload.%IsDefined("maxMessagesReturned") {
         Set value = ..NormalizeIntegerValue(payload.%Get("maxMessagesReturned"), before.maxMessagesReturned, 1, 500)

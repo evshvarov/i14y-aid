@@ -1,9 +1,11 @@
+/// Discover and explain InterSystems IRIS interoperability productions in the current namespace.<br/>
+/// Business logic class defined by OpenAPI in esh.interoperability.aid.api.spec<br/>
+/// Updated Jul 15, 2026 08:05:19
 Class esh.interoperability.aid.api.impl Extends %REST.Impl [ ProcedureBlock ]
 {
 
 Parameter ExposeServerExceptions = 1;
 
-/// /_spec
 /// Get OpenAPI spec
 ClassMethod GetSpec() As %DynamicObject
 {
@@ -14,6 +16,7 @@ ClassMethod GetSpec() As %DynamicObject
     return spec
 }
 
+/// Get module health and capabilities
 ClassMethod Health() As %DynamicObject
 {
     Set result = {}
@@ -25,17 +28,23 @@ ClassMethod Health() As %DynamicObject
     return result
 }
 
+/// Get supported analysis capabilities
 ClassMethod Capabilities() As %DynamicObject
 {
     return ##class(esh.interoperability.aid.service.ProductionDiscovery).Capabilities()
 }
 
+/// Get module analysis settings
 ClassMethod GetSettings() As %DynamicObject
 {
     return ##class(esh.interoperability.aid.service.ProductionDiscovery).GetSettings()
 }
 
-ClassMethod UpdateSettings(settings As %DynamicObject = "") As %DynamicObject
+/// Update module analysis settings<br/>
+/// The method arguments hold values for:<br/>
+///     settings<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod UpdateSettings(settings As %DynamicObject) As %DynamicObject
 {
     If '$IsObject(settings) {
         Set settings = ..ReadJsonBody()
@@ -44,12 +53,17 @@ ClassMethod UpdateSettings(settings As %DynamicObject = "") As %DynamicObject
     return ..HandleSettingsResult(result)
 }
 
+/// List interoperability productions in the current namespace
 ClassMethod ListProductions() As %DynamicObject
 {
     return ##class(esh.interoperability.aid.service.ProductionDiscovery).ListProductions()
 }
 
-ClassMethod GetProduction(productionName As %VarString) As %DynamicObject
+/// Get production metadata<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod GetProduction(productionName As %String) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProduction(productionName)
     If result.%IsDefined("errorCode") {
@@ -63,55 +77,101 @@ ClassMethod GetProduction(productionName As %VarString) As %DynamicObject
     return result
 }
 
-ClassMethod ListComponents(productionName As %VarString) As %DynamicObject
+/// List production components<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod ListComponents(productionName As %String) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListComponents(productionName)
     return ..HandleProductionResult(result)
 }
 
-ClassMethod GetComponentDetail(productionName As %VarString, componentName As %VarString) As %DynamicObject
+/// Get production component detail<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     componentName<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod GetComponentDetail(productionName As %String, componentName As %String) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetComponentDetail(productionName, componentName)
     return ..HandleProductionResult(result)
 }
 
-ClassMethod GetProductionAnalysis(productionName As %VarString) As %DynamicObject
+/// Get static production analysis model<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod GetProductionAnalysis(productionName As %String) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionAnalysis(productionName)
     return ..HandleProductionResult(result)
 }
 
-ClassMethod GetProductionSummary(productionName As %VarString) As %DynamicObject
+/// Get deterministic production summary<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod GetProductionSummary(productionName As %String) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionSummary(productionName)
     return ..HandleProductionResult(result)
 }
 
-ClassMethod GetProductionGraph(productionName As %VarString) As %DynamicObject
+/// Get frontend-neutral production graph<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod GetProductionGraph(productionName As %String) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionGraph(productionName)
     return ..HandleProductionResult(result)
 }
 
-ClassMethod GetProductionStatus(productionName As %VarString) As %DynamicObject
+/// Get production runtime status<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod GetProductionStatus(productionName As %String) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionRuntimeStatus(productionName)
     return ..HandleProductionResult(result)
 }
 
-ClassMethod StartProduction(productionName As %VarString) As %DynamicObject
+/// Start production<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod StartProduction(productionName As %String) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).StartProduction(productionName)
     return ..HandleProductionActionResult(result)
 }
 
-ClassMethod StopProduction(productionName As %VarString, timeout As %Integer = 10, force As %Boolean = 0) As %DynamicObject
+/// Stop production<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     timeout<br/>
+///     force<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod StopProduction(productionName As %String, timeout As %Integer = 10, force As %Boolean = 0) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).StopProduction(productionName, timeout, force)
     return ..HandleProductionActionResult(result)
 }
 
-ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0) As %DynamicObject
+/// List recent interoperability message headers<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     limit<br/>
+///     offset<br/>
+///     sourceConfigName<br/>
+///     targetConfigName<br/>
+///     messageBodyClassName<br/>
+///     sessionId<br/>
+///     errorsOnly<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod ListMessages(productionName As %String, limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %String, targetConfigName As %String, messageBodyClassName As %String, sessionId As %String, errorsOnly As %Boolean = 0) As %DynamicObject
 {
     If '$Data(productionName) {
         Set productionName = ""
@@ -141,7 +201,18 @@ ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 
     return ..HandleRuntimeResult(result)
 }
 
-ClassMethod ListProductionMessages(productionName As %VarString, limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0) As %DynamicObject
+/// List recent interoperability message headers for a production<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     limit<br/>
+///     offset<br/>
+///     sourceConfigName<br/>
+///     targetConfigName<br/>
+///     messageBodyClassName<br/>
+///     sessionId<br/>
+///     errorsOnly<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod ListProductionMessages(productionName As %String, limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %String, targetConfigName As %String, messageBodyClassName As %String, sessionId As %String, errorsOnly As %Boolean = 0) As %DynamicObject
 {
     If '$Data(limit) {
         Set limit = 50
@@ -168,7 +239,12 @@ ClassMethod ListProductionMessages(productionName As %VarString, limit As %Integ
     return ..HandleRuntimeResult(result)
 }
 
-ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integer = 500) As %DynamicObject
+/// List recent message filter facets<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     limit<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod ListMessageFacets(productionName As %String, limit As %Integer = 500) As %DynamicObject
 {
     If '$Data(productionName) {
         Set productionName = ""
@@ -180,7 +256,12 @@ ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integ
     return ..HandleRuntimeResult(result)
 }
 
-ClassMethod ListProductionMessageFacets(productionName As %VarString, limit As %Integer = 500) As %DynamicObject
+/// List recent message filter facets for a production<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     limit<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod ListProductionMessageFacets(productionName As %String, limit As %Integer = 500) As %DynamicObject
 {
     If '$Data(limit) {
         Set limit = 500
@@ -189,61 +270,122 @@ ClassMethod ListProductionMessageFacets(productionName As %VarString, limit As %
     return ..HandleRuntimeResult(result)
 }
 
+/// Get message header metadata<br/>
+/// The method arguments hold values for:<br/>
+///     messageId<br/>
 ClassMethod GetMessage(messageId As %Integer) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetMessage(messageId)
     return ..HandleRuntimeResult(result)
 }
 
-ClassMethod GetProductionMessage(productionName As %VarString, messageId As %Integer) As %DynamicObject
+/// Get production-scoped message header metadata<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     messageId<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod GetProductionMessage(productionName As %String, messageId As %Integer) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionMessage(productionName, messageId)
     return ..HandleRuntimeResult(result)
 }
 
+/// Get safe payload metadata for a message<br/>
+/// The method arguments hold values for:<br/>
+///     messageId<br/>
 ClassMethod GetMessagePayloadMetadata(messageId As %Integer) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetMessagePayloadMetadata(messageId)
     return ..HandleRuntimeResult(result)
 }
 
-ClassMethod GetProductionMessagePayloadMetadata(productionName As %VarString, messageId As %Integer) As %DynamicObject
+/// Get production-scoped safe payload metadata for a message<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     messageId<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod GetProductionMessagePayloadMetadata(productionName As %String, messageId As %Integer) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionMessagePayloadMetadata(productionName, messageId)
     return ..HandleRuntimeResult(result)
 }
 
+/// Get safe payload preview for a message<br/>
+/// The method arguments hold values for:<br/>
+///     messageId<br/>
+ClassMethod GetMessagePayloadPreview(messageId As %Integer) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetMessagePayloadPreview(messageId)
+    return ..HandleRuntimeResult(result)
+}
+
+/// Get production-scoped safe payload preview for a message<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     messageId<br/>
+ClassMethod GetProductionMessagePayloadPreview(productionName As %String, messageId As %Integer) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionMessagePayloadPreview(productionName, messageId)
+    return ..HandleRuntimeResult(result)
+}
+
+/// Get runtime trace for a message header<br/>
+/// The method arguments hold values for:<br/>
+///     messageId<br/>
 ClassMethod GetMessageTrace(messageId As %Integer) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetMessageTrace(messageId)
     return ..HandleRuntimeResult(result)
 }
 
-ClassMethod GetProductionMessageTrace(productionName As %VarString, messageId As %Integer) As %DynamicObject
+/// Get production-scoped runtime trace for a message header<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     messageId<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod GetProductionMessageTrace(productionName As %String, messageId As %Integer) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionMessageTrace(productionName, messageId)
     return ..HandleRuntimeResult(result)
 }
 
-ClassMethod GetProductionMessageSessionSummary(productionName As %VarString, messageId As %Integer) As %DynamicObject
+/// Get production-scoped message session summary<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     messageId<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod GetProductionMessageSessionSummary(productionName As %String, messageId As %Integer) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionMessageSessionSummary(productionName, messageId)
     return ..HandleRuntimeResult(result)
 }
 
-ClassMethod ResendProductionMessage(productionName As %VarString, messageId As %Integer) As %DynamicObject
+/// Request production-scoped message resend<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     messageId<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod ResendProductionMessage(productionName As %String, messageId As %Integer) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ResendProductionMessage(productionName, messageId)
     return ..HandleRuntimeResult(result)
 }
 
+/// Get deterministic explanation for a message trace<br/>
+/// The method arguments hold values for:<br/>
+///     messageId<br/>
 ClassMethod GetMessageExplanation(messageId As %Integer) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetMessageExplanation(messageId)
     return ..HandleRuntimeResult(result)
 }
 
-ClassMethod GetProductionMessageExplanation(productionName As %VarString, messageId As %Integer) As %DynamicObject
+/// Get production-scoped deterministic explanation for a message trace<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     messageId<br/>
+/// WARNING: This method's signature has changed.
+ClassMethod GetProductionMessageExplanation(productionName As %String, messageId As %Integer) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionMessageExplanation(productionName, messageId)
     return ..HandleRuntimeResult(result)
@@ -294,6 +436,9 @@ ClassMethod HandleRuntimeResult(result As %DynamicObject) As %DynamicObject [ Pr
         }
         If result.errorCode = "STATUS_ERROR" {
             return ..Error(500, "STATUS_ERROR", "Runtime message query failed.")
+        }
+        If result.errorCode = "RESEND_FAILED" {
+            return ..Error(500, "RESEND_FAILED", result.%Get("statusText"))
         }
     }
     return result

@@ -18,8 +18,9 @@ The first implementation increment supports:
 - DTL transformation summary extraction for accessible `DTL` XData;
 - BPL process summary extraction for accessible `BPL` XData;
 - API-managed module analysis settings for runtime message limits and feature flags;
-- recent interoperability message header listing, production-scoped session trace reconstruction, deterministic trace explanations, and safe payload metadata without returning payload bodies;
-- safe payload metadata reporting with explicit restriction flags and no body content returned;
+- recent interoperability message header listing, production-scoped session trace reconstruction, deterministic trace explanations, and safe payload metadata;
+- safe payload metadata reporting with explicit restriction flags and optional redacted scalar payload preview when enabled in settings;
+- settings-gated production-scoped message resend through `Ens.MessageHeader.ResendMessage` when available;
 - deterministic component-level explanations with evidence and confidence;
 - deterministic production summaries;
 - Swagger 2.0 API documentation at `/_spec`.
@@ -53,6 +54,7 @@ GET /i14y-aid/api/messages
 GET /i14y-aid/api/messages/facets
 GET /i14y-aid/api/messages/{messageId}
 GET /i14y-aid/api/messages/{messageId}/payload
+GET /i14y-aid/api/messages/{messageId}/payload/preview
 GET /i14y-aid/api/messages/{messageId}/trace
 GET /i14y-aid/api/messages/{messageId}/explanation
 GET /i14y-aid/api/productions
@@ -67,9 +69,11 @@ GET /i14y-aid/api/productions/{productionName}/messages
 GET /i14y-aid/api/productions/{productionName}/messages/facets
 GET /i14y-aid/api/productions/{productionName}/messages/{messageId}
 GET /i14y-aid/api/productions/{productionName}/messages/{messageId}/payload
+GET /i14y-aid/api/productions/{productionName}/messages/{messageId}/payload/preview
 GET /i14y-aid/api/productions/{productionName}/messages/{messageId}/trace
 GET /i14y-aid/api/productions/{productionName}/messages/{messageId}/session
 GET /i14y-aid/api/productions/{productionName}/messages/{messageId}/explanation
+POST /i14y-aid/api/productions/{productionName}/messages/{messageId}/resend
 POST /i14y-aid/api/productions/{productionName}/start
 POST /i14y-aid/api/productions/{productionName}/stop
 ```
@@ -83,6 +87,7 @@ curl http://localhost:57337/i14y-aid/api/settings
 curl -X PUT http://localhost:57337/i14y-aid/api/settings -H "Content-Type: application/json" -d '{"maxTraceDepth":25,"explanationVerbosity":"brief"}'
 curl "http://localhost:57337/i14y-aid/api/messages?limit=10"
 curl "http://localhost:57337/i14y-aid/api/messages/1/payload"
+curl "http://localhost:57337/i14y-aid/api/messages/1/payload/preview"
 curl http://localhost:57337/i14y-aid/api/productions
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/components"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/analysis"
@@ -93,6 +98,7 @@ curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.t
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages/1"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages/1/trace"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages/1/session"
+curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages/1/payload/preview"
 ```
 
 ## Build And Test
@@ -128,11 +134,11 @@ See [docs/demo.md](docs/demo.md) for an end-to-end walkthrough with the sample C
 - install `esh-i14y-csv`;
 - start the production;
 - create a test CSV file in `/home/irisowner/irisdev/in/`;
-- inspect production graph, component detail, runtime messages, trace, explanation, and payload metadata;
+- inspect production graph, component detail, runtime messages, trace, explanation, payload metadata, and optional redacted payload preview;
 - use the optional `i14y-aid-ui` frontend.
 
 ## Current Scope
 
-This version analyzes only the current namespace. It reads compiled class metadata, production XData, accessible routing-rule XData, accessible DTL XData, accessible BPL XData, and interoperability message header metadata. Deeper BPL internals and payload inspection are intentionally deferred.
+This version analyzes only the current namespace. It reads compiled class metadata, production XData, accessible routing-rule XData, accessible DTL XData, accessible BPL XData, interoperability message header metadata, and settings-gated scalar payload preview fields. Deeper BPL internals and full payload object graph inspection are intentionally deferred.
 
-Message bodies are not read or returned by this increment.
+Payload bodies are not returned wholesale. When payload inspection is enabled, the preview endpoint opens the stored body object and returns scalar fields only, applying configured redaction patterns.

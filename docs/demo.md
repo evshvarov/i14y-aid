@@ -137,6 +137,16 @@ curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction
 Payload metadata is intentionally safe: the response reports body class/id and restriction flags, but does not return message body content.
 Production-scoped trace responses also report how many reconstructed session steps belong to the selected production and mark each step as inside or outside that production.
 
+To inspect redacted scalar payload fields, enable payload inspection and call the preview endpoint:
+
+```sh
+curl -X PUT http://localhost:57337/i14y-aid/api/settings \
+  -H "Content-Type: application/json" \
+  -d '{"payloadInspectionEnabled":1,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email"}'
+
+curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/messages/1/payload/preview"
+```
+
 ## 7. Use The UI
 
 From the sibling UI project:
@@ -160,7 +170,7 @@ Recommended UI path:
 3. Inspect the production graph.
 4. Click graph nodes or component rows to load focused component detail.
 5. Open the Messages window.
-6. Select a runtime message to inspect trace and payload metadata.
+6. Select a runtime message to inspect trace, payload metadata, and payload preview when enabled.
 7. Adjust Runtime Settings only when you want to change query limits or verbosity.
 
 ## 8. Reset Settings After Experiments
@@ -168,13 +178,13 @@ Recommended UI path:
 ```sh
 curl -X PUT http://localhost:57337/i14y-aid/api/settings \
   -H "Content-Type: application/json" \
-  -d '{"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}'
+  -d '{"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}'
 ```
 
 ## Known Limitations
 
 - Analysis is scoped to the current namespace.
 - Production definitions are read, not modified.
-- Message body content is not read or returned.
-- Payload inspection can be configured, but body inspection is not implemented in this increment.
+- Payload preview is settings-gated and returns scalar fields only, with configured redaction patterns applied.
+- Full object graph payload inspection is not implemented in this increment.
 - Static analysis depends on accessible compiled class metadata and XData.

@@ -148,6 +148,36 @@ Method FindParameter(items As %DynamicArray, parameterName As %VarString) As %Dy
     return found
 }
 
+Method FindPayloadPreviewField(items As %DynamicArray, fieldName As %VarString) As %DynamicObject [ Private ]
+{
+    Set found = ""
+    For index = 0:1:items.%Size()-1 {
+        Set item = items.%Get(index)
+        If $IsObject(item) {
+            If item.name = fieldName {
+                Set found = item
+                Quit
+            }
+        }
+    }
+    return found
+}
+
+Method FindWarning(items As %DynamicArray, warningCode As %VarString) As %DynamicObject [ Private ]
+{
+    Set found = ""
+    For index = 0:1:items.%Size()-1 {
+        Set item = items.%Get(index)
+        If $IsObject(item) {
+            If item.code = warningCode {
+                Set found = item
+                Quit
+            }
+        }
+    }
+    return found
+}
+
 Method FindTransformation(items As %DynamicArray, transformName As %VarString) As %DynamicObject [ Private ]
 {
     Set found = ""
@@ -193,6 +223,42 @@ Method FindComponentExplanation(items As %DynamicArray, componentName As %VarStr
     return found
 }
 
+Method CreatePayloadPreviewMessage() As %DynamicObject [ Private ]
+{
+    Set result = {}
+    Set body = ##class(esh.interoperability.aid.tests.DemoMessage).%New()
+    Set body.EventType = "ADT"
+    Set body.PatientId = "MRN123"
+    Set sc = body.%Save()
+    If $$$ISERR(sc) {
+        Do result.%Set("errorCode", "BODY_SAVE_FAILED")
+        Do result.%Set("statusText", $System.Status.GetErrorText(sc))
+        return result
+    }
+
+    Set header = ##class(Ens.MessageHeader).%New()
+    Set header.SessionId = $Random(1000000)+1000000
+    Set header.SourceConfigName = "CSV Patient Service"
+    Set header.TargetConfigName = "Patient Router"
+    Set header.MessageBodyClassName = "esh.interoperability.aid.tests.DemoMessage"
+    Set header.MessageBodyId = body.%Id()
+    Set header.Status = 1
+    Set header.Type = 1
+    Set header.Invocation = 1
+    Set header.TimeCreated = $ZDATETIME($HOROLOG, 3)
+    Set header.TimeProcessed = $ZDATETIME($HOROLOG, 3)
+    Set sc = header.%Save()
+    If $$$ISERR(sc) {
+        Do result.%Set("errorCode", "HEADER_SAVE_FAILED")
+        Do result.%Set("statusText", $System.Status.GetErrorText(sc))
+        return result
+    }
+
+    Set result.messageId = header.%Id()
+    Set result.bodyId = body.%Id()
+    return result
+}
+
 Method TestGetSpec()
 {
     Do ..InitRequestResponse()
@@ -220,6 +286,7 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/facets"), "Spec must expose production message facets endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/{messageId}"), "Spec must expose production-scoped message detail endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/{messageId}/payload"), "Spec must expose production-scoped message payload endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/{messageId}/payload/preview"), "Spec must expose production-scoped message payload preview endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/{messageId}/trace"), "Spec must expose production-scoped message trace endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/{messageId}/session"), "Spec must expose production-scoped message session summary endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/{messageId}/resend"), "Spec must expose production-scoped message resend endpoint")
@@ -229,6 +296,7 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.paths.%IsDefined("/messages/facets"), "Spec must expose message facets endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/messages/{messageId}"), "Spec must expose message detail endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/messages/{messageId}/payload"), "Spec must expose message payload metadata endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/messages/{messageId}/payload/preview"), "Spec must expose message payload preview endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/messages/{messageId}/trace"), "Spec must expose message trace endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/messages/{messageId}/explanation"), "Spec must expose message explanation endpoint")
     Set messageParameters = spec.paths.%Get("/messages").get.parameters
@@ -239,11 +307,14 @@ Method TestGetSpec()
     Do $$$AssertTrue($IsObject(..FindParameter(messageParameters, "errorsOnly")), "Spec must expose errorsOnly filter")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageDetailResponse"), "Spec must define MessageDetailResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessagePayloadMetadataResponse"), "Spec must define MessagePayloadMetadataResponse")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("MessagePayloadPreviewResponse"), "Spec must define MessagePayloadPreviewResponse")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("PayloadPreviewField"), "Spec must define PayloadPreviewField")
     Do $$$AssertTrue(spec.definitions.%IsDefined("PayloadMetadata"), "Spec must define PayloadMetadata")
     Do $$$AssertTrue(spec.definitions.MessageDetailResponse.properties.%IsDefined("payloadMetadata"), "Message detail response must expose payloadMetadata")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageFacetResponse"), "Spec must define MessageFacetResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageSessionSummaryResponse"), "Spec must define MessageSessionSummaryResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageResendResponse"), "Spec must define MessageResendResponse")
+    Do $$$AssertTrue(spec.definitions.MessageResendResponse.properties.%IsDefined("statusText"), "Message resend response must expose statusText")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageExplanationResponse"), "Spec must define MessageExplanationResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("ComponentDetailResponse"), "Spec must define ComponentDetailResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("CapabilitiesResponse"), "Spec must define CapabilitiesResponse")
@@ -274,6 +345,7 @@ Method TestHealth()
     Do $$$AssertEquals(result.capabilities.openapiVersion, "2.0", "OpenAPI version mismatch")
     Do $$$AssertEquals(result.capabilities.productionControl, 1, "Production control capability mismatch")
     Do $$$AssertTrue(result.capabilities.%IsDefined("runtimeTraceAnalysis"), "Capabilities must include runtime trace flag")
+    Do $$$AssertTrue(result.capabilities.%IsDefined("payloadPreview"), "Capabilities must include payload preview flag")
 }
 
 Method TestCapabilities()
@@ -286,11 +358,15 @@ Method TestCapabilities()
     Do $$$AssertTrue(result.%IsDefined("interoperabilityAvailable"), "Capabilities must include interoperabilityAvailable")
     Do $$$AssertTrue(result.%IsDefined("productionDiscovery"), "Capabilities must include productionDiscovery")
     Do $$$AssertTrue(result.%IsDefined("runtimeTraceAnalysis"), "Capabilities must include runtimeTraceAnalysis")
-    Do $$$AssertEquals(result.payloadInspection, 0, "Payload inspection capability mismatch")
+    Do $$$AssertEquals(result.payloadInspection, result.runtimeTraceAnalysis, "Payload inspection capability mismatch")
+    Do $$$AssertEquals(result.payloadPreview, result.runtimeTraceAnalysis, "Payload preview capability mismatch")
 }
 
 Method TestGetSettings()
 {
+    Do ..InitRequestResponse()
+    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}
+    Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
     Do ..InitRequestResponse()
     Set result = ##class(esh.interoperability.aid.api.impl).GetSettings()
     Do $$$AssertTrue($IsObject(result), "Settings response must be an object")
@@ -307,16 +383,18 @@ Method TestGetSettings()
 Method TestUpdateSettings()
 {
     Do ..InitRequestResponse()
-    Set payload = {"maxTraceDepth":25,"explanationVerbosity":"brief"}
+    Set payload = {"messageResendEnabled":1,"maxTraceDepth":25,"explanationVerbosity":"brief"}
     Set result = ##class(esh.interoperability.aid.api.impl).UpdateSettings(payload)
     Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}
     Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
     Do $$$AssertTrue($IsObject(result), "Settings update response must be an object")
     Do $$$AssertEquals(result.namespace, $Namespace, "Settings update namespace mismatch")
     Do $$$AssertEquals(result.changed, 1, "Settings update should report changed")
+    Do $$$AssertEquals(result.settings.messageResendEnabled, 1, "Settings messageResendEnabled update mismatch")
     Do $$$AssertEquals(result.settings.maxTraceDepth, 25, "Settings maxTraceDepth update mismatch")
     Do $$$AssertEquals(result.settings.explanationVerbosity, "brief", "Settings explanation verbosity update mismatch")
     Do $$$AssertTrue($IsObject(result.warnings), "Settings update must include warnings")
+    Do $$$AssertEquals(result.warnings.%Size(), 0, "Enabling implemented resend should not emit warnings")
     Do $$$AssertTrue($IsObject(result.evidence), "Settings update must include evidence")
     Do $$$AssertEquals(restored.settings.maxTraceDepth, 50, "Settings restore maxTraceDepth mismatch")
     Do $$$AssertEquals(restored.settings.explanationVerbosity, "normal", "Settings restore explanation verbosity mismatch")
@@ -463,6 +541,59 @@ Method TestGetMessagePayloadMetadataInvalidId()
     Do $$$AssertEquals(result.error.code, "INVALID_MESSAGE_ID", "Invalid message payload metadata error code mismatch")
 }
 
+Method TestGetMessagePayloadPreviewInvalidId()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetMessagePayloadPreview(0)
+    Do $$$AssertTrue($IsObject(result), "Invalid message payload preview response must be an object")
+    Do $$$AssertEquals(%response.Status, 400, "Invalid message payload preview id should set 400")
+    Do $$$AssertEquals(result.error.code, "INVALID_MESSAGE_ID", "Invalid message payload preview error code mismatch")
+}
+
+Method TestGetMessagePayloadPreview()
+{
+    Do ..InitRequestResponse()
+    Set enable = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":1,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}
+    Set update = ##class(esh.interoperability.aid.api.impl).UpdateSettings(enable)
+    Set fixture = ..CreatePayloadPreviewMessage()
+    Do $$$AssertTrue('fixture.%IsDefined("errorCode"), "Payload preview fixture should save successfully")
+
+    Do ..InitRequestResponse()
+    Set metadata = ##class(esh.interoperability.aid.api.impl).GetProductionMessagePayloadMetadata("esh.interoperability.aid.tests.DemoProduction", fixture.messageId)
+    Do $$$AssertTrue($IsObject(metadata), "Payload metadata response must be an object")
+    Do $$$AssertEquals(metadata.payloadInspectionSupported, 1, "Payload metadata should report preview support when body is available")
+    Do $$$AssertEquals(metadata.restrictionReason, "PAYLOAD_PREVIEW_REQUIRED", "Payload metadata should direct callers to preview endpoint")
+    Do $$$AssertTrue($IsObject(..FindWarning(metadata.warnings, "PAYLOAD_PREVIEW_REQUIRED")), "Payload metadata should include preview endpoint warning")
+    Do $$$AssertTrue('$IsObject(..FindWarning(metadata.warnings, "PAYLOAD_INSPECTION_UNSUPPORTED")), "Payload metadata should not report preview as unsupported")
+
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetProductionMessagePayloadPreview("esh.interoperability.aid.tests.DemoProduction", fixture.messageId)
+    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}
+    Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
+
+    Do $$$AssertTrue($IsObject(result), "Payload preview response must be an object")
+    Do $$$AssertEquals(result.productionName, "esh.interoperability.aid.tests.DemoProduction", "Payload preview production mismatch")
+    Do $$$AssertEquals(result.messageId, fixture.messageId, "Payload preview message id mismatch")
+    Do $$$AssertEquals(result.payloadReturned, 1, "Payload preview should return scalar preview fields")
+    Do $$$AssertEquals(result.bodyContentReturned, 1, "Payload preview should report body content returned")
+    Do $$$AssertEquals(result.restricted, 0, "Payload preview should not be restricted when enabled")
+    Do $$$AssertTrue($IsObject(result.fields), "Payload preview fields must be an array")
+    Do $$$AssertEquals(result.fields.%Size(), 2, "Payload preview field count mismatch")
+    Set eventType = ..FindPayloadPreviewField(result.fields, "EventType")
+    Do $$$AssertTrue($IsObject(eventType), "Payload preview should include EventType")
+    Do $$$AssertEquals(eventType.value, "ADT", "Payload preview EventType value mismatch")
+    Do $$$AssertEquals(eventType.redacted, 0, "Payload preview EventType should not be redacted")
+    Set patientId = ..FindPayloadPreviewField(result.fields, "PatientId")
+    Do $$$AssertTrue($IsObject(patientId), "Payload preview should include PatientId")
+    Do $$$AssertEquals(patientId.value, "[redacted]", "Payload preview PatientId value should be redacted")
+    Do $$$AssertEquals(patientId.redacted, 1, "Payload preview PatientId should report redacted")
+    Do $$$AssertTrue($IsObject(result.metadata.fields), "Payload metadata should include preview fields")
+    Do $$$AssertEquals(result.metadata.fields.%Size(), 2, "Payload metadata preview field count mismatch")
+
+    Do ##class(Ens.MessageHeader).%DeleteId(fixture.messageId)
+    Do ##class(esh.interoperability.aid.tests.DemoMessage).%DeleteId(fixture.bodyId)
+}
+
 Method TestGetMessageInvalidId()
 {
     Do ..InitRequestResponse()
@@ -488,6 +619,15 @@ Method TestGetProductionMessagePayloadMetadataInvalidId()
     Do $$$AssertTrue($IsObject(result), "Invalid production-scoped message payload response must be an object")
     Do $$$AssertEquals(%response.Status, 400, "Invalid production-scoped message payload id should set 400")
     Do $$$AssertEquals(result.error.code, "INVALID_MESSAGE_ID", "Invalid production-scoped message payload id error code mismatch")
+}
+
+Method TestGetProductionMessagePayloadPreviewInvalidId()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetProductionMessagePayloadPreview("esh.interoperability.aid.tests.DemoProduction", 0)
+    Do $$$AssertTrue($IsObject(result), "Invalid production-scoped message payload preview response must be an object")
+    Do $$$AssertEquals(%response.Status, 400, "Invalid production-scoped message payload preview id should set 400")
+    Do $$$AssertEquals(result.error.code, "INVALID_MESSAGE_ID", "Invalid production-scoped message payload preview id error code mismatch")
 }
 
 Method TestGetProductionMessageTraceInvalidId()

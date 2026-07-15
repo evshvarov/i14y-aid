@@ -11,7 +11,8 @@ ClassMethod Capabilities() As %DynamicObject
     Set capabilities.productionXDataAnalysis = capabilities.interoperabilityAvailable
     Set capabilities.productionControl = capabilities.interoperabilityAvailable
     Set capabilities.runtimeTraceAnalysis = ..ClassExists("Ens.MessageHeader")
-    Set capabilities.payloadInspection = 0
+    Set capabilities.payloadInspection = capabilities.runtimeTraceAnalysis
+    Set capabilities.payloadPreview = capabilities.runtimeTraceAnalysis
     Set capabilities.openapiVersion = "2.0"
     return capabilities
 }
@@ -591,6 +592,7 @@ ClassMethod GetMessagePayloadMetadata(messageId As %Integer) As %DynamicObject
     Set result.messageBodyClassName = metadata.messageBodyClassName
     Set result.messageBodyId = metadata.messageBodyId
     Set result.bodyReferenceAvailable = metadata.bodyReferenceAvailable
+    Set result.payloadInspectionSupported = metadata.payloadInspectionSupported
     Set result.restricted = metadata.restricted
     Set result.restrictionReason = metadata.restrictionReason
     Set result.warnings = metadata.warnings
@@ -606,6 +608,87 @@ ClassMethod GetProductionMessagePayloadMetadata(productionName As %VarString, me
     }
 
     Set result = ..GetMessagePayloadMetadata(messageId)
+    Do result.%Set("productionName", productionName)
+    return result
+}
+
+ClassMethod GetMessagePayloadPreview(messageId As %Integer) As %DynamicObject
+{
+    Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
+    Set metadataResult = ..GetMessagePayloadMetadata(messageId)
+    If metadataResult.%IsDefined("errorCode") {
+        return metadataResult
+    }
+
+    Set result = {}
+    Set result.namespace = metadataResult.namespace
+    Set result.messageId = messageId
+    Set result.message = metadataResult.message
+    Set result.metadata = metadataResult.metadata
+    Set result.messageBodyClassName = metadataResult.messageBodyClassName
+    Set result.messageBodyId = metadataResult.messageBodyId
+    Set result.bodyReferenceAvailable = metadataResult.bodyReferenceAvailable
+    Set result.payloadReturned = 0
+    Set result.bodyContentReturned = 0
+    Set result.runtimeMessageAnalysisEnabled = metadataResult.runtimeMessageAnalysisEnabled
+    Set result.payloadInspectionEnabled = metadataResult.payloadInspectionEnabled
+    Set result.payloadInspectionSupported = 1
+    Set result.restricted = 1
+    Set result.restrictionReason = metadataResult.restrictionReason
+    Set result.fields = []
+    Set result.warnings = metadataResult.warnings
+    Set result.evidence = metadataResult.evidence
+
+    If 'result.payloadInspectionEnabled {
+        Set result.payloadInspectionSupported = 0
+        return result
+    }
+    Set result.warnings = []
+    If 'result.bodyReferenceAvailable {
+        Set result.restrictionReason = "PAYLOAD_BODY_REFERENCE_MISSING"
+        Do result.warnings.%Push(..NewWarning("PAYLOAD_BODY_REFERENCE_MISSING", "Message body class or ID is missing."))
+        return result
+    }
+    If '..ClassExists(result.messageBodyClassName) {
+        Set result.restrictionReason = "PAYLOAD_BODY_CLASS_NOT_FOUND"
+        Do result.warnings.%Push(..NewWarning("PAYLOAD_BODY_CLASS_NOT_FOUND", "Message body class "_result.messageBodyClassName_" was not found."))
+        return result
+    }
+
+    Set body = ""
+    Try {
+        Set body = $classmethod(result.messageBodyClassName, "%OpenId", result.messageBodyId)
+    } Catch ex {
+        Set body = ""
+    }
+    If '$IsObject(body) {
+        Set result.restrictionReason = "PAYLOAD_BODY_OPEN_FAILED"
+        Do result.warnings.%Push(..NewWarning("PAYLOAD_BODY_OPEN_FAILED", "Message body could not be opened for safe preview."))
+        return result
+    }
+
+    Do ..AddPayloadPreviewFields(body, result.messageBodyClassName, settings.fieldRedactionPatterns, result.fields, result.evidence)
+    Set result.payloadReturned = 1
+    Set result.bodyContentReturned = 1
+    Set result.restricted = 0
+    Set result.restrictionReason = ""
+    Set result.metadata.payloadInspectionSupported = 1
+    Set result.metadata.restricted = 0
+    Set result.metadata.restrictionReason = ""
+    Set result.metadata.fields = result.fields
+    Set result.metadata.warnings = []
+    Do result.evidence.%Push(..NewEvidence("payload-preview", result.messageBodyClassName, result.messageBodyId, "fields", result.fields.%Size(), "observed"))
+    return result
+}
+
+ClassMethod GetProductionMessagePayloadPreview(productionName As %VarString, messageId As %Integer) As %DynamicObject
+{
+    Set scoped = ..GetProductionMessage(productionName, messageId)
+    If scoped.%IsDefined("errorCode") {
+        return scoped
+    }
+
+    Set result = ..GetMessagePayloadPreview(messageId)
     Do result.%Set("productionName", productionName)
     return result
 }
@@ -703,8 +786,8 @@ ClassMethod ResendProductionMessage(productionName As %VarString, messageId As %
     Set result.requested = 1
     Set result.allowed = 0
     Set result.executed = 0
-    Set result.dryRun = 1
-    Set result.supported = 0
+    Set result.dryRun = 0
+    Set result.supported = ..ClassMethodExists("Ens.MessageHeader", "ResendMessage")
     Set result.changed = 0
     Set result.payloadReturned = 0
     Set result.runtimeMessageAnalysisEnabled = settings.runtimeMessageAnalysisEnabled
@@ -716,13 +799,40 @@ ClassMethod ResendProductionMessage(productionName As %VarString, messageId As %
     If 'settings.messageResendEnabled {
         Set result.reason = "MESSAGE_RESEND_DISABLED"
         Do result.warnings.%Push(..NewWarning("MESSAGE_RESEND_DISABLED", "Message resend is disabled by module settings."))
-    } Else {
+        Do result.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", messageId, "SessionId", scoped.message.sessionId, "observed"))
+        Do result.evidence.%Push(..NewEvidence("module-settings", "esh.interoperability.aid.config.Settings", "current", "messageResendEnabled", settings.messageResendEnabled, "confirmed"))
+        return result
+    }
+
+    If 'result.supported {
         Set result.reason = "MESSAGE_RESEND_UNSUPPORTED"
-        Do result.warnings.%Push(..NewWarning("MESSAGE_RESEND_UNSUPPORTED", "Message resend execution is not implemented in this version."))
+        Do result.warnings.%Push(..NewWarning("MESSAGE_RESEND_UNSUPPORTED", "Ens.MessageHeader.ResendMessage is not available in this namespace."))
+        Do result.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", messageId, "SessionId", scoped.message.sessionId, "observed"))
+        Do result.evidence.%Push(..NewEvidence("module-settings", "esh.interoperability.aid.config.Settings", "current", "messageResendEnabled", settings.messageResendEnabled, "confirmed"))
+        return result
+    }
+
+    Set result.allowed = 1
+    Set result.reason = "MESSAGE_RESEND_EXECUTED"
+    New $ROLES
+    Do ..EnableRuntimeControlRole()
+    Set sc = ##class(Ens.MessageHeader).ResendMessage(messageId)
+    If $$$ISERR(sc) {
+        Set result.allowed = 0
+        Set result.executed = 0
+        Set result.changed = 0
+        Set result.reason = "RESEND_FAILED"
+        Do result.%Set("errorCode", "RESEND_FAILED")
+        Do result.%Set("statusText", $System.Status.GetErrorText(sc))
+        Do result.warnings.%Push(..NewWarning("RESEND_FAILED", $System.Status.GetErrorText(sc)))
+    } Else {
+        Set result.executed = 1
+        Set result.changed = 1
     }
 
     Do result.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", messageId, "SessionId", scoped.message.sessionId, "observed"))
     Do result.evidence.%Push(..NewEvidence("module-settings", "esh.interoperability.aid.config.Settings", "current", "messageResendEnabled", settings.messageResendEnabled, "confirmed"))
+    Do result.evidence.%Push(..NewEvidence("runtime-action", "Ens.MessageHeader", messageId, "ResendMessage", "Called Ens.MessageHeader.ResendMessage", "observed"))
     return result
 }
 
@@ -1921,8 +2031,9 @@ ClassMethod NewPayloadMetadata(message As %DynamicObject, settings As %DynamicOb
     If message.messageBodyClassName '= "" {
         Set metadata.bodyClassExists = ..ClassExists(message.messageBodyClassName)
     }
+    Set metadata.payloadInspectionSupported = metadata.bodyReferenceAvailable && metadata.bodyClassExists
     Set metadata.restricted = 1
-    Set metadata.restrictionReason = "PAYLOAD_INSPECTION_UNSUPPORTED"
+    Set metadata.restrictionReason = "PAYLOAD_PREVIEW_REQUIRED"
     Set metadata.fields = []
     Set metadata.warnings = []
     Set metadata.evidence = []
@@ -1933,8 +2044,89 @@ ClassMethod NewPayloadMetadata(message As %DynamicObject, settings As %DynamicOb
         Do metadata.warnings.%Push(..NewWarning("PAYLOAD_INSPECTION_DISABLED", "Payload inspection is disabled by module settings. Message body content was not read or returned."))
         return metadata
     }
-    Do metadata.warnings.%Push(..NewWarning("PAYLOAD_INSPECTION_UNSUPPORTED", "Payload metadata inspection is not implemented in this version. Message body content was not read or returned."))
+    Do metadata.warnings.%Push(..NewWarning("PAYLOAD_PREVIEW_REQUIRED", "Payload metadata does not return body content. Use the payload preview endpoint to inspect redacted scalar fields."))
     return metadata
+}
+
+ClassMethod AddPayloadPreviewFields(body As %RegisteredObject, bodyClassName As %VarString, redactionPatterns As %VarString, fields As %DynamicArray, evidence As %DynamicArray) [ Private ]
+{
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sql = "SELECT Name, Type, Collection FROM %Dictionary.CompiledProperty WHERE Parent = ? ORDER BY Name"
+    Set sc = stmt.%Prepare(sql)
+    If $$$ISERR(sc) {
+        return
+    }
+    Set rset = stmt.%Execute(bodyClassName)
+    If rset.%SQLCODE < 0 {
+        return
+    }
+
+    While rset.%Next() {
+        Set propertyName = rset.%Get("Name")
+        Set propertyType = rset.%Get("Type")
+        Set collection = rset.%Get("Collection")
+        Continue:(propertyName = "")
+        Continue:($Extract(propertyName, 1) = "%")
+        Continue:(collection '= "")
+        Continue:'..IsPreviewScalarType(propertyType)
+
+        Set field = {}
+        Set field.name = propertyName
+        Set field.type = propertyType
+        Set field.redacted = ..ShouldRedactField(propertyName, redactionPatterns)
+        Set field.value = ""
+        If field.redacted {
+            Set field.value = "[redacted]"
+        } Else {
+            Try {
+                Set field.value = ..NormalizePreviewValue($Property(body, propertyName))
+            } Catch ex {
+                Set field.value = "[unavailable]"
+            }
+        }
+        Do fields.%Push(field)
+        Do evidence.%Push(..NewEvidence("payload-property", bodyClassName, propertyName, "Type", propertyType, "observed"))
+    }
+    return
+}
+
+ClassMethod IsPreviewScalarType(propertyType As %VarString) As %Boolean [ Private ]
+{
+    If propertyType = "" {
+        return 1
+    }
+    If $Extract(propertyType, 1, 1) '= "%" {
+        return 0
+    }
+    If (propertyType = "%String") || (propertyType = "%VarString") || (propertyType = "%Integer") || (propertyType = "%Numeric") || (propertyType = "%Boolean") || (propertyType = "%Date") || (propertyType = "%Time") || (propertyType = "%TimeStamp") {
+        return 1
+    }
+    If (propertyType = "%Library.String") || (propertyType = "%Library.VarString") || (propertyType = "%Library.Integer") || (propertyType = "%Library.Numeric") || (propertyType = "%Library.Boolean") || (propertyType = "%Library.Date") || (propertyType = "%Library.Time") || (propertyType = "%Library.TimeStamp") {
+        return 1
+    }
+    return 0
+}
+
+ClassMethod ShouldRedactField(fieldName As %VarString, redactionPatterns As %VarString) As %Boolean [ Private ]
+{
+    Set normalizedField = $ZConvert(fieldName, "L")
+    For index = 1:1:$Length(redactionPatterns, ",") {
+        Set pattern = $ZConvert($ZStrip($Piece(redactionPatterns, ",", index), "<>W"), "L")
+        Continue:(pattern = "")
+        If normalizedField [ pattern {
+            return 1
+        }
+    }
+    return 0
+}
+
+ClassMethod NormalizePreviewValue(value As %String) As %VarString [ Private ]
+{
+    Set text = ""_value
+    If $Length(text) > 500 {
+        Set text = $Extract(text, 1, 500)_"..."
+    }
+    return text
 }
 
 ClassMethod GetMessageHeaderById(messageId As %Integer) As %DynamicObject [ Private ]
@@ -2639,6 +2831,20 @@ ClassMethod ClassExtends(className As %VarString, baseClass As %VarString) As %B
         Set result = 0
     }
     return result
+}
+
+ClassMethod ClassMethodExists(className As %VarString, methodName As %VarString) As %Boolean [ Private ]
+{
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sc = stmt.%Prepare("SELECT Name FROM %Dictionary.CompiledMethod WHERE Parent = ? AND Name = ?")
+    If $$$ISERR(sc) {
+        return 0
+    }
+    Set rset = stmt.%Execute(className, methodName)
+    If rset.%SQLCODE < 0 {
+        return 0
+    }
+    return rset.%Next()
 }
 
 ClassMethod GetClassDescription(className As %VarString) As %VarString [ Private ]

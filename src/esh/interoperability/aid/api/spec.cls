@@ -409,6 +409,12 @@ XData OpenAPI [ MimeType = application/json ]
             "schema": {
               "$ref": "#/definitions/ErrorResponse"
             }
+          },
+          "500": {
+            "description": "Message resend failed",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
           }
         }
       }
@@ -437,6 +443,47 @@ XData OpenAPI [ MimeType = application/json ]
             "description": "Production-scoped safe payload metadata without body content",
             "schema": {
               "$ref": "#/definitions/MessagePayloadMetadataResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message or production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/productions/{productionName}/messages/{messageId}/payload/preview": {
+      "get": {
+        "summary": "Get production-scoped redacted payload preview for a message",
+        "operationId": "GetProductionMessagePayloadPreview",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Production-scoped redacted payload preview",
+            "schema": {
+              "$ref": "#/definitions/MessagePayloadPreviewResponse"
             }
           },
           "400": {
@@ -671,6 +718,41 @@ XData OpenAPI [ MimeType = application/json ]
             "description": "Safe payload metadata without body content",
             "schema": {
               "$ref": "#/definitions/MessagePayloadMetadataResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/messages/{messageId}/payload/preview": {
+      "get": {
+        "summary": "Get redacted payload preview for a message",
+        "operationId": "GetMessagePayloadPreview",
+        "parameters": [
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Redacted payload preview",
+            "schema": {
+              "$ref": "#/definitions/MessagePayloadPreviewResponse"
             }
           },
           "400": {
@@ -1156,6 +1238,9 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "boolean"
         },
         "payloadInspection": {
+          "type": "boolean"
+        },
+        "payloadPreview": {
           "type": "boolean"
         },
         "openapiVersion": {
@@ -1794,6 +1879,92 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "MessagePayloadPreviewResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "messageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "message": {
+          "$ref": "#/definitions/MessageHeader"
+        },
+        "metadata": {
+          "$ref": "#/definitions/PayloadMetadata"
+        },
+        "messageBodyClassName": {
+          "type": "string"
+        },
+        "messageBodyId": {
+          "type": "string"
+        },
+        "bodyReferenceAvailable": {
+          "type": "boolean"
+        },
+        "payloadReturned": {
+          "type": "boolean"
+        },
+        "bodyContentReturned": {
+          "type": "boolean"
+        },
+        "runtimeMessageAnalysisEnabled": {
+          "type": "boolean"
+        },
+        "payloadInspectionEnabled": {
+          "type": "boolean"
+        },
+        "payloadInspectionSupported": {
+          "type": "boolean"
+        },
+        "restricted": {
+          "type": "boolean"
+        },
+        "restrictionReason": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PayloadPreviewField"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "PayloadPreviewField": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "redacted": {
+          "type": "boolean"
+        }
+      }
+    },
     "MessageTraceResponse": {
       "type": "object",
       "properties": {
@@ -2009,6 +2180,9 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "boolean"
         },
         "reason": {
+          "type": "string"
+        },
+        "statusText": {
           "type": "string"
         },
         "payloadReturned": {
