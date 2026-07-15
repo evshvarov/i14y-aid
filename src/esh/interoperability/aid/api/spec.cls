@@ -1209,7 +1209,7 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "string"
         },
         "capabilities": {
-          "type": "object"
+          "$ref": "#/definitions/CapabilitiesResponse"
         }
       }
     },
@@ -1257,6 +1257,9 @@ XData OpenAPI [ MimeType = application/json ]
         "settings": {
           "$ref": "#/definitions/AnalysisSettings"
         },
+        "metrics": {
+          "$ref": "#/definitions/SettingsMetrics"
+        },
         "evidence": {
           "type": "array",
           "items": {
@@ -1277,6 +1280,9 @@ XData OpenAPI [ MimeType = application/json ]
         "settings": {
           "$ref": "#/definitions/AnalysisSettings"
         },
+        "metrics": {
+          "$ref": "#/definitions/SettingsMetrics"
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -1288,6 +1294,47 @@ XData OpenAPI [ MimeType = application/json ]
           "items": {
             "$ref": "#/definitions/Evidence"
           }
+        }
+      }
+    },
+    "SettingsMetrics": {
+      "type": "object",
+      "properties": {
+        "featureFlagCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "enabledFeatureFlagCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "limitSettingCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "warningCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "evidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "confirmedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "observedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "inferredEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "unknownEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
         }
       }
     },
@@ -1351,11 +1398,71 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "integer",
           "format": "int32"
         },
+        "metrics": {
+          "$ref": "#/definitions/ProductionListMetrics"
+        },
         "warnings": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/Warning"
           }
+        }
+      }
+    },
+    "ProductionListMetrics": {
+      "type": "object",
+      "properties": {
+        "productionCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "runningProductionCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "componentCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "serviceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "processCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "operationCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "disabledComponentCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "warningCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "evidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "confirmedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "observedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "inferredEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "unknownEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
         }
       }
     },
@@ -1375,8 +1482,27 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "integer",
           "format": "int32"
         },
+        "serviceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "processCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "operationCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "disabledComponentCount": {
+          "type": "integer",
+          "format": "int32"
+        },
         "runtime": {
           "$ref": "#/definitions/ProductionRuntime"
+        },
+        "runtimeMetrics": {
+          "$ref": "#/definitions/ProductionRuntimeMetrics"
         },
         "isRunning": {
           "type": "boolean"
@@ -1404,12 +1530,34 @@ XData OpenAPI [ MimeType = application/json ]
         "description": {
           "type": "string"
         },
+        "summary": {
+          "type": "string"
+        },
         "componentCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "serviceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "processCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "operationCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "disabledComponentCount": {
           "type": "integer",
           "format": "int32"
         },
         "runtime": {
           "$ref": "#/definitions/ProductionRuntime"
+        },
+        "runtimeMetrics": {
+          "$ref": "#/definitions/ProductionRuntimeMetrics"
         },
         "isRunning": {
           "type": "boolean"
@@ -1422,6 +1570,15 @@ XData OpenAPI [ MimeType = application/json ]
           "items": {
             "$ref": "#/definitions/Component"
           }
+        },
+        "summaryBullets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "metrics": {
+          "$ref": "#/definitions/ProductionMetrics"
         },
         "evidence": {
           "type": "array",
@@ -1450,11 +1607,63 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "integer",
           "format": "int32"
         },
+        "metrics": {
+          "$ref": "#/definitions/ComponentListMetrics"
+        },
         "warnings": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/Warning"
           }
+        }
+      }
+    },
+    "ComponentListMetrics": {
+      "type": "object",
+      "properties": {
+        "componentCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "serviceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "processCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "operationCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "disabledComponentCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "warningCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "evidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "confirmedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "observedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "inferredEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "unknownEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
         }
       }
     },
@@ -1475,6 +1684,15 @@ XData OpenAPI [ MimeType = application/json ]
         },
         "explanation": {
           "$ref": "#/definitions/ComponentExplanation"
+        },
+        "summaryBullets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "metrics": {
+          "$ref": "#/definitions/ComponentMetrics"
         },
         "connections": {
           "type": "array",
@@ -1577,6 +1795,63 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "ComponentMetrics": {
+      "type": "object",
+      "properties": {
+        "connectionCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "externalSystemCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "artifactCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "ruleCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "messageTypeCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "transformationCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "businessProcessCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "explanationCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "evidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "confirmedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "observedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "inferredEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "unknownEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
     "MessageHeaderListResponse": {
       "type": "object",
       "properties": {
@@ -1631,6 +1906,9 @@ XData OpenAPI [ MimeType = application/json ]
         "maxMessagesReturned": {
           "type": "integer",
           "format": "int32"
+        },
+        "metrics": {
+          "$ref": "#/definitions/MessageListMetrics"
         },
         "warnings": {
           "type": "array",
@@ -1766,11 +2044,58 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "integer",
           "format": "int32"
         },
+        "metrics": {
+          "$ref": "#/definitions/MessageListMetrics"
+        },
         "warnings": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/Warning"
           }
+        }
+      }
+    },
+    "MessageListMetrics": {
+      "type": "object",
+      "properties": {
+        "itemCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "errorCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "sourceFacetCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "targetFacetCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "messageBodyClassFacetCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "sessionFacetCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "componentFacetCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "warningCount": {
+          "type": "integer",
+          "format": "int32"
         }
       }
     },
@@ -1799,11 +2124,60 @@ XData OpenAPI [ MimeType = application/json ]
         "runtimeMessageAnalysisEnabled": {
           "type": "boolean"
         },
+        "metrics": {
+          "$ref": "#/definitions/MessageDetailMetrics"
+        },
         "warnings": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/Warning"
           }
+        }
+      }
+    },
+    "MessageDetailMetrics": {
+      "type": "object",
+      "properties": {
+        "payloadReturned": {
+          "type": "boolean"
+        },
+        "payloadInspectionSupported": {
+          "type": "boolean"
+        },
+        "bodyReferenceAvailable": {
+          "type": "boolean"
+        },
+        "messageEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "payloadEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "warningCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "evidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "confirmedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "observedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "inferredEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "unknownEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
         }
       }
     },
@@ -1852,6 +2226,9 @@ XData OpenAPI [ MimeType = application/json ]
         },
         "payloadInspectionSupported": {
           "type": "boolean"
+        },
+        "metrics": {
+          "$ref": "#/definitions/PayloadMetrics"
         },
         "warnings": {
           "type": "array",
@@ -1906,6 +2283,9 @@ XData OpenAPI [ MimeType = application/json ]
           "items": {
             "type": "object"
           }
+        },
+        "metrics": {
+          "$ref": "#/definitions/PayloadMetrics"
         },
         "warnings": {
           "type": "array",
@@ -1976,6 +2356,9 @@ XData OpenAPI [ MimeType = application/json ]
             "$ref": "#/definitions/PayloadPreviewField"
           }
         },
+        "metrics": {
+          "$ref": "#/definitions/PayloadMetrics"
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -1987,6 +2370,43 @@ XData OpenAPI [ MimeType = application/json ]
           "items": {
             "$ref": "#/definitions/Evidence"
           }
+        }
+      }
+    },
+    "PayloadMetrics": {
+      "type": "object",
+      "properties": {
+        "fieldCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "redactedFieldCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "warningCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "evidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "confirmedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "observedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "inferredEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "unknownEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
         }
       }
     },
@@ -2036,6 +2456,9 @@ XData OpenAPI [ MimeType = application/json ]
         "traceExplanation": {
           "$ref": "#/definitions/TraceExplanation"
         },
+        "metrics": {
+          "$ref": "#/definitions/TraceMetrics"
+        },
         "steps": {
           "type": "array",
           "items": {
@@ -2077,6 +2500,39 @@ XData OpenAPI [ MimeType = application/json ]
         },
         "confidence": {
           "type": "string"
+        }
+      }
+    },
+    "TraceMetrics": {
+      "type": "object",
+      "properties": {
+        "stepCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "warningCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "evidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "confirmedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "observedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "inferredEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "unknownEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
         }
       }
     },
@@ -2166,6 +2622,9 @@ XData OpenAPI [ MimeType = application/json ]
         "staticContext": {
           "$ref": "#/definitions/TraceStaticContext"
         },
+        "metrics": {
+          "$ref": "#/definitions/TraceMetrics"
+        },
         "text": {
           "type": "string"
         },
@@ -2242,6 +2701,9 @@ XData OpenAPI [ MimeType = application/json ]
         "selectedMessage": {
           "$ref": "#/definitions/MessageHeader"
         },
+        "metrics": {
+          "$ref": "#/definitions/RuntimeActionMetrics"
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -2253,6 +2715,53 @@ XData OpenAPI [ MimeType = application/json ]
           "items": {
             "$ref": "#/definitions/Evidence"
           }
+        }
+      }
+    },
+    "RuntimeActionMetrics": {
+      "type": "object",
+      "properties": {
+        "requested": {
+          "type": "boolean"
+        },
+        "allowed": {
+          "type": "boolean"
+        },
+        "executed": {
+          "type": "boolean"
+        },
+        "changed": {
+          "type": "boolean"
+        },
+        "dryRun": {
+          "type": "boolean"
+        },
+        "supported": {
+          "type": "boolean"
+        },
+        "warningCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "evidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "confirmedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "observedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "inferredEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "unknownEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
         }
       }
     },
@@ -2282,6 +2791,9 @@ XData OpenAPI [ MimeType = application/json ]
         "stepCount": {
           "type": "integer",
           "format": "int32"
+        },
+        "metrics": {
+          "$ref": "#/definitions/TraceMetrics"
         },
         "payloadReturned": {
           "type": "boolean"
@@ -2471,6 +2983,97 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "AnalysisCoverage": {
+      "type": "object",
+      "properties": {
+        "componentCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "connectionCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "messageTypeCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "externalSystemCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "artifactCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "ruleCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "transformationCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "businessProcessCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "warningCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "evidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "confirmedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "observedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "inferredEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "unknownEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "componentAnalysisAvailable": {
+          "type": "boolean"
+        },
+        "targetAnalysisAvailable": {
+          "type": "boolean"
+        },
+        "messageSignatureAnalysisAvailable": {
+          "type": "boolean"
+        },
+        "routingRuleAnalysisAvailable": {
+          "type": "boolean"
+        },
+        "transformationAnalysisAvailable": {
+          "type": "boolean"
+        },
+        "businessProcessAnalysisAvailable": {
+          "type": "boolean"
+        },
+        "warningCodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "TraceExplanation": {
       "type": "object",
       "properties": {
@@ -2513,6 +3116,18 @@ XData OpenAPI [ MimeType = application/json ]
         },
         "summary": {
           "type": "string"
+        },
+        "summaryBullets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "metrics": {
+          "$ref": "#/definitions/ProductionMetrics"
+        },
+        "analysisCoverage": {
+          "$ref": "#/definitions/AnalysisCoverage"
         },
         "components": {
           "type": "array",
@@ -2627,6 +3242,79 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "ProductionMetrics": {
+      "type": "object",
+      "properties": {
+        "componentCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "serviceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "processCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "operationCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "disabledComponentCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "connectionCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "targetConfigConnectionCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "routingRuleConnectionCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "bplCallConnectionCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "externalSystemCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "artifactCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "ruleCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "messageTypeCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "transformationCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "businessProcessCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "warningCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "explanationCount": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
     "ProductionSummaryResponse": {
       "type": "object",
       "properties": {
@@ -2638,6 +3326,15 @@ XData OpenAPI [ MimeType = application/json ]
         },
         "summary": {
           "type": "string"
+        },
+        "summaryBullets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "metrics": {
+          "$ref": "#/definitions/ProductionMetrics"
         },
         "confidence": {
           "type": "string"
@@ -2664,6 +3361,15 @@ XData OpenAPI [ MimeType = application/json ]
         },
         "productionName": {
           "type": "string"
+        },
+        "summaryBullets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "metrics": {
+          "$ref": "#/definitions/GraphMetrics"
         },
         "nodes": {
           "type": "array",
@@ -2694,6 +3400,67 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "GraphMetrics": {
+      "type": "object",
+      "properties": {
+        "nodeCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "edgeCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "serviceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "processCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "operationCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "disabledNodeCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "targetConfigEdgeCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "routingRuleEdgeCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "bplCallEdgeCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "evidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "confirmedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "observedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "inferredEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "unknownEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
     "GraphNode": {
       "type": "object",
       "properties": {
@@ -2716,6 +3483,9 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "string"
         },
         "adapterClass": {
+          "type": "string"
+        },
+        "text": {
           "type": "string"
         },
         "confidence": {
@@ -3420,6 +4190,9 @@ XData OpenAPI [ MimeType = application/json ]
         "runtime": {
           "$ref": "#/definitions/ProductionRuntime"
         },
+        "metrics": {
+          "$ref": "#/definitions/ProductionRuntimeMetrics"
+        },
         "isRunning": {
           "type": "boolean"
         },
@@ -3445,6 +4218,33 @@ XData OpenAPI [ MimeType = application/json ]
         },
         "runtime": {
           "$ref": "#/definitions/ProductionRuntime"
+        },
+        "metrics": {
+          "$ref": "#/definitions/ProductionRuntimeMetrics"
+        }
+      }
+    },
+    "ProductionRuntimeMetrics": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "isRunning": {
+          "type": "boolean"
+        },
+        "isCurrent": {
+          "type": "boolean"
+        },
+        "hasActiveProduction": {
+          "type": "boolean"
+        },
+        "changed": {
+          "type": "boolean"
+        },
+        "hasError": {
+          "type": "boolean"
         }
       }
     },

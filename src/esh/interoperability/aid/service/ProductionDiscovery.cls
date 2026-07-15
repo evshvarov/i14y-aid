@@ -25,12 +25,17 @@ ClassMethod GetSettings() As %DynamicObject
     Set result.settings = settings
     Set result.evidence = []
     Do result.evidence.%Push(..NewEvidence("module-settings", "esh.interoperability.aid.config.Settings", "current", "settings", "Runtime analysis limits and feature flags", "confirmed"))
+    Set result.metrics = ..BuildSettingsMetrics(result)
     return result
 }
 
 ClassMethod UpdateSettings(payload As %DynamicObject) As %DynamicObject
 {
-    return ##class(esh.interoperability.aid.config.Settings).UpdateFromPayload(payload)
+    Set result = ##class(esh.interoperability.aid.config.Settings).UpdateFromPayload(payload)
+    If $IsObject(result) {
+        Set result.metrics = ..BuildSettingsMetrics(result)
+    }
+    return result
 }
 
 ClassMethod ListProductions() As %DynamicObject
@@ -38,6 +43,7 @@ ClassMethod ListProductions() As %DynamicObject
     Set result = ..NewListResult()
     If '..ClassExists("Ens.Production") {
         Do result.warnings.%Push(..NewWarning("INTEROPERABILITY_NOT_AVAILABLE", "Ens.Production is not available in this namespace."))
+        Set result.metrics = ..BuildProductionListMetrics(result)
         return result
     }
 
@@ -61,16 +67,23 @@ ClassMethod ListProductions() As %DynamicObject
         Set item.name = className
         Set item.namespace = $Namespace
         Set item.description = rset.%Get("Description")
-        Set item.componentCount = ..ListComponents(className).items.%Size()
+        Set components = ..ListComponents(className).items
+        Set item.componentCount = components.%Size()
+        Set item.serviceCount = ..CountComponentsByType(components, "business-service")
+        Set item.processCount = ..CountComponentsByType(components, "business-process")
+        Set item.operationCount = ..CountComponentsByType(components, "business-operation")
+        Set item.disabledComponentCount = ..CountDisabledComponents(components)
         Set item.runtime = ..GetRuntimeStatus(className)
         Set item.isRunning = item.runtime.isRunning
         Set item.runtimeState = item.runtime.stateLabel
+        Set item.runtimeMetrics = ..BuildProductionRuntimeMetrics(item)
         Set item.evidence = []
         Do item.evidence.%Push(..NewEvidence("class-metadata", "%Dictionary.CompiledClass", className, "Super", "Ens.Production", "confirmed"))
         Do result.items.%Push(item)
     }
 
     Do result.%Set("count", result.items.%Size())
+    Set result.metrics = ..BuildProductionListMetrics(result)
     return result
 }
 
@@ -93,8 +106,16 @@ ClassMethod GetProduction(productionName As %VarString) As %DynamicObject
     Set result.runtime = ..GetRuntimeStatus(productionName)
     Set result.isRunning = result.runtime.isRunning
     Set result.runtimeState = result.runtime.stateLabel
+    Set result.runtimeMetrics = ..BuildProductionRuntimeMetrics(result)
     Set result.components = ..ListComponents(productionName).items
     Set result.componentCount = result.components.%Size()
+    Set result.serviceCount = ..CountComponentsByType(result.components, "business-service")
+    Set result.processCount = ..CountComponentsByType(result.components, "business-process")
+    Set result.operationCount = ..CountComponentsByType(result.components, "business-operation")
+    Set result.disabledComponentCount = ..CountDisabledComponents(result.components)
+    Set result.summary = ..BuildProductionOverviewSummary(result)
+    Set result.summaryBullets = ..BuildProductionOverviewSummaryBullets(result)
+    Set result.metrics = ..BuildProductionOverviewMetrics(result)
     Set result.evidence = []
     Do result.evidence.%Push(..NewEvidence("class-metadata", "%Dictionary.CompiledClass", productionName, "Super", "Ens.Production", "confirmed"))
     return result
@@ -118,6 +139,7 @@ ClassMethod GetProductionRuntimeStatus(productionName As %VarString) As %Dynamic
     Set result.runtime = ..GetRuntimeStatus(productionName)
     Set result.isRunning = result.runtime.isRunning
     Set result.runtimeState = result.runtime.stateLabel
+    Set result.metrics = ..BuildProductionRuntimeMetrics(result)
     return result
 }
 
@@ -168,6 +190,9 @@ ClassMethod GetProductionAnalysis(productionName As %VarString) As %DynamicObjec
     Do ..AddConnectionExplanations(result.connections, result.messageTypes, result.connectionExplanations)
     Do ..AddMessageTypeExplanations(result.messageTypes, result.messageTypeExplanations)
     Set result.summary = ..BuildProductionSummary(production, result.connections, result.externalSystems, result.artifacts, result.messageTypes, result.transformations, result.businessProcesses)
+    Set result.metrics = ..BuildProductionMetrics(result)
+    Set result.analysisCoverage = ..BuildAnalysisCoverage(result)
+    Set result.summaryBullets = ..BuildProductionSummaryBullets(production, result.connections, result.externalSystems, result.artifacts, result.messageTypes, result.transformations, result.businessProcesses)
     Do result.evidence.%Push(..NewEvidence("analysis", productionName, productionName, "ProductionDefinition", "Static analysis model", "confirmed"))
     return result
 }
@@ -183,6 +208,8 @@ ClassMethod GetProductionSummary(productionName As %VarString) As %DynamicObject
     Set result.namespace = $Namespace
     Set result.productionName = productionName
     Set result.summary = analysis.summary
+    Set result.summaryBullets = analysis.summaryBullets
+    Set result.metrics = analysis.metrics
     Set result.confidence = analysis.confidence
     Set result.evidence = analysis.evidence
     Set result.warnings = analysis.warnings
@@ -207,6 +234,8 @@ ClassMethod GetProductionGraph(productionName As %VarString) As %DynamicObject
 
     Do ..AddGraphNodes(analysis.components, analysis.componentExplanations, result.nodes)
     Do ..AddGraphEdges(analysis.connections, analysis.messageTypes, analysis.connectionExplanations, result.edges)
+    Set result.metrics = ..BuildGraphMetrics(analysis, result.nodes, result.edges)
+    Set result.summaryBullets = ..BuildGraphSummaryBullets(analysis, result.nodes, result.edges)
     return result
 }
 
@@ -267,6 +296,8 @@ ClassMethod GetComponentDetail(productionName As %VarString, componentName As %V
     Do ..AddItemsForComponent(analysis.transformationExplanations, componentName, result.transformationExplanations)
     Do ..AddItemsForComponent(analysis.businessProcesses, componentName, result.businessProcesses)
     Do ..AddItemsForComponent(analysis.businessProcessExplanations, componentName, result.businessProcessExplanations)
+    Set result.metrics = ..BuildComponentMetrics(result)
+    Set result.summaryBullets = ..BuildComponentSummaryBullets(result)
     Do ..AddEvidenceFromObject(component, result.evidence)
     Do ..AddEvidenceFromObject(result.explanation, result.evidence)
     return result
@@ -288,11 +319,13 @@ ClassMethod StartProduction(productionName As %VarString) As %DynamicObject
     If (before.isRunning = 1) && (before.currentProduction = productionName) {
         Set result.changed = 0
         Set result.runtime = before
+        Set result.metrics = ..BuildProductionRuntimeMetrics(result)
         return result
     }
     If (before.state = 1) && (before.currentProduction '= "") && (before.currentProduction '= productionName) {
         Do result.%Set("errorCode", "PRODUCTION_ALREADY_RUNNING")
         Set result.runtime = before
+        Set result.metrics = ..BuildProductionRuntimeMetrics(result)
         return result
     }
 
@@ -303,11 +336,13 @@ ClassMethod StartProduction(productionName As %VarString) As %DynamicObject
         Do result.%Set("errorCode", "START_FAILED")
         Do result.%Set("statusText", $System.Status.GetErrorText(sc))
         Set result.runtime = ..GetRuntimeStatus(productionName)
+        Set result.metrics = ..BuildProductionRuntimeMetrics(result)
         return result
     }
 
     Set result.changed = 1
     Set result.runtime = ..GetRuntimeStatus(productionName)
+    Set result.metrics = ..BuildProductionRuntimeMetrics(result)
     return result
 }
 
@@ -327,11 +362,13 @@ ClassMethod StopProduction(productionName As %VarString, timeout As %Integer = 1
     If before.isRunning '= 1 {
         Set result.changed = 0
         Set result.runtime = before
+        Set result.metrics = ..BuildProductionRuntimeMetrics(result)
         return result
     }
     If before.currentProduction '= productionName {
         Do result.%Set("errorCode", "PRODUCTION_NOT_ACTIVE")
         Set result.runtime = before
+        Set result.metrics = ..BuildProductionRuntimeMetrics(result)
         return result
     }
 
@@ -342,11 +379,13 @@ ClassMethod StopProduction(productionName As %VarString, timeout As %Integer = 1
         Do result.%Set("errorCode", "STOP_FAILED")
         Do result.%Set("statusText", $System.Status.GetErrorText(sc))
         Set result.runtime = ..GetRuntimeStatus(productionName)
+        Set result.metrics = ..BuildProductionRuntimeMetrics(result)
         return result
     }
 
     Set result.changed = 1
     Set result.runtime = ..GetRuntimeStatus(productionName)
+    Set result.metrics = ..BuildProductionRuntimeMetrics(result)
     return result
 }
 
@@ -376,6 +415,7 @@ ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 
 
     If '..ClassExists("Ens.MessageHeader") {
         Do result.warnings.%Push(..NewWarning("MESSAGE_HEADER_NOT_AVAILABLE", "Ens.MessageHeader is not available in this namespace."))
+        Set result.metrics = ..BuildMessageListMetrics(result)
         return result
     }
 
@@ -429,6 +469,7 @@ ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 
     }
 
     Do result.%Set("count", result.items.%Size())
+    Set result.metrics = ..BuildMessageListMetrics(result)
     return result
 }
 
@@ -459,6 +500,7 @@ ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integ
 
     If '..ClassExists("Ens.MessageHeader") {
         Do result.warnings.%Push(..NewWarning("MESSAGE_HEADER_NOT_AVAILABLE", "Ens.MessageHeader is not available in this namespace."))
+        Set result.metrics = ..BuildMessageListMetrics(result)
         return result
     }
 
@@ -512,6 +554,7 @@ ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integ
         Do ..PushUnique(result.componentNames, rset.%Get("SourceConfigName"))
         Do ..PushUnique(result.componentNames, rset.%Get("TargetConfigName"))
     }
+    Set result.metrics = ..BuildMessageListMetrics(result)
     return result
 }
 
@@ -547,6 +590,8 @@ ClassMethod GetMessage(messageId As %Integer) As %DynamicObject
 
     Set result.message = message
     Set result.payloadMetadata = ..NewPayloadMetadata(message, settings)
+    Set result.payloadMetadata.metrics = ..BuildPayloadMetrics(result.payloadMetadata)
+    Set result.metrics = ..BuildMessageDetailMetrics(result)
     return result
 }
 
@@ -625,6 +670,7 @@ ClassMethod GetMessagePayloadMetadata(messageId As %Integer) As %DynamicObject
     Set result.restrictionReason = metadata.restrictionReason
     Set result.warnings = metadata.warnings
     Set result.evidence = metadata.evidence
+    Do ..AddPayloadMetrics(result)
     return result
 }
 
@@ -669,17 +715,20 @@ ClassMethod GetMessagePayloadPreview(messageId As %Integer) As %DynamicObject
 
     If 'result.payloadInspectionEnabled {
         Set result.payloadInspectionSupported = 0
+        Do ..AddPayloadMetrics(result)
         return result
     }
     Set result.warnings = []
     If 'result.bodyReferenceAvailable {
         Set result.restrictionReason = "PAYLOAD_BODY_REFERENCE_MISSING"
         Do result.warnings.%Push(..NewWarning("PAYLOAD_BODY_REFERENCE_MISSING", "Message body class or ID is missing."))
+        Do ..AddPayloadMetrics(result)
         return result
     }
     If '..ClassExists(result.messageBodyClassName) {
         Set result.restrictionReason = "PAYLOAD_BODY_CLASS_NOT_FOUND"
         Do result.warnings.%Push(..NewWarning("PAYLOAD_BODY_CLASS_NOT_FOUND", "Message body class "_result.messageBodyClassName_" was not found."))
+        Do ..AddPayloadMetrics(result)
         return result
     }
 
@@ -692,6 +741,7 @@ ClassMethod GetMessagePayloadPreview(messageId As %Integer) As %DynamicObject
     If '$IsObject(body) {
         Set result.restrictionReason = "PAYLOAD_BODY_OPEN_FAILED"
         Do result.warnings.%Push(..NewWarning("PAYLOAD_BODY_OPEN_FAILED", "Message body could not be opened for safe preview."))
+        Do ..AddPayloadMetrics(result)
         return result
     }
 
@@ -706,6 +756,7 @@ ClassMethod GetMessagePayloadPreview(messageId As %Integer) As %DynamicObject
     Set result.metadata.fields = result.fields
     Set result.metadata.warnings = []
     Do result.evidence.%Push(..NewEvidence("payload-preview", result.messageBodyClassName, result.messageBodyId, "fields", result.fields.%Size(), "observed"))
+    Do ..AddPayloadMetrics(result)
     return result
 }
 
@@ -770,6 +821,7 @@ ClassMethod GetMessageTrace(messageId As %Integer) As %DynamicObject
     }
     Set result.traceOverview = ..NewTraceOverview(selected, result.steps)
     Set result.traceExplanation = ..NewTraceExplanation(selected, result.steps)
+    Set result.metrics = ..BuildTraceMetrics(result)
     return result
 }
 
@@ -833,6 +885,7 @@ ClassMethod ResendProductionMessage(productionName As %VarString, messageId As %
         Do result.warnings.%Push(..NewWarning("MESSAGE_RESEND_DISABLED", "Message resend is disabled by module settings."))
         Do result.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", messageId, "SessionId", scoped.message.sessionId, "observed"))
         Do result.evidence.%Push(..NewEvidence("module-settings", "esh.interoperability.aid.config.Settings", "current", "messageResendEnabled", settings.messageResendEnabled, "confirmed"))
+        Set result.metrics = ..BuildRuntimeActionMetrics(result)
         return result
     }
 
@@ -841,6 +894,7 @@ ClassMethod ResendProductionMessage(productionName As %VarString, messageId As %
         Do result.warnings.%Push(..NewWarning("MESSAGE_RESEND_UNSUPPORTED", "Ens.MessageHeader.ResendMessage is not available in this namespace."))
         Do result.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", messageId, "SessionId", scoped.message.sessionId, "observed"))
         Do result.evidence.%Push(..NewEvidence("module-settings", "esh.interoperability.aid.config.Settings", "current", "messageResendEnabled", settings.messageResendEnabled, "confirmed"))
+        Set result.metrics = ..BuildRuntimeActionMetrics(result)
         return result
     }
 
@@ -865,6 +919,7 @@ ClassMethod ResendProductionMessage(productionName As %VarString, messageId As %
     Do result.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", messageId, "SessionId", scoped.message.sessionId, "observed"))
     Do result.evidence.%Push(..NewEvidence("module-settings", "esh.interoperability.aid.config.Settings", "current", "messageResendEnabled", settings.messageResendEnabled, "confirmed"))
     Do result.evidence.%Push(..NewEvidence("runtime-action", "Ens.MessageHeader", messageId, "ResendMessage", "Called Ens.MessageHeader.ResendMessage", "observed"))
+    Set result.metrics = ..BuildRuntimeActionMetrics(result)
     return result
 }
 
@@ -882,6 +937,7 @@ ClassMethod GetMessageExplanation(messageId As %Integer) As %DynamicObject
     Set result.explanation = trace.traceExplanation
     Set result.summary = trace.summary
     Set result.stepCount = trace.stepCount
+    Set result.metrics = trace.metrics
     Set result.payloadReturned = trace.payloadReturned
     Set result.runtimeMessageAnalysisEnabled = trace.runtimeMessageAnalysisEnabled
     Set result.warnings = trace.warnings
@@ -922,6 +978,7 @@ ClassMethod ListComponents(productionName As %VarString) As %DynamicObject
     }
     If productionXData = "" {
         Do result.warnings.%Push(..NewWarning("PRODUCTION_XDATA_NOT_FOUND", "No Production XData block was found."))
+        Set result.metrics = ..BuildComponentListMetrics(result)
         return result
     }
 
@@ -948,6 +1005,7 @@ ClassMethod ListComponents(productionName As %VarString) As %DynamicObject
     }
 
     Do result.%Set("count", result.items.%Size())
+    Set result.metrics = ..BuildComponentListMetrics(result)
     return result
 }
 
@@ -2585,6 +2643,7 @@ ClassMethod NewMessageSessionSummaryFromTrace(trace As %DynamicObject, productio
     Set summary.payloadPolicy.bodyContentReturned = 0
     Set summary.payloadPolicy.summary = "Payload body content was not returned."
     Set summary.staticContext = ..NewTraceStaticContext(trace)
+    Set summary.metrics = trace.metrics
     Set summary.text = ..BuildMessageSessionSummaryText(summary)
     Set summary.warnings = trace.warnings
     Set summary.evidence = trace.evidence
@@ -3179,6 +3238,659 @@ ClassMethod BuildProductionSummary(production As %DynamicObject, connections As 
     return text
 }
 
+ClassMethod BuildProductionSummaryBullets(production As %DynamicObject, connections As %DynamicArray, externalSystems As %DynamicArray, artifacts As %DynamicArray, messageTypes As %DynamicArray, transformations As %DynamicArray, businessProcesses As %DynamicArray) As %DynamicArray [ Private ]
+{
+    Set serviceCount = ..CountComponentsByType(production.components, "business-service")
+    Set processCount = ..CountComponentsByType(production.components, "business-process")
+    Set operationCount = ..CountComponentsByType(production.components, "business-operation")
+    Set disabledCount = ..CountDisabledComponents(production.components)
+    Set bullets = []
+
+    Do bullets.%Push(serviceCount_" service"_..Plural(serviceCount)_", "_processCount_" process"_..Plural(processCount)_", and "_operationCount_" operation"_..Plural(operationCount)_" are configured.")
+    Do bullets.%Push(connections.%Size()_" target connection"_..Plural(connections.%Size())_" describe component routing.")
+    Do bullets.%Push(messageTypes.%Size()_" message signature"_..Plural(messageTypes.%Size())_", "_transformations.%Size()_" transformation definition"_..Plural(transformations.%Size())_", and "_businessProcesses.%Size()_" BPL process definition"_..Plural(businessProcesses.%Size())_" were identified.")
+
+    If externalSystems.%Size() > 0 {
+        Do bullets.%Push(externalSystems.%Size()_" external endpoint setting"_..Plural(externalSystems.%Size())_" can be inspected.")
+    }
+    If artifacts.%Size() > 0 {
+        Do bullets.%Push(artifacts.%Size()_" rule, transformation, or BPL artifact"_..Plural(artifacts.%Size())_" support the explanation.")
+    }
+    If disabledCount > 0 {
+        If disabledCount = 1 {
+            Do bullets.%Push(disabledCount_" component is disabled.")
+        } Else {
+            Do bullets.%Push(disabledCount_" components are disabled.")
+        }
+    }
+    return bullets
+}
+
+ClassMethod BuildProductionOverviewSummary(production As %DynamicObject) As %VarString [ Private ]
+{
+    Set text = "Production "_production.name_" contains "_production.serviceCount_" business service"_..Plural(production.serviceCount)_", "_production.processCount_" business process"_..Plural(production.processCount)_", and "_production.operationCount_" business operation"_..Plural(production.operationCount)_"."
+    If production.disabledComponentCount > 0 {
+        If production.disabledComponentCount = 1 {
+            Set text = text_" 1 component is disabled."
+        } Else {
+            Set text = text_" "_production.disabledComponentCount_" components are disabled."
+        }
+    }
+    If production.runtimeState '= "" {
+        Set text = text_" Runtime state is "_production.runtimeState_"."
+    }
+    return text
+}
+
+ClassMethod BuildProductionOverviewSummaryBullets(production As %DynamicObject) As %DynamicArray [ Private ]
+{
+    Set bullets = []
+
+    Do bullets.%Push(production.componentCount_" configured component"_..Plural(production.componentCount)_" are available for inspection.")
+    Do bullets.%Push(production.serviceCount_" service"_..Plural(production.serviceCount)_", "_production.processCount_" process"_..Plural(production.processCount)_", and "_production.operationCount_" operation"_..Plural(production.operationCount)_" are configured.")
+    If production.disabledComponentCount > 0 {
+        If production.disabledComponentCount = 1 {
+            Do bullets.%Push("1 component is disabled.")
+        } Else {
+            Do bullets.%Push(production.disabledComponentCount_" components are disabled.")
+        }
+    }
+    If production.runtimeState '= "" {
+        Do bullets.%Push("Runtime state is "_production.runtimeState_".")
+    }
+    return bullets
+}
+
+ClassMethod BuildProductionOverviewMetrics(production As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.componentCount = production.componentCount
+    Set metrics.serviceCount = production.serviceCount
+    Set metrics.processCount = production.processCount
+    Set metrics.operationCount = production.operationCount
+    Set metrics.disabledComponentCount = production.disabledComponentCount
+    return metrics
+}
+
+ClassMethod BuildProductionListMetrics(result As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.productionCount = 0
+    Set metrics.runningProductionCount = 0
+    Set metrics.componentCount = 0
+    Set metrics.serviceCount = 0
+    Set metrics.processCount = 0
+    Set metrics.operationCount = 0
+    Set metrics.disabledComponentCount = 0
+    Set metrics.warningCount = 0
+    Set metrics.evidenceCount = 0
+    Set metrics.confirmedEvidenceCount = 0
+    Set metrics.observedEvidenceCount = 0
+    Set metrics.inferredEvidenceCount = 0
+    Set metrics.unknownEvidenceCount = 0
+    If $IsObject(result.items) {
+        Set metrics.productionCount = result.items.%Size()
+        For index = 0:1:result.items.%Size()-1 {
+            Set item = result.items.%Get(index)
+            Continue:'$IsObject(item)
+            If item.isRunning {
+                Set metrics.runningProductionCount = metrics.runningProductionCount + 1
+            }
+            Set metrics.componentCount = metrics.componentCount + item.componentCount
+            Set metrics.serviceCount = metrics.serviceCount + item.serviceCount
+            Set metrics.processCount = metrics.processCount + item.processCount
+            Set metrics.operationCount = metrics.operationCount + item.operationCount
+            Set metrics.disabledComponentCount = metrics.disabledComponentCount + item.disabledComponentCount
+            Do ..AddEvidenceCoverageFromObject(item, metrics)
+        }
+    }
+    If $IsObject(result.warnings) {
+        Set metrics.warningCount = result.warnings.%Size()
+    }
+    return metrics
+}
+
+ClassMethod BuildProductionRuntimeMetrics(result As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.state = 0
+    Set metrics.isRunning = 0
+    Set metrics.isCurrent = 0
+    Set metrics.hasActiveProduction = 0
+    Set metrics.changed = 0
+    Set metrics.hasError = 0
+    If $IsObject(result.runtime) {
+        Set metrics.state = result.runtime.state
+        Set metrics.isRunning = result.runtime.isRunning
+        Set metrics.isCurrent = result.runtime.isCurrent
+        Set metrics.hasActiveProduction = $Select(result.runtime.currentProduction '= "":1, 1:0)
+    }
+    If result.%IsDefined("changed") {
+        Set metrics.changed = result.changed
+    }
+    If result.%IsDefined("errorCode") {
+        Set metrics.hasError = 1
+    }
+    return metrics
+}
+
+ClassMethod BuildComponentSummaryBullets(detail As %DynamicObject) As %DynamicArray [ Private ]
+{
+    Set bullets = []
+    Set componentType = "component"
+    If $IsObject(detail.component) {
+        Set componentType = ..ComponentTypeText(detail.component.type)
+    }
+
+    Do bullets.%Push(detail.componentName_" is a "_componentType_" with "_detail.connections.%Size()_" related connection"_..Plural(detail.connections.%Size())_".")
+    If detail.messageTypes.%Size() > 0 {
+        Do bullets.%Push(detail.messageTypes.%Size()_" message signature"_..Plural(detail.messageTypes.%Size())_" describe request and response contracts.")
+    }
+    If detail.externalSystems.%Size() > 0 {
+        If detail.externalSystems.%Size() = 1 {
+            Do bullets.%Push(detail.externalSystems.%Size()_" external endpoint setting is attached to this component.")
+        } Else {
+            Do bullets.%Push(detail.externalSystems.%Size()_" external endpoint settings are attached to this component.")
+        }
+    }
+    If detail.rules.%Size() > 0 {
+        If detail.rules.%Size() = 1 {
+            Do bullets.%Push(detail.rules.%Size()_" routing rule is linked to this component.")
+        } Else {
+            Do bullets.%Push(detail.rules.%Size()_" routing rules are linked to this component.")
+        }
+    }
+    If detail.transformations.%Size() > 0 {
+        If detail.transformations.%Size() = 1 {
+            Do bullets.%Push(detail.transformations.%Size()_" transformation definition is linked to this component.")
+        } Else {
+            Do bullets.%Push(detail.transformations.%Size()_" transformation definitions are linked to this component.")
+        }
+    }
+    If detail.businessProcesses.%Size() > 0 {
+        If detail.businessProcesses.%Size() = 1 {
+            Do bullets.%Push(detail.businessProcesses.%Size()_" BPL process definition is linked to this component.")
+        } Else {
+            Do bullets.%Push(detail.businessProcesses.%Size()_" BPL process definitions are linked to this component.")
+        }
+    }
+    If detail.artifacts.%Size() > 0 {
+        Do bullets.%Push(detail.artifacts.%Size()_" supporting artifact"_..Plural(detail.artifacts.%Size())_" provide evidence.")
+    }
+    return bullets
+}
+
+ClassMethod BuildProductionMetrics(analysis As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.componentCount = analysis.components.%Size()
+    Set metrics.serviceCount = ..CountComponentsByType(analysis.components, "business-service")
+    Set metrics.processCount = ..CountComponentsByType(analysis.components, "business-process")
+    Set metrics.operationCount = ..CountComponentsByType(analysis.components, "business-operation")
+    Set metrics.disabledComponentCount = ..CountDisabledComponents(analysis.components)
+    Set metrics.connectionCount = analysis.connections.%Size()
+    Set metrics.targetConfigConnectionCount = ..CountConnectionsByKind(analysis.connections, "target-config")
+    Set metrics.routingRuleConnectionCount = ..CountConnectionsByKind(analysis.connections, "routing-rule")
+    Set metrics.bplCallConnectionCount = ..CountConnectionsByKind(analysis.connections, "bpl-call")
+    Set metrics.externalSystemCount = analysis.externalSystems.%Size()
+    Set metrics.artifactCount = analysis.artifacts.%Size()
+    Set metrics.ruleCount = analysis.rules.%Size()
+    Set metrics.messageTypeCount = analysis.messageTypes.%Size()
+    Set metrics.transformationCount = analysis.transformations.%Size()
+    Set metrics.businessProcessCount = analysis.businessProcesses.%Size()
+    Set metrics.warningCount = analysis.warnings.%Size()
+    Set metrics.explanationCount = analysis.componentExplanations.%Size() + analysis.connectionExplanations.%Size() + analysis.externalSystemExplanations.%Size() + analysis.artifactExplanations.%Size() + analysis.ruleExplanations.%Size() + analysis.messageTypeExplanations.%Size() + analysis.transformationExplanations.%Size() + analysis.businessProcessExplanations.%Size()
+    return metrics
+}
+
+ClassMethod BuildAnalysisCoverage(analysis As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set coverage = {}
+    Set coverage.componentCount = analysis.components.%Size()
+    Set coverage.connectionCount = analysis.connections.%Size()
+    Set coverage.messageTypeCount = analysis.messageTypes.%Size()
+    Set coverage.externalSystemCount = analysis.externalSystems.%Size()
+    Set coverage.artifactCount = analysis.artifacts.%Size()
+    Set coverage.ruleCount = analysis.rules.%Size()
+    Set coverage.transformationCount = analysis.transformations.%Size()
+    Set coverage.businessProcessCount = analysis.businessProcesses.%Size()
+    Set coverage.warningCount = analysis.warnings.%Size()
+    Set coverage.componentAnalysisAvailable = (coverage.componentCount > 0)
+    Set coverage.targetAnalysisAvailable = (coverage.connectionCount > 0)
+    Set coverage.messageSignatureAnalysisAvailable = (coverage.messageTypeCount > 0)
+    Set coverage.routingRuleAnalysisAvailable = (coverage.ruleCount > 0)
+    Set coverage.transformationAnalysisAvailable = (coverage.transformationCount > 0)
+    Set coverage.businessProcessAnalysisAvailable = (coverage.businessProcessCount > 0)
+    Set coverage.warningCodes = []
+    Set coverage.limitations = []
+    Set coverage.evidenceCount = 0
+    Set coverage.confirmedEvidenceCount = 0
+    Set coverage.observedEvidenceCount = 0
+    Set coverage.inferredEvidenceCount = 0
+    Set coverage.unknownEvidenceCount = 0
+
+    For index = 0:1:analysis.warnings.%Size()-1 {
+        Set warning = analysis.warnings.%Get(index)
+        Continue:'$IsObject(warning)
+        Set code = warning.code
+        Continue:(code = "")
+        Continue:(..ArrayContains(coverage.warningCodes, code))
+        Do coverage.warningCodes.%Push(code)
+    }
+
+    If 'coverage.routingRuleAnalysisAvailable {
+        Do coverage.limitations.%Push("No accessible routing-rule definitions were identified.")
+    }
+    If 'coverage.transformationAnalysisAvailable {
+        Do coverage.limitations.%Push("No accessible DTL transformation definitions were identified.")
+    }
+    If 'coverage.businessProcessAnalysisAvailable {
+        Do coverage.limitations.%Push("No accessible BPL process definitions were identified.")
+    }
+    If coverage.warningCodes.%Size() > 0 {
+        Do coverage.limitations.%Push("Review warning codes for unsupported or ambiguous analysis findings.")
+    }
+    Do ..AddEvidenceCoverageFromArray(analysis.components, coverage)
+    Do ..AddEvidenceCoverageFromArray(analysis.connections, coverage)
+    Do ..AddEvidenceCoverageFromArray(analysis.externalSystems, coverage)
+    Do ..AddEvidenceCoverageFromArray(analysis.artifacts, coverage)
+    Do ..AddEvidenceCoverageFromArray(analysis.rules, coverage)
+    Do ..AddEvidenceCoverageFromArray(analysis.messageTypes, coverage)
+    Do ..AddEvidenceCoverageFromArray(analysis.transformations, coverage)
+    Do ..AddEvidenceCoverageFromArray(analysis.businessProcesses, coverage)
+    Do ..AddEvidenceCoverageFromArray(analysis.componentExplanations, coverage)
+    Do ..AddEvidenceCoverageFromArray(analysis.connectionExplanations, coverage)
+    Do ..AddEvidenceCoverageFromArray(analysis.externalSystemExplanations, coverage)
+    Do ..AddEvidenceCoverageFromArray(analysis.artifactExplanations, coverage)
+    Do ..AddEvidenceCoverageFromArray(analysis.ruleExplanations, coverage)
+    Do ..AddEvidenceCoverageFromArray(analysis.messageTypeExplanations, coverage)
+    Do ..AddEvidenceCoverageFromArray(analysis.transformationExplanations, coverage)
+    Do ..AddEvidenceCoverageFromArray(analysis.businessProcessExplanations, coverage)
+    return coverage
+}
+
+ClassMethod AddEvidenceCoverageFromArray(items As %DynamicArray, coverage As %DynamicObject) [ Private ]
+{
+    For index = 0:1:items.%Size()-1 {
+        Set item = items.%Get(index)
+        Continue:'$IsObject(item)
+        Continue:'$IsObject(item.evidence)
+        Do ..AddEvidenceCoverageFromEvidenceArray(item.evidence, coverage)
+    }
+    return
+}
+
+ClassMethod AddEvidenceCoverageFromObject(item As %DynamicObject, coverage As %DynamicObject) [ Private ]
+{
+    If '$IsObject(item) {
+        return
+    }
+    If '$IsObject(item.evidence) {
+        return
+    }
+    Do ..AddEvidenceCoverageFromEvidenceArray(item.evidence, coverage)
+    return
+}
+
+ClassMethod AddEvidenceCoverageFromEvidenceArray(items As %DynamicArray, coverage As %DynamicObject) [ Private ]
+{
+    For index = 0:1:items.%Size()-1 {
+        Set evidence = items.%Get(index)
+        Continue:'$IsObject(evidence)
+        Set confidence = evidence.confidence
+        Set coverage.evidenceCount = coverage.evidenceCount + 1
+        If confidence = "confirmed" {
+            Set coverage.confirmedEvidenceCount = coverage.confirmedEvidenceCount + 1
+        } ElseIf confidence = "observed" {
+            Set coverage.observedEvidenceCount = coverage.observedEvidenceCount + 1
+        } ElseIf confidence = "inferred" {
+            Set coverage.inferredEvidenceCount = coverage.inferredEvidenceCount + 1
+        } Else {
+            Set coverage.unknownEvidenceCount = coverage.unknownEvidenceCount + 1
+        }
+    }
+    return
+}
+
+ClassMethod BuildComponentMetrics(detail As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.connectionCount = detail.connections.%Size()
+    Set metrics.externalSystemCount = detail.externalSystems.%Size()
+    Set metrics.artifactCount = detail.artifacts.%Size()
+    Set metrics.ruleCount = detail.rules.%Size()
+    Set metrics.messageTypeCount = detail.messageTypes.%Size()
+    Set metrics.transformationCount = detail.transformations.%Size()
+    Set metrics.businessProcessCount = detail.businessProcesses.%Size()
+    Set metrics.explanationCount = detail.connectionExplanations.%Size() + detail.externalSystemExplanations.%Size() + detail.artifactExplanations.%Size() + detail.ruleExplanations.%Size() + detail.messageTypeExplanations.%Size() + detail.transformationExplanations.%Size() + detail.businessProcessExplanations.%Size()
+    Set metrics.evidenceCount = 0
+    Set metrics.confirmedEvidenceCount = 0
+    Set metrics.observedEvidenceCount = 0
+    Set metrics.inferredEvidenceCount = 0
+    Set metrics.unknownEvidenceCount = 0
+    Do ..AddEvidenceCoverageFromObject(detail.component, metrics)
+    Do ..AddEvidenceCoverageFromObject(detail.explanation, metrics)
+    Do ..AddEvidenceCoverageFromArray(detail.connections, metrics)
+    Do ..AddEvidenceCoverageFromArray(detail.connectionExplanations, metrics)
+    Do ..AddEvidenceCoverageFromArray(detail.externalSystems, metrics)
+    Do ..AddEvidenceCoverageFromArray(detail.externalSystemExplanations, metrics)
+    Do ..AddEvidenceCoverageFromArray(detail.artifacts, metrics)
+    Do ..AddEvidenceCoverageFromArray(detail.artifactExplanations, metrics)
+    Do ..AddEvidenceCoverageFromArray(detail.rules, metrics)
+    Do ..AddEvidenceCoverageFromArray(detail.ruleExplanations, metrics)
+    Do ..AddEvidenceCoverageFromArray(detail.messageTypes, metrics)
+    Do ..AddEvidenceCoverageFromArray(detail.messageTypeExplanations, metrics)
+    Do ..AddEvidenceCoverageFromArray(detail.transformations, metrics)
+    Do ..AddEvidenceCoverageFromArray(detail.transformationExplanations, metrics)
+    Do ..AddEvidenceCoverageFromArray(detail.businessProcesses, metrics)
+    Do ..AddEvidenceCoverageFromArray(detail.businessProcessExplanations, metrics)
+    return metrics
+}
+
+ClassMethod BuildComponentListMetrics(result As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.componentCount = 0
+    Set metrics.serviceCount = 0
+    Set metrics.processCount = 0
+    Set metrics.operationCount = 0
+    Set metrics.disabledComponentCount = 0
+    Set metrics.warningCount = 0
+    Set metrics.evidenceCount = 0
+    Set metrics.confirmedEvidenceCount = 0
+    Set metrics.observedEvidenceCount = 0
+    Set metrics.inferredEvidenceCount = 0
+    Set metrics.unknownEvidenceCount = 0
+    If $IsObject(result.items) {
+        Set metrics.componentCount = result.items.%Size()
+        Set metrics.serviceCount = ..CountComponentsByType(result.items, "business-service")
+        Set metrics.processCount = ..CountComponentsByType(result.items, "business-process")
+        Set metrics.operationCount = ..CountComponentsByType(result.items, "business-operation")
+        Set metrics.disabledComponentCount = ..CountDisabledComponents(result.items)
+        Do ..AddEvidenceCoverageFromArray(result.items, metrics)
+    }
+    If $IsObject(result.warnings) {
+        Set metrics.warningCount = result.warnings.%Size()
+    }
+    return metrics
+}
+
+ClassMethod ArrayContains(items As %DynamicArray, value As %VarString) As %Boolean [ Private ]
+{
+    For index = 0:1:items.%Size()-1 {
+        If items.%Get(index) = value {
+            return 1
+        }
+    }
+    return 0
+}
+
+ClassMethod BuildGraphSummaryBullets(analysis As %DynamicObject, nodes As %DynamicArray, edges As %DynamicArray) As %DynamicArray [ Private ]
+{
+    Set serviceCount = ..CountComponentsByType(analysis.components, "business-service")
+    Set processCount = ..CountComponentsByType(analysis.components, "business-process")
+    Set operationCount = ..CountComponentsByType(analysis.components, "business-operation")
+    Set routingCount = ..CountConnectionsByKind(analysis.connections, "routing-rule")
+    Set bplCount = ..CountConnectionsByKind(analysis.connections, "bpl-call")
+    Set targetCount = ..CountConnectionsByKind(analysis.connections, "target-config")
+    Set bullets = []
+
+    Do bullets.%Push(nodes.%Size()_" graph node"_..Plural(nodes.%Size())_" represent "_serviceCount_" service"_..Plural(serviceCount)_", "_processCount_" process"_..Plural(processCount)_", and "_operationCount_" operation"_..Plural(operationCount)_".")
+    Do bullets.%Push(edges.%Size()_" graph edge"_..Plural(edges.%Size())_" describe target-config, routing-rule, and BPL relationships.")
+    If targetCount > 0 {
+        Do bullets.%Push(targetCount_" configured target connection"_..Plural(targetCount)_" came from component settings.")
+    }
+    If routingCount > 0 {
+        Do bullets.%Push(routingCount_" routing-rule edge"_..Plural(routingCount)_" came from rule analysis.")
+    }
+    If bplCount > 0 {
+        Do bullets.%Push(bplCount_" BPL call edge"_..Plural(bplCount)_" came from process analysis.")
+    }
+    return bullets
+}
+
+ClassMethod BuildGraphMetrics(analysis As %DynamicObject, nodes As %DynamicArray, edges As %DynamicArray) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.nodeCount = nodes.%Size()
+    Set metrics.edgeCount = edges.%Size()
+    Set metrics.serviceCount = ..CountComponentsByType(analysis.components, "business-service")
+    Set metrics.processCount = ..CountComponentsByType(analysis.components, "business-process")
+    Set metrics.operationCount = ..CountComponentsByType(analysis.components, "business-operation")
+    Set metrics.disabledNodeCount = ..CountDisabledComponents(analysis.components)
+    Set metrics.targetConfigEdgeCount = ..CountConnectionsByKind(analysis.connections, "target-config")
+    Set metrics.routingRuleEdgeCount = ..CountConnectionsByKind(analysis.connections, "routing-rule")
+    Set metrics.bplCallEdgeCount = ..CountConnectionsByKind(analysis.connections, "bpl-call")
+    Set metrics.evidenceCount = 0
+    Set metrics.confirmedEvidenceCount = 0
+    Set metrics.observedEvidenceCount = 0
+    Set metrics.inferredEvidenceCount = 0
+    Set metrics.unknownEvidenceCount = 0
+    Do ..AddEvidenceCoverageFromArray(nodes, metrics)
+    Do ..AddEvidenceCoverageFromArray(edges, metrics)
+    return metrics
+}
+
+ClassMethod BuildTraceMetrics(trace As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.stepCount = trace.steps.%Size()
+    Set metrics.warningCount = trace.warnings.%Size()
+    Set metrics.evidenceCount = 0
+    Set metrics.confirmedEvidenceCount = 0
+    Set metrics.observedEvidenceCount = 0
+    Set metrics.inferredEvidenceCount = 0
+    Set metrics.unknownEvidenceCount = 0
+    Do ..AddEvidenceCoverageFromEvidenceArray(trace.evidence, metrics)
+    Do ..AddEvidenceCoverageFromArray(trace.steps, metrics)
+    return metrics
+}
+
+ClassMethod BuildMessageListMetrics(result As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.itemCount = 0
+    Set metrics.totalCount = 0
+    Set metrics.errorCount = 0
+    Set metrics.hasMore = 0
+    Set metrics.sourceFacetCount = 0
+    Set metrics.targetFacetCount = 0
+    Set metrics.messageBodyClassFacetCount = 0
+    Set metrics.sessionFacetCount = 0
+    Set metrics.componentFacetCount = 0
+    Set metrics.warningCount = 0
+
+    If $IsObject(result.items) {
+        Set metrics.itemCount = result.items.%Size()
+        Set metrics.totalCount = metrics.itemCount
+        For index = 0:1:result.items.%Size()-1 {
+            Set item = result.items.%Get(index)
+            Continue:'$IsObject(item)
+            If item.isError {
+                Set metrics.errorCount = metrics.errorCount + 1
+            }
+        }
+    }
+    If result.%IsDefined("count") {
+        Set metrics.itemCount = result.count
+        Set metrics.totalCount = result.count
+    }
+    If result.%IsDefined("totalCount") {
+        Set metrics.totalCount = result.totalCount
+    }
+    If result.%IsDefined("errorCount") {
+        Set metrics.errorCount = result.errorCount
+    }
+    If result.%IsDefined("hasMore") {
+        Set metrics.hasMore = result.hasMore
+    }
+    If $IsObject(result.sourceConfigNames) {
+        Set metrics.sourceFacetCount = result.sourceConfigNames.%Size()
+    }
+    If $IsObject(result.targetConfigNames) {
+        Set metrics.targetFacetCount = result.targetConfigNames.%Size()
+    }
+    If $IsObject(result.messageBodyClassNames) {
+        Set metrics.messageBodyClassFacetCount = result.messageBodyClassNames.%Size()
+    }
+    If $IsObject(result.sessionIds) {
+        Set metrics.sessionFacetCount = result.sessionIds.%Size()
+    }
+    If $IsObject(result.componentNames) {
+        Set metrics.componentFacetCount = result.componentNames.%Size()
+    }
+    If $IsObject(result.warnings) {
+        Set metrics.warningCount = result.warnings.%Size()
+    }
+    return metrics
+}
+
+ClassMethod BuildMessageDetailMetrics(detail As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.payloadReturned = 0
+    Set metrics.payloadInspectionSupported = 0
+    Set metrics.bodyReferenceAvailable = 0
+    Set metrics.messageEvidenceCount = 0
+    Set metrics.payloadEvidenceCount = 0
+    Set metrics.warningCount = 0
+    Set metrics.evidenceCount = 0
+    Set metrics.confirmedEvidenceCount = 0
+    Set metrics.observedEvidenceCount = 0
+    Set metrics.inferredEvidenceCount = 0
+    Set metrics.unknownEvidenceCount = 0
+
+    If detail.%IsDefined("payloadReturned") {
+        Set metrics.payloadReturned = detail.payloadReturned
+    }
+    If $IsObject(detail.warnings) {
+        Set metrics.warningCount = detail.warnings.%Size()
+    }
+    If $IsObject(detail.message) {
+        If $IsObject(detail.message.evidence) {
+            Set metrics.messageEvidenceCount = detail.message.evidence.%Size()
+            Do ..AddEvidenceCoverageFromEvidenceArray(detail.message.evidence, metrics)
+        }
+    }
+    If $IsObject(detail.payloadMetadata) {
+        If detail.payloadMetadata.%IsDefined("payloadInspectionSupported") {
+            Set metrics.payloadInspectionSupported = detail.payloadMetadata.payloadInspectionSupported
+        }
+        If detail.payloadMetadata.%IsDefined("bodyReferenceAvailable") {
+            Set metrics.bodyReferenceAvailable = detail.payloadMetadata.bodyReferenceAvailable
+        }
+        If $IsObject(detail.payloadMetadata.warnings) {
+            Set metrics.warningCount = metrics.warningCount + detail.payloadMetadata.warnings.%Size()
+        }
+        If $IsObject(detail.payloadMetadata.evidence) {
+            Set metrics.payloadEvidenceCount = detail.payloadMetadata.evidence.%Size()
+            Do ..AddEvidenceCoverageFromEvidenceArray(detail.payloadMetadata.evidence, metrics)
+        }
+    }
+    return metrics
+}
+
+ClassMethod BuildRuntimeActionMetrics(action As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.requested = action.requested
+    Set metrics.allowed = action.allowed
+    Set metrics.executed = action.executed
+    Set metrics.changed = action.changed
+    Set metrics.dryRun = action.dryRun
+    Set metrics.supported = action.supported
+    Set metrics.warningCount = 0
+    Set metrics.evidenceCount = 0
+    Set metrics.confirmedEvidenceCount = 0
+    Set metrics.observedEvidenceCount = 0
+    Set metrics.inferredEvidenceCount = 0
+    Set metrics.unknownEvidenceCount = 0
+    If $IsObject(action.warnings) {
+        Set metrics.warningCount = action.warnings.%Size()
+    }
+    If $IsObject(action.evidence) {
+        Do ..AddEvidenceCoverageFromEvidenceArray(action.evidence, metrics)
+    }
+    return metrics
+}
+
+ClassMethod BuildSettingsMetrics(settingsResult As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.featureFlagCount = 0
+    Set metrics.enabledFeatureFlagCount = 0
+    Set metrics.limitSettingCount = 0
+    Set metrics.warningCount = 0
+    Set metrics.evidenceCount = 0
+    Set metrics.confirmedEvidenceCount = 0
+    Set metrics.observedEvidenceCount = 0
+    Set metrics.inferredEvidenceCount = 0
+    Set metrics.unknownEvidenceCount = 0
+    If $IsObject(settingsResult.settings) {
+        Set flagNames = ["runtimeMessageAnalysisEnabled","payloadInspectionEnabled","messageResendEnabled","sourceCodeInferenceEnabled","aiProviderEnabled"]
+        For index = 0:1:flagNames.%Size()-1 {
+            Set flagName = flagNames.%Get(index)
+            Continue:'settingsResult.settings.%IsDefined(flagName)
+            Set metrics.featureFlagCount = metrics.featureFlagCount + 1
+            If settingsResult.settings.%Get(flagName) {
+                Set metrics.enabledFeatureFlagCount = metrics.enabledFeatureFlagCount + 1
+            }
+        }
+        Set limitNames = ["maxMessagesReturned","maxTraceDepth","defaultMessageLookbackDays"]
+        For index = 0:1:limitNames.%Size()-1 {
+            Set limitName = limitNames.%Get(index)
+            Continue:'settingsResult.settings.%IsDefined(limitName)
+            Set metrics.limitSettingCount = metrics.limitSettingCount + 1
+        }
+    }
+    If $IsObject(settingsResult.warnings) {
+        Set metrics.warningCount = settingsResult.warnings.%Size()
+    }
+    If $IsObject(settingsResult.evidence) {
+        Do ..AddEvidenceCoverageFromEvidenceArray(settingsResult.evidence, metrics)
+    }
+    return metrics
+}
+
+ClassMethod AddPayloadMetrics(payload As %DynamicObject) [ Private ]
+{
+    Set payload.metrics = ..BuildPayloadMetrics(payload)
+    If $IsObject(payload.metadata) {
+        Set payload.metadata.metrics = payload.metrics
+    }
+    return
+}
+
+ClassMethod BuildPayloadMetrics(payload As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.fieldCount = 0
+    Set metrics.redactedFieldCount = 0
+    Set metrics.warningCount = 0
+    Set metrics.evidenceCount = 0
+    Set metrics.confirmedEvidenceCount = 0
+    Set metrics.observedEvidenceCount = 0
+    Set metrics.inferredEvidenceCount = 0
+    Set metrics.unknownEvidenceCount = 0
+    If $IsObject(payload.fields) {
+        Set metrics.fieldCount = payload.fields.%Size()
+        For index = 0:1:payload.fields.%Size()-1 {
+            Set field = payload.fields.%Get(index)
+            Continue:'$IsObject(field)
+            If field.redacted {
+                Set metrics.redactedFieldCount = metrics.redactedFieldCount + 1
+            }
+        }
+    }
+    If $IsObject(payload.warnings) {
+        Set metrics.warningCount = payload.warnings.%Size()
+    }
+    If $IsObject(payload.evidence) {
+        Do ..AddEvidenceCoverageFromEvidenceArray(payload.evidence, metrics)
+    }
+    return metrics
+}
+
 ClassMethod CountComponentsByType(components As %DynamicArray, componentType As %VarString) As %Integer [ Private ]
 {
     Set count = 0
@@ -3186,6 +3898,20 @@ ClassMethod CountComponentsByType(components As %DynamicArray, componentType As 
         Set component = components.%Get(index)
         If $IsObject(component) {
             If component.type = componentType {
+                Set count = count + 1
+            }
+        }
+    }
+    return count
+}
+
+ClassMethod CountConnectionsByKind(connections As %DynamicArray, kind As %VarString) As %Integer [ Private ]
+{
+    Set count = 0
+    For index = 0:1:connections.%Size()-1 {
+        Set connection = connections.%Get(index)
+        If $IsObject(connection) {
+            If connection.kind = kind {
                 Set count = count + 1
             }
         }
