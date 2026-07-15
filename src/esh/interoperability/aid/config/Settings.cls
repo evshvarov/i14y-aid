@@ -5,6 +5,8 @@ Property RuntimeMessageAnalysisEnabled As %Boolean [ InitialExpression = 1 ];
 
 Property PayloadInspectionEnabled As %Boolean [ InitialExpression = 0 ];
 
+Property MessageResendEnabled As %Boolean [ InitialExpression = 0 ];
+
 Property MaxMessagesReturned As %Integer [ InitialExpression = 100 ];
 
 Property MaxTraceDepth As %Integer [ InitialExpression = 50 ];
@@ -28,6 +30,7 @@ ClassMethod Defaults() As %DynamicObject
     Set settings = {}
     Set settings.runtimeMessageAnalysisEnabled = 1
     Set settings.payloadInspectionEnabled = 0
+    Set settings.messageResendEnabled = 0
     Set settings.maxMessagesReturned = 100
     Set settings.maxTraceDepth = 50
     Set settings.defaultMessageLookbackDays = 7
@@ -44,7 +47,7 @@ ClassMethod Current() As %DynamicObject
 {
     Set settings = ..Defaults()
     Set stmt = ##class(%SQL.Statement).%New()
-    Set sql = "SELECT TOP 1 RuntimeMessageAnalysisEnabled, PayloadInspectionEnabled, MaxMessagesReturned, MaxTraceDepth, DefaultMessageLookbackDays, FieldRedactionPatterns, ClassExclusions, ProductionExclusions, SourceCodeInferenceEnabled, ExplanationVerbosity, AIProviderEnabled FROM esh_interoperability_aid_config.Settings ORDER BY ID"
+    Set sql = "SELECT TOP 1 RuntimeMessageAnalysisEnabled, PayloadInspectionEnabled, MessageResendEnabled, MaxMessagesReturned, MaxTraceDepth, DefaultMessageLookbackDays, FieldRedactionPatterns, ClassExclusions, ProductionExclusions, SourceCodeInferenceEnabled, ExplanationVerbosity, AIProviderEnabled FROM esh_interoperability_aid_config.Settings ORDER BY ID"
     Set sc = stmt.%Prepare(sql)
     If $$$ISERR(sc) {
         return settings
@@ -56,6 +59,7 @@ ClassMethod Current() As %DynamicObject
     If rset.%Next() {
         Set settings.runtimeMessageAnalysisEnabled = rset.%Get("RuntimeMessageAnalysisEnabled")
         Set settings.payloadInspectionEnabled = rset.%Get("PayloadInspectionEnabled")
+        Set settings.messageResendEnabled = rset.%Get("MessageResendEnabled")
         Set settings.maxMessagesReturned = rset.%Get("MaxMessagesReturned")
         Set settings.maxTraceDepth = rset.%Get("MaxTraceDepth")
         Set settings.defaultMessageLookbackDays = rset.%Get("DefaultMessageLookbackDays")
@@ -105,6 +109,16 @@ ClassMethod UpdateFromPayload(payload As %DynamicObject) As %DynamicObject
         Set settings.PayloadInspectionEnabled = value
         If value {
             Do result.warnings.%Push(..NewWarning("PAYLOAD_INSPECTION_UNSUPPORTED", "Payload inspection can be enabled in settings, but payload body inspection is not implemented in this version."))
+        }
+    }
+    If payload.%IsDefined("messageResendEnabled") {
+        Set value = ..NormalizeBooleanValue(payload.%Get("messageResendEnabled"), before.messageResendEnabled)
+        If value '= before.messageResendEnabled {
+            Set result.changed = 1
+        }
+        Set settings.MessageResendEnabled = value
+        If value {
+            Do result.warnings.%Push(..NewWarning("MESSAGE_RESEND_UNSUPPORTED", "Message resend can be enabled in settings, but resend execution is not implemented in this version."))
         }
     }
     If payload.%IsDefined("maxMessagesReturned") {
@@ -193,6 +207,9 @@ ClassMethod ApplyDefaultBounds(settings As %DynamicObject) [ Private ]
     }
     If settings.defaultMessageLookbackDays < 1 {
         Set settings.defaultMessageLookbackDays = 7
+    }
+    If settings.messageResendEnabled = "" {
+        Set settings.messageResendEnabled = 0
     }
     If settings.explanationVerbosity = "" {
         Set settings.explanationVerbosity = "normal"
@@ -317,6 +334,9 @@ Storage Default
 </Value>
 <Value name="12">
 <Value>AIProviderEnabled</Value>
+</Value>
+<Value name="13">
+<Value>MessageResendEnabled</Value>
 </Value>
 </Data>
 <DataLocation>^esh.interoperabilCC6D.SettingsD</DataLocation>

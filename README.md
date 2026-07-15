@@ -18,7 +18,7 @@ The first implementation increment supports:
 - DTL transformation summary extraction for accessible `DTL` XData;
 - BPL process summary extraction for accessible `BPL` XData;
 - API-managed module analysis settings for runtime message limits and feature flags;
-- recent interoperability message header listing, session trace reconstruction, and deterministic trace explanations without returning payload bodies;
+- recent interoperability message header listing, production-scoped session trace reconstruction, deterministic trace explanations, and safe payload metadata without returning payload bodies;
 - safe payload metadata reporting with explicit restriction flags and no body content returned;
 - deterministic component-level explanations with evidence and confidence;
 - deterministic production summaries;
@@ -68,6 +68,7 @@ GET /i14y-aid/api/productions/{productionName}/messages/facets
 GET /i14y-aid/api/productions/{productionName}/messages/{messageId}
 GET /i14y-aid/api/productions/{productionName}/messages/{messageId}/payload
 GET /i14y-aid/api/productions/{productionName}/messages/{messageId}/trace
+GET /i14y-aid/api/productions/{productionName}/messages/{messageId}/session
 GET /i14y-aid/api/productions/{productionName}/messages/{messageId}/explanation
 POST /i14y-aid/api/productions/{productionName}/start
 POST /i14y-aid/api/productions/{productionName}/stop
@@ -91,6 +92,7 @@ curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.t
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages/facets?limit=100"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages/1"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages/1/trace"
+curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages/1/session"
 ```
 
 ## Build And Test

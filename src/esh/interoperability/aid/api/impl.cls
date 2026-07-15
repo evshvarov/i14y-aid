@@ -225,6 +225,18 @@ ClassMethod GetProductionMessageTrace(productionName As %VarString, messageId As
     return ..HandleRuntimeResult(result)
 }
 
+ClassMethod GetProductionMessageSessionSummary(productionName As %VarString, messageId As %Integer) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionMessageSessionSummary(productionName, messageId)
+    return ..HandleRuntimeResult(result)
+}
+
+ClassMethod ResendProductionMessage(productionName As %VarString, messageId As %Integer) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ResendProductionMessage(productionName, messageId)
+    return ..HandleRuntimeResult(result)
+}
+
 ClassMethod GetMessageExplanation(messageId As %Integer) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetMessageExplanation(messageId)

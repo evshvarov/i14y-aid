@@ -486,6 +486,88 @@
         }
       }
     },
+    "/productions/{productionName}/messages/{messageId}/session": {
+      "get": {
+        "summary": "Get production-scoped message session summary",
+        "operationId": "GetProductionMessageSessionSummary",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Production-scoped message session summary",
+            "schema": {
+              "$ref": "#/definitions/MessageSessionSummaryResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message or production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/productions/{productionName}/messages/{messageId}/resend": {
+      "post": {
+        "summary": "Request production-scoped message resend",
+        "operationId": "ResendProductionMessage",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message resend request status",
+            "schema": {
+              "$ref": "#/definitions/MessageResendResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message or production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/productions/{productionName}/messages/{messageId}/explanation": {
       "get": {
         "summary": "Get production-scoped deterministic explanation for a message trace",
@@ -1122,6 +1204,9 @@
           "type": "boolean"
         },
         "payloadInspectionEnabled": {
+          "type": "boolean"
+        },
+        "messageResendEnabled": {
           "type": "boolean"
         },
         "maxMessagesReturned": {
@@ -1770,6 +1855,176 @@
         },
         "confidence": {
           "type": "string"
+        }
+      }
+    },
+    "MessageSessionSummaryResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "messageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "sessionId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "selectedMessage": {
+          "$ref": "#/definitions/MessageHeader"
+        },
+        "stepCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "productionStepCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "outsideProductionStepCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "errorCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "firstSeen": {
+          "type": "string"
+        },
+        "lastSeen": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "finalTarget": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "participants": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "payloadReturned": {
+          "type": "boolean"
+        },
+        "runtimeMessageAnalysisEnabled": {
+          "type": "boolean"
+        },
+        "payloadPolicy": {
+          "type": "object",
+          "properties": {
+            "payloadReturned": {
+              "type": "boolean"
+            },
+            "payloadInspectionEnabled": {
+              "type": "boolean"
+            },
+            "payloadInspectionSupported": {
+              "type": "boolean"
+            },
+            "bodyContentReturned": {
+              "type": "boolean"
+            },
+            "summary": {
+              "type": "string"
+            }
+          }
+        },
+        "text": {
+          "type": "string"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        },
+        "confidence": {
+          "type": "string"
+        }
+      }
+    },
+    "MessageResendResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "messageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "sessionId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "action": {
+          "type": "string"
+        },
+        "requested": {
+          "type": "boolean"
+        },
+        "allowed": {
+          "type": "boolean"
+        },
+        "executed": {
+          "type": "boolean"
+        },
+        "dryRun": {
+          "type": "boolean"
+        },
+        "supported": {
+          "type": "boolean"
+        },
+        "changed": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "payloadReturned": {
+          "type": "boolean"
+        },
+        "runtimeMessageAnalysisEnabled": {
+          "type": "boolean"
+        },
+        "messageResendEnabled": {
+          "type": "boolean"
+        },
+        "selectedMessage": {
+          "$ref": "#/definitions/MessageHeader"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
         }
       }
     },

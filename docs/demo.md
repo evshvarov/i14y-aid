@@ -129,11 +129,13 @@ Pick a `messageId` from the response, then inspect detail, trace, explanation, a
 ```sh
 curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/messages/1"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/messages/1/trace"
+curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/messages/1/session"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/messages/1/explanation"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/messages/1/payload"
 ```
 
 Payload metadata is intentionally safe: the response reports body class/id and restriction flags, but does not return message body content.
+Production-scoped trace responses also report how many reconstructed session steps belong to the selected production and mark each step as inside or outside that production.
 
 ## 7. Use The UI
 

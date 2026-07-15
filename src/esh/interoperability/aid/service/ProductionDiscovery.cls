@@ -676,6 +676,56 @@ ClassMethod GetProductionMessageTrace(productionName As %VarString, messageId As
     return result
 }
 
+ClassMethod GetProductionMessageSessionSummary(productionName As %VarString, messageId As %Integer) As %DynamicObject
+{
+    Set trace = ..GetProductionMessageTrace(productionName, messageId)
+    If trace.%IsDefined("errorCode") {
+        return trace
+    }
+
+    return ..NewMessageSessionSummaryFromTrace(trace, productionName)
+}
+
+ClassMethod ResendProductionMessage(productionName As %VarString, messageId As %Integer) As %DynamicObject
+{
+    Set scoped = ..GetProductionMessage(productionName, messageId)
+    If scoped.%IsDefined("errorCode") {
+        return scoped
+    }
+
+    Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.productionName = productionName
+    Set result.messageId = messageId
+    Set result.sessionId = scoped.message.sessionId
+    Set result.action = "resend"
+    Set result.requested = 1
+    Set result.allowed = 0
+    Set result.executed = 0
+    Set result.dryRun = 1
+    Set result.supported = 0
+    Set result.changed = 0
+    Set result.payloadReturned = 0
+    Set result.runtimeMessageAnalysisEnabled = settings.runtimeMessageAnalysisEnabled
+    Set result.messageResendEnabled = settings.messageResendEnabled
+    Set result.selectedMessage = scoped.message
+    Set result.warnings = []
+    Set result.evidence = []
+
+    If 'settings.messageResendEnabled {
+        Set result.reason = "MESSAGE_RESEND_DISABLED"
+        Do result.warnings.%Push(..NewWarning("MESSAGE_RESEND_DISABLED", "Message resend is disabled by module settings."))
+    } Else {
+        Set result.reason = "MESSAGE_RESEND_UNSUPPORTED"
+        Do result.warnings.%Push(..NewWarning("MESSAGE_RESEND_UNSUPPORTED", "Message resend execution is not implemented in this version."))
+    }
+
+    Do result.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", messageId, "SessionId", scoped.message.sessionId, "observed"))
+    Do result.evidence.%Push(..NewEvidence("module-settings", "esh.interoperability.aid.config.Settings", "current", "messageResendEnabled", settings.messageResendEnabled, "confirmed"))
+    return result
+}
+
 ClassMethod GetMessageExplanation(messageId As %Integer) As %DynamicObject
 {
     Set trace = ..GetMessageTrace(messageId)
@@ -1777,6 +1827,60 @@ ClassMethod NameInArray(names As %DynamicArray, value As %VarString) As %Boolean
         }
     }
     return 0
+}
+
+ClassMethod NewMessageSessionSummaryFromTrace(trace As %DynamicObject, productionName As %VarString) As %DynamicObject [ Private ]
+{
+    Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
+    Set summary = {}
+    Set overview = trace.traceOverview
+    Set selected = trace.selectedMessage
+
+    Set summary.namespace = trace.namespace
+    Set summary.productionName = productionName
+    Set summary.messageId = trace.messageId
+    Set summary.sessionId = trace.sessionId
+    Set summary.selectedMessage = selected
+    Set summary.stepCount = trace.stepCount
+    Set summary.productionStepCount = trace.productionStepCount
+    Set summary.outsideProductionStepCount = trace.stepCount - trace.productionStepCount
+    Set summary.errorCount = overview.errorCount
+    Set summary.firstSeen = overview.firstSeen
+    Set summary.lastSeen = overview.lastSeen
+    Set summary.origin = overview.origin
+    Set summary.finalTarget = overview.finalTarget
+    Set summary.path = overview.path
+    Set summary.participants = overview.participants
+    Set summary.payloadReturned = trace.payloadReturned
+    Set summary.runtimeMessageAnalysisEnabled = trace.runtimeMessageAnalysisEnabled
+    Set summary.payloadPolicy = {}
+    Set summary.payloadPolicy.payloadReturned = trace.payloadReturned
+    Set summary.payloadPolicy.payloadInspectionEnabled = settings.payloadInspectionEnabled
+    Set summary.payloadPolicy.payloadInspectionSupported = 0
+    Set summary.payloadPolicy.bodyContentReturned = 0
+    Set summary.payloadPolicy.summary = "Payload body content was not returned."
+    Set summary.text = ..BuildMessageSessionSummaryText(summary)
+    Set summary.warnings = trace.warnings
+    Set summary.evidence = trace.evidence
+    Set summary.confidence = trace.confidence
+    return summary
+}
+
+ClassMethod BuildMessageSessionSummaryText(summary As %DynamicObject) As %VarString [ Private ]
+{
+    Set text = "Message "_summary.messageId_" is in session "_summary.sessionId_" with "_summary.stepCount_" reconstructed step"_..Plural(summary.stepCount)
+    Set text = text_", including "_summary.productionStepCount_" step"_..Plural(summary.productionStepCount)_" in production "_summary.productionName
+    If summary.outsideProductionStepCount > 0 {
+        Set text = text_" and "_summary.outsideProductionStepCount_" step"_..Plural(summary.outsideProductionStepCount)_" outside that production"
+    }
+    If summary.path '= "" {
+        Set text = text_". Observed path: "_summary.path
+    }
+    If summary.errorCount > 0 {
+        Set text = text_". "_summary.errorCount_" step"_..Plural(summary.errorCount)_" marked as error"
+    }
+    Set text = text_". Payload body content was not returned."
+    return text
 }
 
 ClassMethod NewMessageHeaderFromRow(rset As %SQL.IResultSet) As %DynamicObject [ Private ]
