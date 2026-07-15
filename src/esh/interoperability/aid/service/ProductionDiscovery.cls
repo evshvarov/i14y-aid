@@ -205,7 +205,7 @@ ClassMethod GetProductionGraph(productionName As %VarString) As %DynamicObject
     Set result.evidence = analysis.evidence
     Set result.confidence = analysis.confidence
 
-    Do ..AddGraphNodes(analysis.components, result.nodes)
+    Do ..AddGraphNodes(analysis.components, analysis.componentExplanations, result.nodes)
     Do ..AddGraphEdges(analysis.connections, analysis.messageTypes, analysis.connectionExplanations, result.edges)
     return result
 }
@@ -1508,17 +1508,17 @@ ClassMethod AddBusinessProcessExplanations(businessProcesses As %DynamicArray, e
     return
 }
 
-ClassMethod AddGraphNodes(components As %DynamicArray, nodes As %DynamicArray) [ Private ]
+ClassMethod AddGraphNodes(components As %DynamicArray, componentExplanations As %DynamicArray, nodes As %DynamicArray) [ Private ]
 {
     For index = 0:1:components.%Size()-1 {
         Set component = components.%Get(index)
         Continue:'$IsObject(component)
-        Do nodes.%Push(..NewGraphNode(component))
+        Do nodes.%Push(..NewGraphNode(component, componentExplanations))
     }
     return
 }
 
-ClassMethod NewGraphNode(component As %DynamicObject) As %DynamicObject [ Private ]
+ClassMethod NewGraphNode(component As %DynamicObject, componentExplanations As %DynamicArray) As %DynamicObject [ Private ]
 {
     Set node = {}
     Set node.id = component.name
@@ -1528,6 +1528,10 @@ ClassMethod NewGraphNode(component As %DynamicObject) As %DynamicObject [ Privat
     Set node.enabled = component.enabled
     Set node.protocol = component.protocol
     Set node.adapterClass = component.adapterClass
+    Set explanation = ..FindComponentExplanationByName(componentExplanations, component.name)
+    If $IsObject(explanation) {
+        Set node.text = explanation.text
+    }
     Set node.confidence = component.confidence
     Set node.evidence = component.evidence
     return node
