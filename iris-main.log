@@ -858,3 +858,327 @@ Starting IRIS
 
 08:24:49 2026-07-14 [INFO] ...started InterSystems IRIS instance IRIS
 14:25:27 2026-07-15 [INFO] Shutting down InterSystems IRIS instance IRIS...
+18:52:20 2026-07-16 [INFO] Executing command /home/irisowner/irissys/startISCAgent.sh 2188...
+18:52:20 2026-07-16 [INFO] Writing status to file: /home/irisowner/irissys/iscagent.status
+Reading configuration from file: /home/irisowner/irissys/iscagent.conf
+ISCAgent[17]: Starting
+ISCAgent[19]: Starting ApplicationServer on *:2188
+
+18:52:20 2026-07-16 [INFO] ...executed command /home/irisowner/irissys/startISCAgent.sh 2188
+18:52:20 2026-07-16 [INFO] Starting InterSystems IRIS instance IRIS...
+18:52:21 2026-07-16 [INFO] 
+Now attempting WIJ compare, /usr/irissys/mgr/IRIS.WIJ
+log: 07/16/26-18:52:20:889 (430) 0 [Generic.Event] Allocated 102MB shared memory
+
+Allocated 102MB shared memory
+16MB global buffers, 35MB routine buffers
+log: 07/16/26-18:52:20:889 (430) 0 [Generic.Event] 16MB global buffers, 35MB routine buffers, 16MB journal buffers, 2MB buffer descriptors, 16MB heap, 1MB ECP, 14MB miscellaneous
+
+
+ERROR #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3log: 07/16/26-18:52:20:893 (430) 0 [SIMD] SIMD optimization level: DEFAULT
+
+log: 07/16/26-18:52:20:916 (430) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/ (SFN 0) read-write.
+
+log: 07/16/26-18:52:20:942 (430) 1 [Utility.Event] Error opening CPF file to get IRISTEMP and IRISLOCALDATA directories, using defaults
+
+log: 07/16/26-18:52:20:952 (430) 1 [Database.MountedRO] dRO]  opening CPF file to get IRISTEMP and IRISLOCALDATA directories, using defaults...(repeated 1 times)
+
+log: 07/16/26-18:52:20:952 (430) 0 [Database.MountedRO] Mounted database /usr/irissys/mgr/irislib/ (SFN 1) read-only. Database label is marked read-only. 
+
+log: 07/16/26-18:52:20:968 (430) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/irissecurity/ (SFN 2) read-write.
+
+log: 07/16/26-18:52:20:995 (430) 0 [Utility.Event] Merging /home/irisowner/dev/merge.cpf into /usr/irissys/iris.cpf
+
+log: 07/16/26-18:52:21:005 (430) 0 [Utility.Event] Validating CPF file /usr/irissys/iris.cpf_Merge
+
+log: 07/16/26-18:52:21:251 (430) 0 [Utility.Event] No errors found in CPF file /usr/irissys/iris.cpf_Merge
+
+log: 07/16/26-18:52:21:254 (430) 0 [Utility.Event] Reading [Actions] section
+
+log: 07/16/26-18:52:21:384 (430) 0 [Generic.Event] Was expecting crc 0x3e8cce49,6a55f24e instead of 0xeae8453e,6a55f24c for rtn (%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3.1) rbufnum-311
+
+log: 07/16/26-18:52:21:390 (430) 2 [Utility.Event] ERROR #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3
+
+log: 07/16/26-18:52:21:391 (430) 3 [Database.MountedRW] dRW]  #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3...(repeated 1 times)
+
+log: 07/16/26-18:52:21:391 (430) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/irislocaldata/ (SFN 3) read-write.
+
+Merging IRIS, please wait...
+An error was encountered while initializing the system.
+Please see the merge.log and messages.log files in
+/usr/irissys/mgr/.
+
+18:52:21 2026-07-16 [ERROR] Command "iris start IRIS quietly" exited with status 256
+18:52:21 2026-07-16 [ERROR] See the above messages or /usr/irissys/mgr/messages.log for more information
+18:52:21 2026-07-16 [ERROR] Error starting InterSystems IRIS (1st attempt)
+18:52:21 2026-07-16 [INFO] Shutting down InterSystems IRIS instance IRIS...
+18:52:21 2026-07-16 [INFO] Instance is not running
+irisforce encountered an error.
+    See messages.log for details.
+
+18:52:21 2026-07-16 [INFO] Verifying InterSystems IRIS instance IRIS is down...
+18:52:21 2026-07-16 [INFO] IRIS^/usr/irissys^2025.3.0.226.0com^down, last used Wed Jul 15 14:25:27 2026^iris.cpf^1972^52773^0^^IRIS^^^/usr/irissys^1972
+
+18:52:21 2026-07-16 [INFO] ...verified that InterSystems IRIS instance IRIS is down
+18:52:21 2026-07-16 [INFO] Starting InterSystems IRIS instance IRIS...
+18:52:21 2026-07-16 [INFO] 
+Now attempting WIJ compare, /usr/irissys/mgr/IRIS.WIJ
+log: 07/16/26-18:52:21:494 (506) 0 [Generic.Event] Allocated 102MB shared memory
+
+Allocated 102MB shared memory
+16MB global buffers, 35MB routine buffers
+log: 07/16/26-18:52:21:494 (506) 0 [Generic.Event] 16MB global buffers, 35MB routine buffers, 16MB journal buffers, 2MB buffer descriptors, 16MB heap, 1MB ECP, 14MB miscellaneous
+
+
+ERROR #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3log: 07/16/26-18:52:21:495 (506) 0 [SIMD] SIMD optimization level: DEFAULT
+
+log: 07/16/26-18:52:21:498 (506) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/ (SFN 0) read-write.
+
+log: 07/16/26-18:52:21:504 (506) 1 [Utility.Event] Error opening CPF file to get IRISTEMP and IRISLOCALDATA directories, using defaults
+
+log: 07/16/26-18:52:21:509 (506) 1 [Database.MountedRO] dRO]  opening CPF file to get IRISTEMP and IRISLOCALDATA directories, using defaults...(repeated 1 times)
+
+log: 07/16/26-18:52:21:509 (506) 0 [Database.MountedRO] Mounted database /usr/irissys/mgr/irislib/ (SFN 1) read-only. Database label is marked read-only. 
+
+log: 07/16/26-18:52:21:513 (506) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/irissecurity/ (SFN 2) read-write.
+
+log: 07/16/26-18:52:21:524 (506) 0 [Utility.Event] Merging /home/irisowner/dev/merge.cpf into /usr/irissys/iris.cpf
+
+log: 07/16/26-18:52:21:528 (506) 0 [Utility.Event] Validating CPF file /usr/irissys/iris.cpf_Merge
+
+log: 07/16/26-18:52:21:721 (506) 0 [Utility.Event] No errors found in CPF file /usr/irissys/iris.cpf_Merge
+
+log: 07/16/26-18:52:21:721 (506) 0 [Utility.Event] Reading [Actions] section
+
+log: 07/16/26-18:52:21:843 (506) 0 [Generic.Event] Was expecting crc 0x3e8cce49,6a55f24e instead of 0xeae8453e,6a55f24c for rtn (%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3.1) rbufnum-311
+
+log: 07/16/26-18:52:21:850 (506) 2 [Utility.Event] ERROR #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3
+
+log: 07/16/26-18:52:21:852 (506) 3 [Database.MountedRW] dRW]  #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3...(repeated 1 times)
+
+log: 07/16/26-18:52:21:852 (506) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/irislocaldata/ (SFN 3) read-write.
+
+Merging IRIS, please wait...
+An error was encountered while initializing the system.
+Please see the merge.log and messages.log files in
+/usr/irissys/mgr/.
+
+18:52:21 2026-07-16 [ERROR] Command "iris start IRIS quietly" exited with status 256
+18:52:21 2026-07-16 [ERROR] See the above messages or /usr/irissys/mgr/messages.log for more information
+18:52:21 2026-07-16 [FATAL] Error starting InterSystems IRIS (final attempt)
+18:52:22 2026-07-16 [INFO] Executing command /home/irisowner/irissys/startISCAgent.sh 2188...
+18:52:22 2026-07-16 [INFO] Writing status to file: /home/irisowner/irissys/iscagent.status
+Reading configuration from file: /home/irisowner/irissys/iscagent.conf
+ISCAgent[18]: Starting
+ISCAgent[19]: Starting ApplicationServer on *:2188
+
+18:52:22 2026-07-16 [INFO] ...executed command /home/irisowner/irissys/startISCAgent.sh 2188
+18:52:22 2026-07-16 [INFO] Starting InterSystems IRIS instance IRIS...
+18:52:22 2026-07-16 [INFO] 
+Now attempting WIJ compare, /usr/irissys/mgr/IRIS.WIJ
+log: 07/16/26-18:52:22:593 (91) 0 [Generic.Event] Allocated 102MB shared memory
+
+Allocated 102MB shared memory
+16MB global buffers, 35MB routine buffers
+log: 07/16/26-18:52:22:593 (91) 0 [Generic.Event] 16MB global buffers, 35MB routine buffers, 16MB journal buffers, 2MB buffer descriptors, 16MB heap, 1MB ECP, 14MB miscellaneous
+
+
+ERROR #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3log: 07/16/26-18:52:22:594 (91) 0 [SIMD] SIMD optimization level: DEFAULT
+
+log: 07/16/26-18:52:22:598 (91) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/ (SFN 0) read-write.
+
+log: 07/16/26-18:52:22:612 (91) 1 [Utility.Event] Error opening CPF file to get IRISTEMP and IRISLOCALDATA directories, using defaults
+
+log: 07/16/26-18:52:22:623 (91) 1 [Database.MountedRO] dRO]  opening CPF file to get IRISTEMP and IRISLOCALDATA directories, using defaults...(repeated 1 times)
+
+log: 07/16/26-18:52:22:623 (91) 0 [Database.MountedRO] Mounted database /usr/irissys/mgr/irislib/ (SFN 1) read-only. Database label is marked read-only. 
+
+log: 07/16/26-18:52:22:639 (91) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/irissecurity/ (SFN 2) read-write.
+
+log: 07/16/26-18:52:22:658 (91) 0 [Utility.Event] Merging /home/irisowner/dev/merge.cpf into /usr/irissys/iris.cpf
+
+log: 07/16/26-18:52:22:665 (91) 0 [Utility.Event] Validating CPF file /usr/irissys/iris.cpf_Merge
+
+log: 07/16/26-18:52:22:822 (91) 0 [Utility.Event] No errors found in CPF file /usr/irissys/iris.cpf_Merge
+
+log: 07/16/26-18:52:22:822 (91) 0 [Utility.Event] Reading [Actions] section
+
+log: 07/16/26-18:52:22:934 (91) 0 [Generic.Event] Was expecting crc 0x3e8cce49,6a55f24e instead of 0xeae8453e,6a55f24c for rtn (%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3.1) rbufnum-311
+
+log: 07/16/26-18:52:22:939 (91) 2 [Utility.Event] ERROR #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3
+
+log: 07/16/26-18:52:22:940 (91) 3 [Database.MountedRW] dRW]  #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3...(repeated 1 times)
+
+log: 07/16/26-18:52:22:940 (91) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/irislocaldata/ (SFN 3) read-write.
+
+Merging IRIS, please wait...
+An error was encountered while initializing the system.
+Please see the merge.log and messages.log files in
+/usr/irissys/mgr/.
+
+18:52:22 2026-07-16 [ERROR] Command "iris start IRIS quietly" exited with status 256
+18:52:22 2026-07-16 [ERROR] See the above messages or /usr/irissys/mgr/messages.log for more information
+18:52:22 2026-07-16 [ERROR] Error starting InterSystems IRIS (1st attempt)
+18:52:22 2026-07-16 [INFO] Shutting down InterSystems IRIS instance IRIS...
+18:52:22 2026-07-16 [INFO] Instance is not running
+irisforce encountered an error.
+    See messages.log for details.
+
+18:52:22 2026-07-16 [INFO] Verifying InterSystems IRIS instance IRIS is down...
+18:52:22 2026-07-16 [INFO] IRIS^/usr/irissys^2025.3.0.226.0com^down, last used Wed Jul 15 14:25:27 2026^iris.cpf^1972^52773^0^^IRIS^^^/usr/irissys^1972
+
+18:52:22 2026-07-16 [INFO] ...verified that InterSystems IRIS instance IRIS is down
+18:52:22 2026-07-16 [INFO] Starting InterSystems IRIS instance IRIS...
+18:52:23 2026-07-16 [INFO] 
+Now attempting WIJ compare, /usr/irissys/mgr/IRIS.WIJ
+log: 07/16/26-18:52:22:980 (167) 0 [Generic.Event] Allocated 102MB shared memory
+
+Allocated 102MB shared memory
+16MB global buffers, 35MB routine buffers
+log: 07/16/26-18:52:22:980 (167) 0 [Generic.Event] 16MB global buffers, 35MB routine buffers, 16MB journal buffers, 2MB buffer descriptors, 16MB heap, 1MB ECP, 14MB miscellaneous
+
+
+ERROR #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3log: 07/16/26-18:52:22:981 (167) 0 [SIMD] SIMD optimization level: DEFAULT
+
+log: 07/16/26-18:52:22:985 (167) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/ (SFN 0) read-write.
+
+log: 07/16/26-18:52:23:005 (167) 1 [Utility.Event] Error opening CPF file to get IRISTEMP and IRISLOCALDATA directories, using defaults
+
+log: 07/16/26-18:52:23:019 (167) 1 [Database.MountedRO] dRO]  opening CPF file to get IRISTEMP and IRISLOCALDATA directories, using defaults...(repeated 1 times)
+
+log: 07/16/26-18:52:23:019 (167) 0 [Database.MountedRO] Mounted database /usr/irissys/mgr/irislib/ (SFN 1) read-only. Database label is marked read-only. 
+
+log: 07/16/26-18:52:23:027 (167) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/irissecurity/ (SFN 2) read-write.
+
+log: 07/16/26-18:52:23:042 (167) 0 [Utility.Event] Merging /home/irisowner/dev/merge.cpf into /usr/irissys/iris.cpf
+
+log: 07/16/26-18:52:23:047 (167) 0 [Utility.Event] Validating CPF file /usr/irissys/iris.cpf_Merge
+
+log: 07/16/26-18:52:23:226 (167) 0 [Utility.Event] No errors found in CPF file /usr/irissys/iris.cpf_Merge
+
+log: 07/16/26-18:52:23:226 (167) 0 [Utility.Event] Reading [Actions] section
+
+log: 07/16/26-18:52:23:325 (167) 0 [Generic.Event] Was expecting crc 0x3e8cce49,6a55f24e instead of 0xeae8453e,6a55f24c for rtn (%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3.1) rbufnum-311
+
+log: 07/16/26-18:52:23:326 (167) 2 [Utility.Event] ERROR #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3
+
+log: 07/16/26-18:52:23:327 (167) 3 [Database.MountedRW] dRW]  #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3...(repeated 1 times)
+
+log: 07/16/26-18:52:23:327 (167) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/irislocaldata/ (SFN 3) read-write.
+
+Merging IRIS, please wait...
+An error was encountered while initializing the system.
+Please see the merge.log and messages.log files in
+/usr/irissys/mgr/.
+
+18:52:23 2026-07-16 [ERROR] Command "iris start IRIS quietly" exited with status 256
+18:52:23 2026-07-16 [ERROR] See the above messages or /usr/irissys/mgr/messages.log for more information
+18:52:23 2026-07-16 [FATAL] Error starting InterSystems IRIS (final attempt)
+18:52:23 2026-07-16 [INFO] Executing command /home/irisowner/irissys/startISCAgent.sh 2188...
+18:52:23 2026-07-16 [INFO] Writing status to file: /home/irisowner/irissys/iscagent.status
+Reading configuration from file: /home/irisowner/irissys/iscagent.conf
+ISCAgent[18]: Starting
+ISCAgent[19]: Starting ApplicationServer on *:2188
+
+18:52:23 2026-07-16 [INFO] ...executed command /home/irisowner/irissys/startISCAgent.sh 2188
+18:52:23 2026-07-16 [INFO] Starting InterSystems IRIS instance IRIS...
+18:52:24 2026-07-16 [INFO] 
+Now attempting WIJ compare, /usr/irissys/mgr/IRIS.WIJ
+log: 07/16/26-18:52:24:026 (91) 0 [Generic.Event] Allocated 102MB shared memory
+
+Allocated 102MB shared memory
+16MB global buffers, 35MB routine buffers
+log: 07/16/26-18:52:24:026 (91) 0 [Generic.Event] 16MB global buffers, 35MB routine buffers, 16MB journal buffers, 2MB buffer descriptors, 16MB heap, 1MB ECP, 14MB miscellaneous
+
+
+ERROR #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3log: 07/16/26-18:52:24:028 (91) 0 [SIMD] SIMD optimization level: DEFAULT
+
+log: 07/16/26-18:52:24:034 (91) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/ (SFN 0) read-write.
+
+log: 07/16/26-18:52:24:048 (91) 1 [Utility.Event] Error opening CPF file to get IRISTEMP and IRISLOCALDATA directories, using defaults
+
+log: 07/16/26-18:52:24:053 (91) 1 [Database.MountedRO] dRO]  opening CPF file to get IRISTEMP and IRISLOCALDATA directories, using defaults...(repeated 1 times)
+
+log: 07/16/26-18:52:24:053 (91) 0 [Database.MountedRO] Mounted database /usr/irissys/mgr/irislib/ (SFN 1) read-only. Database label is marked read-only. 
+
+log: 07/16/26-18:52:24:063 (91) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/irissecurity/ (SFN 2) read-write.
+
+log: 07/16/26-18:52:24:073 (91) 0 [Utility.Event] Merging /home/irisowner/dev/merge.cpf into /usr/irissys/iris.cpf
+
+log: 07/16/26-18:52:24:078 (91) 0 [Utility.Event] Validating CPF file /usr/irissys/iris.cpf_Merge
+
+log: 07/16/26-18:52:24:245 (91) 0 [Utility.Event] No errors found in CPF file /usr/irissys/iris.cpf_Merge
+
+log: 07/16/26-18:52:24:245 (91) 0 [Utility.Event] Reading [Actions] section
+
+log: 07/16/26-18:52:24:363 (91) 0 [Generic.Event] Was expecting crc 0x3e8cce49,6a55f24e instead of 0xeae8453e,6a55f24c for rtn (%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3.1) rbufnum-311
+
+log: 07/16/26-18:52:24:369 (91) 2 [Utility.Event] ERROR #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3
+
+log: 07/16/26-18:52:24:370 (91) 3 [Database.MountedRW] dRW]  #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3...(repeated 1 times)
+
+log: 07/16/26-18:52:24:370 (91) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/irislocaldata/ (SFN 3) read-write.
+
+Merging IRIS, please wait...
+An error was encountered while initializing the system.
+Please see the merge.log and messages.log files in
+/usr/irissys/mgr/.
+
+18:52:24 2026-07-16 [ERROR] Command "iris start IRIS quietly" exited with status 256
+18:52:24 2026-07-16 [ERROR] See the above messages or /usr/irissys/mgr/messages.log for more information
+18:52:24 2026-07-16 [ERROR] Error starting InterSystems IRIS (1st attempt)
+18:52:24 2026-07-16 [INFO] Shutting down InterSystems IRIS instance IRIS...
+18:52:24 2026-07-16 [INFO] Instance is not running
+irisforce encountered an error.
+    See messages.log for details.
+
+18:52:24 2026-07-16 [INFO] Verifying InterSystems IRIS instance IRIS is down...
+18:52:24 2026-07-16 [INFO] IRIS^/usr/irissys^2025.3.0.226.0com^down, last used Wed Jul 15 14:25:27 2026^iris.cpf^1972^52773^0^^IRIS^^^/usr/irissys^1972
+
+18:52:24 2026-07-16 [INFO] ...verified that InterSystems IRIS instance IRIS is down
+18:52:24 2026-07-16 [INFO] Starting InterSystems IRIS instance IRIS...
+18:52:24 2026-07-16 [INFO] 
+Now attempting WIJ compare, /usr/irissys/mgr/IRIS.WIJ
+log: 07/16/26-18:52:24:411 (167) 0 [Generic.Event] Allocated 102MB shared memory
+
+Allocated 102MB shared memory
+16MB global buffers, 35MB routine buffers
+log: 07/16/26-18:52:24:411 (167) 0 [Generic.Event] 16MB global buffers, 35MB routine buffers, 16MB journal buffers, 2MB buffer descriptors, 16MB heap, 1MB ECP, 14MB miscellaneous
+
+
+ERROR #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3log: 07/16/26-18:52:24:412 (167) 0 [SIMD] SIMD optimization level: DEFAULT
+
+log: 07/16/26-18:52:24:413 (167) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/ (SFN 0) read-write.
+
+log: 07/16/26-18:52:24:424 (167) 1 [Utility.Event] Error opening CPF file to get IRISTEMP and IRISLOCALDATA directories, using defaults
+
+log: 07/16/26-18:52:24:433 (167) 1 [Database.MountedRO] dRO]  opening CPF file to get IRISTEMP and IRISLOCALDATA directories, using defaults...(repeated 1 times)
+
+log: 07/16/26-18:52:24:433 (167) 0 [Database.MountedRO] Mounted database /usr/irissys/mgr/irislib/ (SFN 1) read-only. Database label is marked read-only. 
+
+log: 07/16/26-18:52:24:440 (167) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/irissecurity/ (SFN 2) read-write.
+
+log: 07/16/26-18:52:24:458 (167) 0 [Utility.Event] Merging /home/irisowner/dev/merge.cpf into /usr/irissys/iris.cpf
+
+log: 07/16/26-18:52:24:464 (167) 0 [Utility.Event] Validating CPF file /usr/irissys/iris.cpf_Merge
+
+log: 07/16/26-18:52:24:617 (167) 0 [Utility.Event] No errors found in CPF file /usr/irissys/iris.cpf_Merge
+
+log: 07/16/26-18:52:24:617 (167) 0 [Utility.Event] Reading [Actions] section
+
+log: 07/16/26-18:52:24:703 (167) 0 [Generic.Event] Was expecting crc 0x3e8cce49,6a55f24e instead of 0xeae8453e,6a55f24c for rtn (%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3.1) rbufnum-311
+
+log: 07/16/26-18:52:24:708 (167) 2 [Utility.Event] ERROR #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3
+
+log: 07/16/26-18:52:24:709 (167) 3 [Database.MountedRW] dRW]  #5002: ObjectScript error: <INVALID CLASS>ListExecute+5^Config.Debug.1 *%SYS.sqlcq.uE3Ui7JROktrgZ26NC3z4gtzYwE3...(repeated 1 times)
+
+log: 07/16/26-18:52:24:709 (167) 0 [Database.MountedRW] Mounted database /usr/irissys/mgr/irislocaldata/ (SFN 3) read-write.
+
+Merging IRIS, please wait...
+An error was encountered while initializing the system.
+Please see the merge.log and messages.log files in
+/usr/irissys/mgr/.
+
+18:52:24 2026-07-16 [ERROR] Command "iris start IRIS quietly" exited with status 256
+18:52:24 2026-07-16 [ERROR] See the above messages or /usr/irissys/mgr/messages.log for more information
+18:52:24 2026-07-16 [FATAL] Error starting InterSystems IRIS (final attempt)
