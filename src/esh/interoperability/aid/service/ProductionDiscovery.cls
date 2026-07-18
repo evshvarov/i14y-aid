@@ -13,6 +13,7 @@ ClassMethod Capabilities() As %DynamicObject
     Set capabilities.runtimeTraceAnalysis = ..ClassExists("Ens.MessageHeader")
     Set capabilities.payloadInspection = capabilities.runtimeTraceAnalysis
     Set capabilities.payloadPreview = capabilities.runtimeTraceAnalysis
+    Set capabilities.productionLogs = (..ProductionLogClassName() '= "")
     Set capabilities.openapiVersion = "2.0"
     return capabilities
 }
@@ -555,6 +556,94 @@ ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integ
         Do ..PushUnique(result.componentNames, rset.%Get("TargetConfigName"))
     }
     Set result.metrics = ..BuildMessageListMetrics(result)
+    return result
+}
+
+ClassMethod ListProductionLogs(productionName As %VarString = "", limit As %Integer = 50, offset As %Integer = 0, type As %VarString = "", source As %VarString = "", contains As %VarString = "") As %DynamicObject
+{
+    Set result = ..NewListResult()
+    Set result.productionName = productionName
+    Set result.limit = ..NormalizeLimitWithMaximum(limit, 50, 500)
+    Set result.offset = ..NormalizeOffset(offset)
+    Set result.type = type
+    Set result.source = source
+    Set result.contains = contains
+    Set result.hasMore = 0
+    Set result.sourceNames = []
+    Set result.typeNames = []
+    Set result.logClassName = ""
+
+    If productionName '= "" {
+        If '..IsValidClassName(productionName) {
+            Do result.%Set("errorCode", "INVALID_PRODUCTION_NAME")
+            Set result.metrics = ..BuildProductionLogMetrics(result)
+            return result
+        }
+        If '..ClassExtends(productionName, "Ens.Production") {
+            Do result.%Set("errorCode", "PRODUCTION_NOT_FOUND")
+            Set result.metrics = ..BuildProductionLogMetrics(result)
+            return result
+        }
+    }
+
+    Set logClassName = ..ProductionLogClassName()
+    If logClassName = "" {
+        Do result.warnings.%Push(..NewWarning("PRODUCTION_LOG_NOT_AVAILABLE", "No supported interoperability event log class is available in this namespace."))
+        Set result.metrics = ..BuildProductionLogMetrics(result)
+        return result
+    }
+
+    Set result.logClassName = logClassName
+    Set componentNames = []
+    If productionName '= "" {
+        Set componentNames = ..ProductionComponentNames(productionName)
+    }
+
+    Set timeProperty = ..FirstExistingProperty(logClassName, ["TimeLogged","TimeCreated","TimeStamp","Timestamp"])
+    Set typeProperty = ..FirstExistingProperty(logClassName, ["Type","EventType","Level","Severity"])
+    Set sourceProperty = ..FirstExistingProperty(logClassName, ["Source","ConfigName","SourceConfigName","Component","ComponentName"])
+    Set textProperty = ..FirstExistingProperty(logClassName, ["Text","Message","Description"])
+    Set sessionProperty = ..FirstExistingProperty(logClassName, ["SessionId","Session"])
+    Set jobProperty = ..FirstExistingProperty(logClassName, ["Job","JobId","ProcessId"])
+
+    Set sql = "SELECT %ID AS LogId, "_..LogSelectExpression(timeProperty,"TimeLogged")_", "_..LogSelectExpression(typeProperty,"Type")_", "_..LogSelectExpression(sourceProperty,"Source")_", "_..LogSelectExpression(textProperty,"Text")_", "_..LogSelectExpression(sessionProperty,"SessionId")_", "_..LogSelectExpression(jobProperty,"Job")_" FROM "_..ClassSqlTableReference(logClassName)
+    If timeProperty '= "" {
+        Set sql = sql _ " ORDER BY "_timeProperty_" DESC, %ID DESC"
+    } Else {
+        Set sql = sql _ " ORDER BY %ID DESC"
+    }
+
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sc = stmt.%Prepare(sql)
+    If $$$ISERR(sc) {
+        return ..AddStatusError(.result, "Status error: "_$System.Status.GetErrorText(sc))
+    }
+    Set rset = stmt.%Execute()
+    If rset.%SQLCODE < 0 {
+        return ..AddStatusError(.result, "SQL error: "_rset.%Message)
+    }
+
+    Set skipped = 0
+    Set matched = 0
+    For {
+        Quit:'rset.%Next()
+        Continue:'..ShouldIncludeProductionLog(rset, componentNames, productionName, type, source, contains)
+        Set matched = matched + 1
+        Do ..PushUnique(result.sourceNames, rset.%Get("Source"))
+        Do ..PushUnique(result.typeNames, rset.%Get("Type"))
+        If skipped < result.offset {
+            Set skipped = skipped + 1
+            Continue
+        }
+        If result.items.%Size() >= result.limit {
+            Set result.hasMore = 1
+            Quit
+        }
+        Do result.items.%Push(..NewProductionLogEntryFromRow(rset, productionName))
+    }
+    Set result.count = result.items.%Size()
+    Set result.totalCount = matched
+    Set result.metrics = ..BuildProductionLogMetrics(result)
     return result
 }
 
@@ -2407,6 +2496,49 @@ ClassMethod ShouldIncludeMessageHeader(rset As %SQL.IResultSet, componentNames A
     return 1
 }
 
+ClassMethod ShouldIncludeProductionLog(rset As %SQL.IResultSet, componentNames As %DynamicArray, productionName As %VarString = "", type As %VarString = "", source As %VarString = "", contains As %VarString = "") As %Boolean [ Private ]
+{
+    Set logSource = rset.%Get("Source")
+    Set logType = rset.%Get("Type")
+    Set logText = rset.%Get("Text")
+    If componentNames.%Size() > 0 {
+        Set productionMatch = 0
+        For index = 0:1:componentNames.%Size()-1 {
+            Set componentName = componentNames.%Get(index)
+            If logSource = componentName {
+                Set productionMatch = 1
+                Quit
+            }
+            If logText [ componentName {
+                Set productionMatch = 1
+                Quit
+            }
+        }
+        If 'productionMatch {
+            If (productionName '= "") && ((logSource = productionName) || (logText [ productionName)) {
+                Set productionMatch = 1
+            }
+        }
+        If 'productionMatch {
+            return 0
+        }
+    }
+    If (type '= "") && (logType '= type) {
+        return 0
+    }
+    If (source '= "") && (logSource '= source) {
+        return 0
+    }
+    If contains '= "" {
+        Set normalizedText = $ZConvert(logText, "L")
+        Set normalizedContains = $ZConvert(contains, "L")
+        If normalizedText '[ normalizedContains {
+            return 0
+        }
+    }
+    return 1
+}
+
 ClassMethod MessageBelongsToProduction(message As %DynamicObject, productionName As %VarString) As %Boolean [ Private ]
 {
     If '$IsObject(message) {
@@ -2744,6 +2876,24 @@ ClassMethod NewMessageHeaderFromRow(rset As %SQL.IResultSet) As %DynamicObject [
     Set header.evidence = []
     Do header.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", header.messageId, "MessageBodyClassName", header.messageBodyClassName, "observed"))
     return header
+}
+
+ClassMethod NewProductionLogEntryFromRow(rset As %SQL.IResultSet, productionName As %VarString = "") As %DynamicObject [ Private ]
+{
+    Set entry = {}
+    Set entry.logId = rset.%Get("LogId")
+    Set entry.timeLogged = rset.%Get("TimeLogged")
+    Set entry.type = rset.%Get("Type")
+    Set entry.source = rset.%Get("Source")
+    Set entry.sessionId = rset.%Get("SessionId")
+    Set entry.job = rset.%Get("Job")
+    Set entry.text = rset.%Get("Text")
+    Set entry.productionName = productionName
+    Set entry.inProduction = $Select(productionName'="":1,1:0)
+    Set entry.confidence = "observed"
+    Set entry.evidence = []
+    Do entry.evidence.%Push(..NewEvidence("production-log", "event-log", entry.logId, "Source", entry.source, "observed"))
+    return entry
 }
 
 ClassMethod NewPayloadMetadata(message As %DynamicObject, settings As %DynamicObject) As %DynamicObject [ Private ]
@@ -3745,6 +3895,44 @@ ClassMethod BuildMessageListMetrics(result As %DynamicObject) As %DynamicObject 
     return metrics
 }
 
+ClassMethod BuildProductionLogMetrics(result As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.itemCount = 0
+    Set metrics.totalCount = 0
+    Set metrics.hasMore = 0
+    Set metrics.sourceFacetCount = 0
+    Set metrics.typeFacetCount = 0
+    Set metrics.warningCount = 0
+    Set metrics.evidenceCount = 0
+    Set metrics.confirmedEvidenceCount = 0
+    Set metrics.observedEvidenceCount = 0
+    Set metrics.inferredEvidenceCount = 0
+    Set metrics.unknownEvidenceCount = 0
+    If $IsObject(result.items) {
+        Set metrics.itemCount = result.items.%Size()
+        Do ..AddEvidenceCoverageFromArray(result.items, metrics)
+    }
+    If result.%IsDefined("totalCount") {
+        Set metrics.totalCount = result.totalCount
+    } Else {
+        Set metrics.totalCount = metrics.itemCount
+    }
+    If result.%IsDefined("hasMore") {
+        Set metrics.hasMore = result.hasMore
+    }
+    If $IsObject(result.sourceNames) {
+        Set metrics.sourceFacetCount = result.sourceNames.%Size()
+    }
+    If $IsObject(result.typeNames) {
+        Set metrics.typeFacetCount = result.typeNames.%Size()
+    }
+    If $IsObject(result.warnings) {
+        Set metrics.warningCount = result.warnings.%Size()
+    }
+    return metrics
+}
+
 ClassMethod BuildMessageDetailMetrics(detail As %DynamicObject) As %DynamicObject [ Private ]
 {
     Set metrics = {}
@@ -4314,6 +4502,71 @@ ClassMethod ClassMethodExists(className As %VarString, methodName As %VarString)
         return 0
     }
     return rset.%Next()
+}
+
+ClassMethod ClassPropertyExists(className As %VarString, propertyName As %VarString) As %Boolean [ Private ]
+{
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sc = stmt.%Prepare("SELECT Name FROM %Dictionary.CompiledProperty WHERE Parent = ? AND Name = ?")
+    If $$$ISERR(sc) {
+        return 0
+    }
+    Set rset = stmt.%Execute(className, propertyName)
+    If rset.%SQLCODE < 0 {
+        return 0
+    }
+    return rset.%Next()
+}
+
+ClassMethod FirstExistingProperty(className As %VarString, propertyNames As %DynamicArray) As %VarString [ Private ]
+{
+    For index = 0:1:propertyNames.%Size()-1 {
+        Set propertyName = propertyNames.%Get(index)
+        If ..ClassPropertyExists(className, propertyName) {
+            return propertyName
+        }
+    }
+    return ""
+}
+
+ClassMethod ProductionLogClassName() As %VarString [ Private ]
+{
+    Set candidates = ["Ens.Util.Log","Ens.EventLog","EnsLib.Util.Log"]
+    For index = 0:1:candidates.%Size()-1 {
+        Set className = candidates.%Get(index)
+        If ..ClassExists(className) {
+            return className
+        }
+    }
+    return ""
+}
+
+ClassMethod LogSelectExpression(propertyName As %VarString, alias As %VarString) As %VarString [ Private ]
+{
+    If propertyName = "" {
+        return "'' AS "_alias
+    }
+    return propertyName_" AS "_alias
+}
+
+ClassMethod ClassSqlTableReference(className As %VarString) As %VarString [ Private ]
+{
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sc = stmt.%Prepare("SELECT SqlSchemaName, SqlTableName FROM %Dictionary.CompiledClass WHERE Name = ?")
+    If $$$ISERR(sc) {
+        return className
+    }
+    Set rset = stmt.%Execute(className)
+    If rset.%SQLCODE < 0 {
+        return className
+    }
+    If 'rset.%Next() {
+        return className
+    }
+    If (rset.%Get("SqlSchemaName") '= "") && (rset.%Get("SqlTableName") '= "") {
+        return rset.%Get("SqlSchemaName")_"."_rset.%Get("SqlTableName")
+    }
+    return className
 }
 
 ClassMethod GetClassDescription(className As %VarString) As %VarString [ Private ]

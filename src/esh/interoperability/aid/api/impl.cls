@@ -270,6 +270,63 @@ ClassMethod ListProductionMessageFacets(productionName As %String, limit As %Int
     return ..HandleRuntimeResult(result)
 }
 
+/// List recent interoperability production logs
+/// The method arguments hold values for:
+///     productionName
+///     limit
+///     offset
+///     type
+///     source
+///     contains
+ClassMethod ListProductionLogs(productionName As %String, limit As %Integer = 50, offset As %Integer = 0, type As %String, source As %String, contains As %String) As %DynamicObject
+{
+    If '$Data(limit) {
+        Set limit = 50
+    }
+    If '$Data(offset) {
+        Set offset = 0
+    }
+    If '$Data(type) {
+        Set type = ""
+    }
+    If '$Data(source) {
+        Set source = ""
+    }
+    If '$Data(contains) {
+        Set contains = ""
+    }
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListProductionLogs(productionName, limit, offset, type, source, contains)
+    return ..HandleRuntimeResult(result)
+}
+
+/// List recent interoperability logs for all productions
+/// The method arguments hold values for:
+///     limit
+///     offset
+///     type
+///     source
+///     contains
+ClassMethod ListLogs(limit As %Integer = 50, offset As %Integer = 0, type As %String, source As %String, contains As %String) As %DynamicObject
+{
+    If '$Data(limit) {
+        Set limit = 50
+    }
+    If '$Data(offset) {
+        Set offset = 0
+    }
+    If '$Data(type) {
+        Set type = ""
+    }
+    If '$Data(source) {
+        Set source = ""
+    }
+    If '$Data(contains) {
+        Set contains = ""
+    }
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListProductionLogs("", limit, offset, type, source, contains)
+    return ..HandleRuntimeResult(result)
+}
+
 /// Get message header metadata<br/>
 /// The method arguments hold values for:<br/>
 ///     messageId<br/>

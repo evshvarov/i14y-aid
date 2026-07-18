@@ -118,6 +118,12 @@ List production-scoped messages:
 curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/messages?limit=25"
 ```
 
+List production-scoped event logs:
+
+```sh
+curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/logs?limit=25"
+```
+
 List message facets for filters:
 
 ```sh

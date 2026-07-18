@@ -240,6 +240,68 @@
         }
       }
     },
+    "/logs": {
+      "get": {
+        "summary": "List recent interoperability production logs",
+        "operationId": "ListLogs",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 50
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "contains",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent production logs",
+            "schema": {
+              "$ref": "#/definitions/ProductionLogListResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Production log query failed",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/productions/{productionName}/messages": {
       "get": {
         "summary": "List recent interoperability message headers for a production",
@@ -314,6 +376,80 @@
           },
           "404": {
             "description": "Message headers or production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/productions/{productionName}/logs": {
+      "get": {
+        "summary": "List recent interoperability logs for a production",
+        "operationId": "ListProductionLogs",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 50
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "contains",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent production logs",
+            "schema": {
+              "$ref": "#/definitions/ProductionLogListResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Production log query failed",
             "schema": {
               "$ref": "#/definitions/ErrorResponse"
             }
@@ -1234,6 +1370,9 @@
         "payloadPreview": {
           "type": "boolean"
         },
+        "productionLogs": {
+          "type": "boolean"
+        },
         "openapiVersion": {
           "type": "string"
         }
@@ -2085,6 +2224,165 @@
           "format": "int32"
         },
         "warningCount": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "ProductionLogListResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProductionLogEntry"
+          }
+        },
+        "count": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "limit": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "offset": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "type": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "contains": {
+          "type": "string"
+        },
+        "sourceNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "typeNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "logClassName": {
+          "type": "string"
+        },
+        "metrics": {
+          "$ref": "#/definitions/ProductionLogMetrics"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        }
+      }
+    },
+    "ProductionLogEntry": {
+      "type": "object",
+      "properties": {
+        "logId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "timeLogged": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "job": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "inProduction": {
+          "type": "boolean"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "ProductionLogMetrics": {
+      "type": "object",
+      "properties": {
+        "itemCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "sourceFacetCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "typeFacetCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "warningCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "evidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "confirmedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "observedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "inferredEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "unknownEvidenceCount": {
           "type": "integer",
           "format": "int32"
         }

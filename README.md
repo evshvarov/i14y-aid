@@ -52,6 +52,7 @@ GET /i14y-aid/api/settings
 PUT /i14y-aid/api/settings
 GET /i14y-aid/api/messages
 GET /i14y-aid/api/messages/facets
+GET /i14y-aid/api/logs
 GET /i14y-aid/api/messages/{messageId}
 GET /i14y-aid/api/messages/{messageId}/payload
 GET /i14y-aid/api/messages/{messageId}/payload/preview
@@ -65,6 +66,7 @@ GET /i14y-aid/api/productions/{productionName}/analysis
 GET /i14y-aid/api/productions/{productionName}/summary
 GET /i14y-aid/api/productions/{productionName}/graph
 GET /i14y-aid/api/productions/{productionName}/status
+GET /i14y-aid/api/productions/{productionName}/logs
 GET /i14y-aid/api/productions/{productionName}/messages
 GET /i14y-aid/api/productions/{productionName}/messages/facets
 GET /i14y-aid/api/productions/{productionName}/messages/{messageId}
@@ -86,6 +88,7 @@ curl http://localhost:57337/i14y-aid/api/capabilities
 curl http://localhost:57337/i14y-aid/api/settings
 curl -X PUT http://localhost:57337/i14y-aid/api/settings -H "Content-Type: application/json" -d '{"maxTraceDepth":25,"explanationVerbosity":"brief"}'
 curl "http://localhost:57337/i14y-aid/api/messages?limit=10"
+curl "http://localhost:57337/i14y-aid/api/logs?limit=10"
 curl "http://localhost:57337/i14y-aid/api/messages/1/payload"
 curl "http://localhost:57337/i14y-aid/api/messages/1/payload/preview"
 curl http://localhost:57337/i14y-aid/api/productions
@@ -93,6 +96,7 @@ curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.t
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/analysis"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/summary"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/graph"
+curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/logs?limit=10"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages?limit=10"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages/facets?limit=100"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages/1"
