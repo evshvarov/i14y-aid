@@ -1622,6 +1622,9 @@ XData OpenAPI [ MimeType = application/json ]
         "payloadInspectionEnabled": {
           "type": "boolean"
         },
+        "payloadMetadataEnabled": {
+          "type": "boolean"
+        },
         "messageResendEnabled": {
           "type": "boolean"
         },
@@ -2707,6 +2710,9 @@ XData OpenAPI [ MimeType = application/json ]
         "payloadInspectionEnabled": {
           "type": "boolean"
         },
+        "payloadMetadataEnabled": {
+          "type": "boolean"
+        },
         "payloadInspectionSupported": {
           "type": "boolean"
         },
@@ -2744,6 +2750,9 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "boolean"
         },
         "payloadInspectionEnabled": {
+          "type": "boolean"
+        },
+        "payloadMetadataEnabled": {
           "type": "boolean"
         },
         "payloadInspectionSupported": {

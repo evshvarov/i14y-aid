@@ -140,7 +140,7 @@ curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction
 curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/messages/1/payload"
 ```
 
-Payload metadata is intentionally safe: the response reports body class/id and restriction flags, but does not return message body content.
+Payload metadata is intentionally safe: the response reports body class/id and field names/types, but does not return message body content.
 Production-scoped trace responses also report how many reconstructed session steps belong to the selected production and mark each step as inside or outside that production.
 
 To inspect redacted scalar payload fields, enable payload inspection and call the preview endpoint:
@@ -191,6 +191,6 @@ curl -X PUT http://localhost:57337/i14y-aid/api/settings \
 
 - Analysis is scoped to the current namespace.
 - Production definitions are read, not modified.
-- Payload preview is settings-gated and returns scalar fields only, with configured redaction patterns applied.
+- Payload metadata is settings-gated and returns field names/types without values. Payload preview is settings-gated and returns scalar fields only, with configured redaction patterns applied.
 - Full object graph payload inspection is not implemented in this increment.
 - Static analysis depends on accessible compiled class metadata and XData.

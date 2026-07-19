@@ -854,9 +854,12 @@ ClassMethod GetMessagePayloadMetadata(messageId As %Integer) As %DynamicObject
     Set result.messageBodyClassName = metadata.messageBodyClassName
     Set result.messageBodyId = metadata.messageBodyId
     Set result.bodyReferenceAvailable = metadata.bodyReferenceAvailable
+    Set result.payloadReturned = metadata.payloadReturned
+    Set result.payloadMetadataEnabled = metadata.payloadMetadataEnabled
     Set result.payloadInspectionSupported = metadata.payloadInspectionSupported
     Set result.restricted = metadata.restricted
     Set result.restrictionReason = metadata.restrictionReason
+    Set result.fields = metadata.fields
     Set result.warnings = metadata.warnings
     Set result.evidence = metadata.evidence
     Do ..AddPayloadMetrics(result)
@@ -3254,6 +3257,7 @@ ClassMethod NewPayloadMetadata(message As %DynamicObject, settings As %DynamicOb
     Set metadata.messageBodyId = message.messageBodyId
     Set metadata.payloadReturned = 0
     Set metadata.payloadInspectionEnabled = settings.payloadInspectionEnabled
+    Set metadata.payloadMetadataEnabled = settings.payloadMetadataEnabled
     Set metadata.payloadInspectionSupported = 0
     Set metadata.bodyReferenceAvailable = (message.messageBodyClassName '= "") && (message.messageBodyId '= "")
     Set metadata.bodyClassExists = 0
@@ -3262,7 +3266,7 @@ ClassMethod NewPayloadMetadata(message As %DynamicObject, settings As %DynamicOb
     }
     Set metadata.payloadInspectionSupported = metadata.bodyReferenceAvailable && metadata.bodyClassExists
     Set metadata.restricted = 1
-    Set metadata.restrictionReason = "PAYLOAD_PREVIEW_REQUIRED"
+    Set metadata.restrictionReason = "PAYLOAD_METADATA_DISABLED"
     Set metadata.fields = []
     Set metadata.warnings = []
     Set metadata.evidence = []
@@ -3273,8 +3277,56 @@ ClassMethod NewPayloadMetadata(message As %DynamicObject, settings As %DynamicOb
         Do metadata.warnings.%Push(..NewWarning("PAYLOAD_INSPECTION_DISABLED", "Payload inspection is disabled by module settings. Message body content was not read or returned."))
         return metadata
     }
-    Do metadata.warnings.%Push(..NewWarning("PAYLOAD_PREVIEW_REQUIRED", "Payload metadata does not return body content. Use the payload preview endpoint to inspect redacted scalar fields."))
+    If 'settings.payloadMetadataEnabled {
+        Do metadata.warnings.%Push(..NewWarning("PAYLOAD_METADATA_DISABLED", "Payload metadata is disabled by module settings. Use the payload preview endpoint to inspect redacted scalar fields."))
+        return metadata
+    }
+    If 'metadata.bodyReferenceAvailable {
+        Set metadata.restrictionReason = "PAYLOAD_BODY_REFERENCE_MISSING"
+        Do metadata.warnings.%Push(..NewWarning("PAYLOAD_BODY_REFERENCE_MISSING", "Message body class or ID is missing."))
+        return metadata
+    }
+    If 'metadata.bodyClassExists {
+        Set metadata.restrictionReason = "PAYLOAD_BODY_CLASS_NOT_FOUND"
+        Do metadata.warnings.%Push(..NewWarning("PAYLOAD_BODY_CLASS_NOT_FOUND", "Message body class "_metadata.messageBodyClassName_" was not found."))
+        return metadata
+    }
+    Do ..AddPayloadMetadataFields(metadata.messageBodyClassName, metadata.fields, metadata.evidence)
+    Set metadata.payloadReturned = 1
+    Set metadata.restricted = 0
+    Set metadata.restrictionReason = ""
     return metadata
+}
+
+ClassMethod AddPayloadMetadataFields(bodyClassName As %VarString, fields As %DynamicArray, evidence As %DynamicArray) [ Private ]
+{
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sql = "SELECT Name, Type, Collection FROM %Dictionary.CompiledProperty WHERE Parent = ? ORDER BY Name"
+    Set sc = stmt.%Prepare(sql)
+    If $$$ISERR(sc) {
+        return
+    }
+    Set rset = stmt.%Execute(bodyClassName)
+    If rset.%SQLCODE < 0 {
+        return
+    }
+
+    While rset.%Next() {
+        Set propertyName = rset.%Get("Name")
+        Set propertyType = rset.%Get("Type")
+        Set collection = rset.%Get("Collection")
+        Continue:(propertyName = "")
+        Continue:($Extract(propertyName, 1) = "%")
+
+        Set field = {}
+        Set field.name = propertyName
+        Set field.type = propertyType
+        Set field.collection = collection
+        Set field.previewScalar = (collection = "") && ..IsPreviewScalarType(propertyType)
+        Do fields.%Push(field)
+        Do evidence.%Push(..NewEvidence("payload-property", bodyClassName, propertyName, "Type", propertyType, "observed"))
+    }
+    return
 }
 
 ClassMethod AddPayloadPreviewFields(body As %RegisteredObject, bodyClassName As %VarString, redactionPatterns As %VarString, fields As %DynamicArray, evidence As %DynamicArray) [ Private ]
@@ -4365,7 +4417,7 @@ ClassMethod BuildSettingsMetrics(settingsResult As %DynamicObject) As %DynamicOb
     Set metrics.inferredEvidenceCount = 0
     Set metrics.unknownEvidenceCount = 0
     If $IsObject(settingsResult.settings) {
-        Set flagNames = ["runtimeMessageAnalysisEnabled","payloadInspectionEnabled","messageResendEnabled","sourceCodeInferenceEnabled","aiProviderEnabled","aiSummaryEnabled"]
+        Set flagNames = ["runtimeMessageAnalysisEnabled","payloadInspectionEnabled","payloadMetadataEnabled","messageResendEnabled","sourceCodeInferenceEnabled","aiProviderEnabled","aiSummaryEnabled"]
         For index = 0:1:flagNames.%Size()-1 {
             Set flagName = flagNames.%Get(index)
             Continue:'settingsResult.settings.%IsDefined(flagName)

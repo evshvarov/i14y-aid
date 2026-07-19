@@ -19,7 +19,7 @@ The first implementation increment supports:
 - BPL process summary extraction for accessible `BPL` XData;
 - API-managed module analysis settings for runtime message limits and feature flags;
 - recent interoperability message header listing, production-scoped session trace reconstruction, deterministic trace explanations, and safe payload metadata;
-- safe payload metadata reporting with explicit restriction flags and optional redacted scalar payload preview when enabled in settings;
+- safe payload metadata reporting and optional redacted scalar payload preview when enabled in settings;
 - settings-gated production-scoped message resend through `Ens.MessageHeader.ResendMessage` when available;
 - deterministic component-level explanations with evidence and confidence;
 - deterministic production summaries;
@@ -148,6 +148,6 @@ See [docs/demo.md](docs/demo.md) for an end-to-end walkthrough with the sample C
 
 ## Current Scope
 
-This version analyzes only the current namespace. It reads compiled class metadata, production XData, accessible routing-rule XData, accessible DTL XData, accessible BPL XData, interoperability message header metadata, and settings-gated scalar payload preview fields. Deeper BPL internals and full payload object graph inspection are intentionally deferred.
+This version analyzes only the current namespace. It reads compiled class metadata, production XData, accessible routing-rule XData, accessible DTL XData, accessible BPL XData, interoperability message header metadata, settings-gated payload field metadata, and settings-gated scalar payload preview fields. Deeper BPL internals and full payload object graph inspection are intentionally deferred.
 
-Payload bodies are not returned wholesale. When payload inspection is enabled, the preview endpoint opens the stored body object and returns scalar fields only, applying configured redaction patterns.
+Payload bodies are not returned wholesale. When payload inspection and payload metadata are enabled, the metadata endpoint returns field names and types without values. The preview endpoint opens the stored body object and returns scalar fields only, applying configured redaction patterns.
