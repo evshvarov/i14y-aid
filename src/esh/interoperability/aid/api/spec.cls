@@ -197,6 +197,13 @@ XData OpenAPI [ MimeType = application/json ]
             "required": false,
             "type": "string",
             "description": "Inclusive upper bound for TimeCreated. Accepts ISO 8601."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Message status filter. Accepts IRIS status code or label, for example 9 or Completed."
           }
         ],
         "responses": {
@@ -253,6 +260,13 @@ XData OpenAPI [ MimeType = application/json ]
             "required": false,
             "type": "string",
             "description": "Inclusive upper bound for TimeCreated. Accepts ISO 8601."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Message status filter. Accepts IRIS status code or label, for example 9 or Completed."
           }
         ],
         "responses": {
@@ -302,7 +316,8 @@ XData OpenAPI [ MimeType = application/json ]
             "name": "type",
             "in": "query",
             "required": false,
-            "type": "string"
+            "type": "string",
+            "description": "Log type filter. Accepts IRIS log type code or label, for example 2 or Error."
           },
           {
             "name": "source",
@@ -424,6 +439,13 @@ XData OpenAPI [ MimeType = application/json ]
             "required": false,
             "type": "string",
             "description": "Inclusive upper bound for TimeCreated. Accepts ISO 8601."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Message status filter. Accepts IRIS status code or label, for example 9 or Completed."
           }
         ],
         "responses": {
@@ -479,7 +501,8 @@ XData OpenAPI [ MimeType = application/json ]
             "name": "type",
             "in": "query",
             "required": false,
-            "type": "string"
+            "type": "string",
+            "description": "Log type filter. Accepts IRIS log type code or label, for example 2 or Error."
           },
           {
             "name": "source",
@@ -568,6 +591,13 @@ XData OpenAPI [ MimeType = application/json ]
             "required": false,
             "type": "string",
             "description": "Inclusive upper bound for TimeCreated. Accepts ISO 8601."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Message status filter. Accepts IRIS status code or label, for example 9 or Completed."
           }
         ],
         "responses": {
@@ -2591,6 +2621,9 @@ XData OpenAPI [ MimeType = application/json ]
         "errorsOnly": {
           "type": "boolean"
         },
+        "status": {
+          "type": "string"
+        },
         "startDate": {
           "type": "string",
           "format": "date-time"
@@ -2744,6 +2777,26 @@ XData OpenAPI [ MimeType = application/json ]
             "type": "string"
           }
         },
+        "statusNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "statusFacets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "statusLabel": {
+                "type": "string"
+              }
+            }
+          }
+        },
         "componentNames": {
           "type": "array",
           "items": {
@@ -2802,6 +2855,10 @@ XData OpenAPI [ MimeType = application/json ]
           "format": "int32"
         },
         "sessionFacetCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "statusFacetCount": {
           "type": "integer",
           "format": "int32"
         },
@@ -2878,6 +2935,20 @@ XData OpenAPI [ MimeType = application/json ]
             "type": "string"
           }
         },
+        "typeFacets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "typeLabel": {
+                "type": "string"
+              }
+            }
+          }
+        },
         "logClassName": {
           "type": "string"
         },
@@ -2903,6 +2974,9 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "string"
         },
         "type": {
+          "type": "string"
+        },
+        "typeLabel": {
           "type": "string"
         },
         "source": {

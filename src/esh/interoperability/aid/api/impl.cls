@@ -263,8 +263,9 @@ ClassMethod StopProduction(productionName As %String, timeout As %Integer = 10, 
 ///     errorsOnly<br/>
 ///     startDate<br/>
 ///     endDate<br/>
+///     status<br/>
 /// WARNING: This method's signature has changed.
-ClassMethod ListMessages(productionName As %String, limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %String, targetConfigName As %String, messageBodyClassName As %String, sessionId As %String, errorsOnly As %Boolean = 0, startDate As %String, endDate As %String) As %DynamicObject
+ClassMethod ListMessages(productionName As %String, limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %String, targetConfigName As %String, messageBodyClassName As %String, sessionId As %String, errorsOnly As %Boolean = 0, startDate As %String, endDate As %String, status As %String = "") As %DynamicObject
 {
     If '$Data(productionName) {
         Set productionName = ""
@@ -296,7 +297,10 @@ ClassMethod ListMessages(productionName As %String, limit As %Integer = 50, offs
     If '$Data(endDate) {
         Set endDate = ""
     }
-    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListMessages(productionName, limit, offset, sourceConfigName, targetConfigName, messageBodyClassName, sessionId, errorsOnly, startDate, endDate)
+    If '$Data(status) {
+        Set status = ""
+    }
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListMessages(productionName, limit, offset, sourceConfigName, targetConfigName, messageBodyClassName, sessionId, errorsOnly, startDate, endDate, status)
     return ..HandleRuntimeResult(result)
 }
 
@@ -312,8 +316,9 @@ ClassMethod ListMessages(productionName As %String, limit As %Integer = 50, offs
 ///     errorsOnly<br/>
 ///     startDate<br/>
 ///     endDate<br/>
+///     status<br/>
 /// WARNING: This method's signature has changed.
-ClassMethod ListProductionMessages(productionName As %String, limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %String, targetConfigName As %String, messageBodyClassName As %String, sessionId As %String, errorsOnly As %Boolean = 0, startDate As %String, endDate As %String) As %DynamicObject
+ClassMethod ListProductionMessages(productionName As %String, limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %String, targetConfigName As %String, messageBodyClassName As %String, sessionId As %String, errorsOnly As %Boolean = 0, startDate As %String, endDate As %String, status As %String = "") As %DynamicObject
 {
     If '$Data(limit) {
         Set limit = 50
@@ -342,7 +347,10 @@ ClassMethod ListProductionMessages(productionName As %String, limit As %Integer 
     If '$Data(endDate) {
         Set endDate = ""
     }
-    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListMessages(productionName, limit, offset, sourceConfigName, targetConfigName, messageBodyClassName, sessionId, errorsOnly, startDate, endDate)
+    If '$Data(status) {
+        Set status = ""
+    }
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListMessages(productionName, limit, offset, sourceConfigName, targetConfigName, messageBodyClassName, sessionId, errorsOnly, startDate, endDate, status)
     return ..HandleRuntimeResult(result)
 }
 
@@ -352,8 +360,9 @@ ClassMethod ListProductionMessages(productionName As %String, limit As %Integer 
 ///     limit<br/>
 ///     startDate<br/>
 ///     endDate<br/>
+///     status<br/>
 /// WARNING: This method's signature has changed.
-ClassMethod ListMessageFacets(productionName As %String, limit As %Integer = 500, startDate As %String, endDate As %String) As %DynamicObject
+ClassMethod ListMessageFacets(productionName As %String, limit As %Integer = 500, startDate As %String, endDate As %String, status As %String = "") As %DynamicObject
 {
     If '$Data(productionName) {
         Set productionName = ""
@@ -367,7 +376,10 @@ ClassMethod ListMessageFacets(productionName As %String, limit As %Integer = 500
     If '$Data(endDate) {
         Set endDate = ""
     }
-    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListMessageFacets(productionName, limit, startDate, endDate)
+    If '$Data(status) {
+        Set status = ""
+    }
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListMessageFacets(productionName, limit, startDate, endDate, status)
     return ..HandleRuntimeResult(result)
 }
 
@@ -377,8 +389,9 @@ ClassMethod ListMessageFacets(productionName As %String, limit As %Integer = 500
 ///     limit<br/>
 ///     startDate<br/>
 ///     endDate<br/>
+///     status<br/>
 /// WARNING: This method's signature has changed.
-ClassMethod ListProductionMessageFacets(productionName As %String, limit As %Integer = 500, startDate As %String, endDate As %String) As %DynamicObject
+ClassMethod ListProductionMessageFacets(productionName As %String, limit As %Integer = 500, startDate As %String, endDate As %String, status As %String = "") As %DynamicObject
 {
     If '$Data(limit) {
         Set limit = 500
@@ -389,7 +402,10 @@ ClassMethod ListProductionMessageFacets(productionName As %String, limit As %Int
     If '$Data(endDate) {
         Set endDate = ""
     }
-    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListMessageFacets(productionName, limit, startDate, endDate)
+    If '$Data(status) {
+        Set status = ""
+    }
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListMessageFacets(productionName, limit, startDate, endDate, status)
     return ..HandleRuntimeResult(result)
 }
 

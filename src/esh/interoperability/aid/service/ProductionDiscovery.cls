@@ -1083,7 +1083,7 @@ ClassMethod StopProduction(productionName As %VarString, timeout As %Integer = 1
     return result
 }
 
-ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0, startDate As %VarString = "", endDate As %VarString = "") As %DynamicObject
+ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0, startDate As %VarString = "", endDate As %VarString = "", status As %VarString = "") As %DynamicObject
 {
     Set result = ..NewListResult()
     Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
@@ -1098,6 +1098,7 @@ ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 
     Set limit = ..NormalizeLimitWithMaximum(limit, 50, settings.maxMessagesReturned)
     Set offset = ..NormalizeOffset(offset)
     Set errorsOnly = ..NormalizeBoolean(errorsOnly, 0)
+    Set status = ..NormalizeMessageStatusFilter(status)
     Set dateRange = ..NormalizeDateRange(startDate, endDate)
     If 'dateRange.valid {
         Do result.%Set("errorCode", "INVALID_DATE_FILTER")
@@ -1111,6 +1112,7 @@ ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 
     Do result.%Set("messageBodyClassName", messageBodyClassName)
     Do result.%Set("sessionId", sessionId)
     Do result.%Set("errorsOnly", errorsOnly)
+    Do result.%Set("status", status)
     Do result.%Set("startDate", dateRange.startDate)
     Do result.%Set("endDate", dateRange.endDate)
     Do result.%Set("hasMore", 0)
@@ -1157,7 +1159,7 @@ ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 
     Set collected = 0
     For {
         Quit:'rset.%Next()
-        Continue:'..ShouldIncludeMessageHeader(rset, componentNames, sourceConfigName, targetConfigName, messageBodyClassName, sessionId, errorsOnly, dateRange.startHorolog, dateRange.endHorolog)
+        Continue:'..ShouldIncludeMessageHeader(rset, componentNames, sourceConfigName, targetConfigName, messageBodyClassName, sessionId, errorsOnly, status, dateRange.startHorolog, dateRange.endHorolog)
         If skipped < offset {
             Set skipped = skipped + 1
             Continue
@@ -1175,7 +1177,7 @@ ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 
     return result
 }
 
-ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integer = 500, startDate As %VarString = "", endDate As %VarString = "") As %DynamicObject
+ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integer = 500, startDate As %VarString = "", endDate As %VarString = "", status As %VarString = "") As %DynamicObject
 {
     Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
     Set result = {}
@@ -1189,6 +1191,7 @@ ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integ
         return result
     }
     Set limit = ..NormalizeLimitWithMaximum(limit, 500, settings.maxMessagesReturned)
+    Set status = ..NormalizeMessageStatusFilter(status)
     Set dateRange = ..NormalizeDateRange(startDate, endDate)
     If 'dateRange.valid {
         Do result.%Set("errorCode", "INVALID_DATE_FILTER")
@@ -1196,6 +1199,7 @@ ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integ
         return result
     }
     Set result.limit = limit
+    Set result.status = status
     Set result.startDate = dateRange.startDate
     Set result.endDate = dateRange.endDate
     Set result.totalCount = 0
@@ -1205,6 +1209,8 @@ ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integ
     Set result.targetConfigNames = []
     Set result.messageBodyClassNames = []
     Set result.sessionIds = []
+    Set result.statusNames = []
+    Set result.statusFacets = []
     Set result.componentNames = []
     Set result.warnings = []
 
@@ -1248,7 +1254,7 @@ ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integ
 
     For {
         Quit:'rset.%Next()
-        Continue:'..ShouldIncludeMessageHeader(rset, componentNames, "", "", "", "", 0, dateRange.startHorolog, dateRange.endHorolog)
+        Continue:'..ShouldIncludeMessageHeader(rset, componentNames, "", "", "", "", 0, status, dateRange.startHorolog, dateRange.endHorolog)
         If result.totalCount >= limit {
             Set result.hasMore = 1
             Quit
@@ -1261,6 +1267,8 @@ ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integ
         Do ..PushUnique(result.targetConfigNames, rset.%Get("TargetConfigName"))
         Do ..PushUnique(result.messageBodyClassNames, rset.%Get("MessageBodyClassName"))
         Do ..PushUnique(result.sessionIds, rset.%Get("SessionId"))
+        Do ..PushUnique(result.statusNames, rset.%Get("Status"))
+        Do ..PushStatusFacet(result.statusFacets, rset.%Get("Status"))
         Do ..PushUnique(result.componentNames, rset.%Get("SourceConfigName"))
         Do ..PushUnique(result.componentNames, rset.%Get("TargetConfigName"))
     }
@@ -1274,6 +1282,7 @@ ClassMethod ListProductionLogs(productionName As %VarString = "", limit As %Inte
     Set result.productionName = productionName
     Set result.limit = ..NormalizeLimitWithMaximum(limit, 50, 500)
     Set result.offset = ..NormalizeOffset(offset)
+    Set type = ..NormalizeLogTypeFilter(type)
     Set dateRange = ..NormalizeDateRange(startDate, endDate)
     If 'dateRange.valid {
         Do result.%Set("errorCode", "INVALID_DATE_FILTER")
@@ -1289,6 +1298,7 @@ ClassMethod ListProductionLogs(productionName As %VarString = "", limit As %Inte
     Set result.hasMore = 0
     Set result.sourceNames = []
     Set result.typeNames = []
+    Set result.typeFacets = []
     Set result.logClassName = ""
 
     If productionName '= "" {
@@ -1349,6 +1359,7 @@ ClassMethod ListProductionLogs(productionName As %VarString = "", limit As %Inte
         Set matched = matched + 1
         Do ..PushUnique(result.sourceNames, rset.%Get("Source"))
         Do ..PushUnique(result.typeNames, rset.%Get("Type"))
+        Do ..PushLogTypeFacet(result.typeFacets, rset.%Get("Type"))
         If skipped < result.offset {
             Set skipped = skipped + 1
             Continue
@@ -3122,6 +3133,44 @@ ClassMethod PushUnique(items As %DynamicArray, value As %VarString) [ Private ]
     return
 }
 
+ClassMethod PushStatusFacet(items As %DynamicArray, status As %VarString) [ Private ]
+{
+    If status = "" {
+        return
+    }
+    For index = 0:1:items.%Size()-1 {
+        Set item = items.%Get(index)
+        Continue:'$IsObject(item)
+        If item.status = status {
+            return
+        }
+    }
+    Set facet = {}
+    Set facet.status = status
+    Set facet.statusLabel = ..MessageStatusLabel(status)
+    Do items.%Push(facet)
+    return
+}
+
+ClassMethod PushLogTypeFacet(items As %DynamicArray, type As %VarString) [ Private ]
+{
+    If type = "" {
+        return
+    }
+    For index = 0:1:items.%Size()-1 {
+        Set item = items.%Get(index)
+        Continue:'$IsObject(item)
+        If item.type = type {
+            return
+        }
+    }
+    Set facet = {}
+    Set facet.type = type
+    Set facet.typeLabel = ..LogTypeLabel(type)
+    Do items.%Push(facet)
+    return
+}
+
 ClassMethod JoinArray(items As %DynamicArray) As %VarString [ Private ]
 {
     Set text = ""
@@ -4072,7 +4121,7 @@ ClassMethod NewExternalSystem(productionName As %VarString, componentName As %Va
     return external
 }
 
-ClassMethod ShouldIncludeMessageHeader(rset As %SQL.IResultSet, componentNames As %DynamicArray, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0, startHorolog As %VarString = "", endHorolog As %VarString = "") As %Boolean [ Private ]
+ClassMethod ShouldIncludeMessageHeader(rset As %SQL.IResultSet, componentNames As %DynamicArray, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0, status As %VarString = "", startHorolog As %VarString = "", endHorolog As %VarString = "") As %Boolean [ Private ]
 {
     Set source = rset.%Get("SourceConfigName")
     Set target = rset.%Get("TargetConfigName")
@@ -4102,6 +4151,9 @@ ClassMethod ShouldIncludeMessageHeader(rset As %SQL.IResultSet, componentNames A
         return 0
     }
     If (sessionId '= "") && (rset.%Get("SessionId") '= sessionId) {
+        return 0
+    }
+    If (status '= "") && (rset.%Get("Status") '= status) {
         return 0
     }
     If errorsOnly && (rset.%Get("IsError") '= 1) {
@@ -4643,12 +4695,105 @@ ClassMethod MessageStatusLabel(status As %VarString) As %VarString [ Private ]
     return ""
 }
 
+ClassMethod NormalizeMessageStatusFilter(status As %VarString) As %VarString [ Private ]
+{
+    Set normalized = $ZConvert($ZStrip(status, "<>W"), "L")
+    If normalized = "" {
+        return ""
+    }
+    If status?1.N {
+        return +status
+    }
+    If normalized = "created" {
+        return 1
+    }
+    If normalized = "queued" {
+        return 2
+    }
+    If normalized = "delivered" {
+        return 3
+    }
+    If normalized = "discarded" {
+        return 4
+    }
+    If normalized = "suspended" {
+        return 5
+    }
+    If normalized = "deferred" {
+        return 6
+    }
+    If normalized = "aborted" {
+        return 7
+    }
+    If normalized = "error" {
+        return 8
+    }
+    If normalized = "completed" {
+        return 9
+    }
+    return status
+}
+
+ClassMethod LogTypeLabel(type As %VarString) As %VarString [ Private ]
+{
+    If type = 1 {
+        return "Assert"
+    }
+    If type = 2 {
+        return "Error"
+    }
+    If type = 3 {
+        return "Warning"
+    }
+    If type = 4 {
+        return "Info"
+    }
+    If type = 5 {
+        return "Trace"
+    }
+    If type = 6 {
+        return "Alert"
+    }
+    return ""
+}
+
+ClassMethod NormalizeLogTypeFilter(type As %VarString) As %VarString [ Private ]
+{
+    Set normalized = $ZConvert($ZStrip(type, "<>W"), "L")
+    If normalized = "" {
+        return ""
+    }
+    If type?1.N {
+        return +type
+    }
+    If normalized = "assert" {
+        return 1
+    }
+    If normalized = "error" {
+        return 2
+    }
+    If normalized = "warning" {
+        return 3
+    }
+    If normalized = "info" {
+        return 4
+    }
+    If normalized = "trace" {
+        return 5
+    }
+    If normalized = "alert" {
+        return 6
+    }
+    return type
+}
+
 ClassMethod NewProductionLogEntryFromRow(rset As %SQL.IResultSet, productionName As %VarString = "") As %DynamicObject [ Private ]
 {
     Set entry = {}
     Set entry.logId = rset.%Get("LogId")
     Set entry.timeLogged = rset.%Get("TimeLogged")
     Set entry.type = rset.%Get("Type")
+    Set entry.typeLabel = ..LogTypeLabel(entry.type)
     Set entry.source = rset.%Get("Source")
     Set entry.sessionId = rset.%Get("SessionId")
     Set entry.job = rset.%Get("Job")
@@ -4739,7 +4884,8 @@ ClassMethod NewSessionTimelineLogEvent(log As %DynamicObject, sequence As %Integ
     Set event.source = log.source
     Set event.target = ""
     Set event.status = log.type
-    Set event.isError = $Select(($ZConvert(log.type, "L")["error"):1,1:0)
+    Set event.statusLabel = log.typeLabel
+    Set event.isError = $Select((log.type = 2) || ($ZConvert(log.type, "L")["error") || ($ZConvert(log.typeLabel, "L") = "error"):1,1:0)
     Set event.text = log.text
     Set event.confidence = "observed"
     Set event.evidence = []
@@ -5751,6 +5897,7 @@ ClassMethod BuildMessageListMetrics(result As %DynamicObject) As %DynamicObject 
     Set metrics.targetFacetCount = 0
     Set metrics.messageBodyClassFacetCount = 0
     Set metrics.sessionFacetCount = 0
+    Set metrics.statusFacetCount = 0
     Set metrics.componentFacetCount = 0
     Set metrics.warningCount = 0
 
@@ -5790,6 +5937,11 @@ ClassMethod BuildMessageListMetrics(result As %DynamicObject) As %DynamicObject 
     If $IsObject(result.sessionIds) {
         Set metrics.sessionFacetCount = result.sessionIds.%Size()
     }
+    If $IsObject(result.statusFacets) {
+        Set metrics.statusFacetCount = result.statusFacets.%Size()
+    } ElseIf $IsObject(result.statusNames) {
+        Set metrics.statusFacetCount = result.statusNames.%Size()
+    }
     If $IsObject(result.componentNames) {
         Set metrics.componentFacetCount = result.componentNames.%Size()
     }
@@ -5828,7 +5980,9 @@ ClassMethod BuildProductionLogMetrics(result As %DynamicObject) As %DynamicObjec
     If $IsObject(result.sourceNames) {
         Set metrics.sourceFacetCount = result.sourceNames.%Size()
     }
-    If $IsObject(result.typeNames) {
+    If $IsObject(result.typeFacets) {
+        Set metrics.typeFacetCount = result.typeFacets.%Size()
+    } ElseIf $IsObject(result.typeNames) {
         Set metrics.typeFacetCount = result.typeNames.%Size()
     }
     If $IsObject(result.warnings) {
