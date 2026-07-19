@@ -390,7 +390,7 @@ ClassMethod StopProduction(productionName As %VarString, timeout As %Integer = 1
     return result
 }
 
-ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0) As %DynamicObject
+ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0, startDate As %VarString = "", endDate As %VarString = "") As %DynamicObject
 {
     Set result = ..NewListResult()
     Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
@@ -405,6 +405,12 @@ ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 
     Set limit = ..NormalizeLimitWithMaximum(limit, 50, settings.maxMessagesReturned)
     Set offset = ..NormalizeOffset(offset)
     Set errorsOnly = ..NormalizeBoolean(errorsOnly, 0)
+    Set dateRange = ..NormalizeDateRange(startDate, endDate)
+    If 'dateRange.valid {
+        Do result.%Set("errorCode", "INVALID_DATE_FILTER")
+        Do result.%Set("statusText", dateRange.statusText)
+        return result
+    }
     Do result.%Set("limit", limit)
     Do result.%Set("offset", offset)
     Do result.%Set("sourceConfigName", sourceConfigName)
@@ -412,6 +418,8 @@ ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 
     Do result.%Set("messageBodyClassName", messageBodyClassName)
     Do result.%Set("sessionId", sessionId)
     Do result.%Set("errorsOnly", errorsOnly)
+    Do result.%Set("startDate", dateRange.startDate)
+    Do result.%Set("endDate", dateRange.endDate)
     Do result.%Set("hasMore", 0)
 
     If '..ClassExists("Ens.MessageHeader") {
@@ -456,7 +464,7 @@ ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 
     Set collected = 0
     For {
         Quit:'rset.%Next()
-        Continue:'..ShouldIncludeMessageHeader(rset, componentNames, sourceConfigName, targetConfigName, messageBodyClassName, sessionId, errorsOnly)
+        Continue:'..ShouldIncludeMessageHeader(rset, componentNames, sourceConfigName, targetConfigName, messageBodyClassName, sessionId, errorsOnly, dateRange.startHorolog, dateRange.endHorolog)
         If skipped < offset {
             Set skipped = skipped + 1
             Continue
@@ -474,7 +482,7 @@ ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 
     return result
 }
 
-ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integer = 500) As %DynamicObject
+ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integer = 500, startDate As %VarString = "", endDate As %VarString = "") As %DynamicObject
 {
     Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
     Set result = {}
@@ -488,7 +496,15 @@ ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integ
         return result
     }
     Set limit = ..NormalizeLimitWithMaximum(limit, 500, settings.maxMessagesReturned)
+    Set dateRange = ..NormalizeDateRange(startDate, endDate)
+    If 'dateRange.valid {
+        Do result.%Set("errorCode", "INVALID_DATE_FILTER")
+        Do result.%Set("statusText", dateRange.statusText)
+        return result
+    }
     Set result.limit = limit
+    Set result.startDate = dateRange.startDate
+    Set result.endDate = dateRange.endDate
     Set result.totalCount = 0
     Set result.errorCount = 0
     Set result.hasMore = 0
@@ -539,7 +555,7 @@ ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integ
 
     For {
         Quit:'rset.%Next()
-        Continue:'..ShouldIncludeMessageHeader(rset, componentNames)
+        Continue:'..ShouldIncludeMessageHeader(rset, componentNames, "", "", "", "", 0, dateRange.startHorolog, dateRange.endHorolog)
         If result.totalCount >= limit {
             Set result.hasMore = 1
             Quit
@@ -559,15 +575,24 @@ ClassMethod ListMessageFacets(productionName As %VarString = "", limit As %Integ
     return result
 }
 
-ClassMethod ListProductionLogs(productionName As %VarString = "", limit As %Integer = 50, offset As %Integer = 0, type As %VarString = "", source As %VarString = "", contains As %VarString = "") As %DynamicObject
+ClassMethod ListProductionLogs(productionName As %VarString = "", limit As %Integer = 50, offset As %Integer = 0, type As %VarString = "", source As %VarString = "", contains As %VarString = "", startDate As %VarString = "", endDate As %VarString = "") As %DynamicObject
 {
     Set result = ..NewListResult()
     Set result.productionName = productionName
     Set result.limit = ..NormalizeLimitWithMaximum(limit, 50, 500)
     Set result.offset = ..NormalizeOffset(offset)
+    Set dateRange = ..NormalizeDateRange(startDate, endDate)
+    If 'dateRange.valid {
+        Do result.%Set("errorCode", "INVALID_DATE_FILTER")
+        Do result.%Set("statusText", dateRange.statusText)
+        Set result.metrics = ..BuildProductionLogMetrics(result)
+        return result
+    }
     Set result.type = type
     Set result.source = source
     Set result.contains = contains
+    Set result.startDate = dateRange.startDate
+    Set result.endDate = dateRange.endDate
     Set result.hasMore = 0
     Set result.sourceNames = []
     Set result.typeNames = []
@@ -627,7 +652,7 @@ ClassMethod ListProductionLogs(productionName As %VarString = "", limit As %Inte
     Set matched = 0
     For {
         Quit:'rset.%Next()
-        Continue:'..ShouldIncludeProductionLog(rset, componentNames, productionName, type, source, contains)
+        Continue:'..ShouldIncludeProductionLog(rset, componentNames, productionName, type, source, contains, dateRange.startHorolog, dateRange.endHorolog)
         Set matched = matched + 1
         Do ..PushUnique(result.sourceNames, rset.%Get("Source"))
         Do ..PushUnique(result.typeNames, rset.%Get("Type"))
@@ -2461,10 +2486,13 @@ ClassMethod NewExternalSystem(productionName As %VarString, componentName As %Va
     return external
 }
 
-ClassMethod ShouldIncludeMessageHeader(rset As %SQL.IResultSet, componentNames As %DynamicArray, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0) As %Boolean [ Private ]
+ClassMethod ShouldIncludeMessageHeader(rset As %SQL.IResultSet, componentNames As %DynamicArray, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0, startHorolog As %VarString = "", endHorolog As %VarString = "") As %Boolean [ Private ]
 {
     Set source = rset.%Get("SourceConfigName")
     Set target = rset.%Get("TargetConfigName")
+    If '..ShouldIncludeDateTime(rset.%Get("TimeCreated"), startHorolog, endHorolog) {
+        return 0
+    }
     If componentNames.%Size() > 0 {
         Set productionMatch = 0
         For index = 0:1:componentNames.%Size()-1 {
@@ -2496,11 +2524,14 @@ ClassMethod ShouldIncludeMessageHeader(rset As %SQL.IResultSet, componentNames A
     return 1
 }
 
-ClassMethod ShouldIncludeProductionLog(rset As %SQL.IResultSet, componentNames As %DynamicArray, productionName As %VarString = "", type As %VarString = "", source As %VarString = "", contains As %VarString = "") As %Boolean [ Private ]
+ClassMethod ShouldIncludeProductionLog(rset As %SQL.IResultSet, componentNames As %DynamicArray, productionName As %VarString = "", type As %VarString = "", source As %VarString = "", contains As %VarString = "", startHorolog As %VarString = "", endHorolog As %VarString = "") As %Boolean [ Private ]
 {
     Set logSource = rset.%Get("Source")
     Set logType = rset.%Get("Type")
     Set logText = rset.%Get("Text")
+    If '..ShouldIncludeDateTime(rset.%Get("TimeLogged"), startHorolog, endHorolog) {
+        return 0
+    }
     If componentNames.%Size() > 0 {
         Set productionMatch = 0
         For index = 0:1:componentNames.%Size()-1 {
@@ -2537,6 +2568,121 @@ ClassMethod ShouldIncludeProductionLog(rset As %SQL.IResultSet, componentNames A
         }
     }
     return 1
+}
+
+ClassMethod NormalizeDateRange(startDate As %VarString = "", endDate As %VarString = "") As %DynamicObject [ Private ]
+{
+    Set range = {}
+    Set range.valid = 1
+    Set range.startDate = ""
+    Set range.endDate = ""
+    Set range.startHorolog = ""
+    Set range.endHorolog = ""
+    Set range.statusText = ""
+
+    Set start = ..NormalizeDateFilter(startDate, 0)
+    If 'start.valid {
+        Set range.valid = 0
+        Set range.statusText = "Invalid startDate. Use ISO 8601, for example 2026-07-18T10:00:00."
+        return range
+    }
+
+    Set finish = ..NormalizeDateFilter(endDate, 1)
+    If 'finish.valid {
+        Set range.valid = 0
+        Set range.statusText = "Invalid endDate. Use ISO 8601, for example 2026-07-18T23:59:59."
+        return range
+    }
+
+    Set range.startDate = start.value
+    Set range.endDate = finish.value
+    Set range.startHorolog = start.horolog
+    Set range.endHorolog = finish.horolog
+    If (range.startHorolog '= "") && (range.endHorolog '= "") && (..CompareHorolog(range.startHorolog, range.endHorolog) > 0) {
+        Set range.valid = 0
+        Set range.statusText = "startDate must be earlier than or equal to endDate."
+    }
+    return range
+}
+
+ClassMethod NormalizeDateFilter(value As %VarString = "", endOfDay As %Boolean = 0) As %DynamicObject [ Private ]
+{
+    Set result = {}
+    Set result.valid = 1
+    Set result.value = ""
+    Set result.horolog = ""
+
+    Set text = $ZStrip(value, "<>W")
+    If text = "" {
+        return result
+    }
+
+    Set text = $Replace(text, "T", " ")
+    If $Extract(text, $Length(text)) = "Z" {
+        Set text = $Extract(text, 1, $Length(text)-1)
+    }
+    If text["." {
+        Set text = $Piece(text, ".", 1)
+    }
+    If $Length(text) > 19 {
+        Set text = $Extract(text, 1, 19)
+    }
+    If $Length(text) = 10 {
+        Set text = text_$Select(endOfDay:" 23:59:59",1:" 00:00:00")
+    }
+
+    Try {
+        Set horolog = $ZDATETIMEH(text, 3)
+    } Catch ex {
+        Set result.valid = 0
+        return result
+    }
+
+    Set result.value = $ZDATETIME(horolog, 3)
+    Set result.horolog = horolog
+    return result
+}
+
+ClassMethod ShouldIncludeDateTime(value As %VarString, startHorolog As %VarString = "", endHorolog As %VarString = "") As %Boolean [ Private ]
+{
+    If (startHorolog = "") && (endHorolog = "") {
+        return 1
+    }
+    Set rowDate = ..NormalizeDateFilter(value, 0)
+    If 'rowDate.valid {
+        return 0
+    }
+    If rowDate.horolog = "" {
+        return 0
+    }
+    If (startHorolog '= "") && (..CompareHorolog(rowDate.horolog, startHorolog) < 0) {
+        return 0
+    }
+    If (endHorolog '= "") && (..CompareHorolog(rowDate.horolog, endHorolog) > 0) {
+        return 0
+    }
+    return 1
+}
+
+ClassMethod CompareHorolog(left As %VarString, right As %VarString) As %Integer [ Private ]
+{
+    Set leftDay = +$Piece(left, ",", 1)
+    Set rightDay = +$Piece(right, ",", 1)
+    If leftDay < rightDay {
+        return -1
+    }
+    If leftDay > rightDay {
+        return 1
+    }
+    Set leftSecond = +$Piece(left, ",", 2)
+    Set rightSecond = +$Piece(right, ",", 2)
+    If leftSecond < rightSecond {
+        return -1
+    }
+    If leftSecond > rightSecond {
+        return 1
+    }
+    return 0
 }
 
 ClassMethod MessageBelongsToProduction(message As %DynamicObject, productionName As %VarString) As %Boolean [ Private ]

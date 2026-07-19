@@ -183,6 +183,20 @@ XData OpenAPI [ MimeType = application/json ]
             "required": false,
             "type": "boolean",
             "default": false
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Inclusive lower bound for TimeCreated. Accepts ISO 8601."
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Inclusive upper bound for TimeCreated. Accepts ISO 8601."
           }
         ],
         "responses": {
@@ -225,6 +239,20 @@ XData OpenAPI [ MimeType = application/json ]
             "type": "integer",
             "format": "int32",
             "default": 500
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Inclusive lower bound for TimeCreated. Accepts ISO 8601."
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Inclusive upper bound for TimeCreated. Accepts ISO 8601."
           }
         ],
         "responses": {
@@ -287,6 +315,20 @@ XData OpenAPI [ MimeType = application/json ]
             "in": "query",
             "required": false,
             "type": "string"
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Inclusive lower bound for the log timestamp. Accepts ISO 8601."
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Inclusive upper bound for the log timestamp. Accepts ISO 8601."
           }
         ],
         "responses": {
@@ -368,6 +410,20 @@ XData OpenAPI [ MimeType = application/json ]
             "required": false,
             "type": "boolean",
             "default": false
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Inclusive lower bound for TimeCreated. Accepts ISO 8601."
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Inclusive upper bound for TimeCreated. Accepts ISO 8601."
           }
         ],
         "responses": {
@@ -436,6 +492,20 @@ XData OpenAPI [ MimeType = application/json ]
             "in": "query",
             "required": false,
             "type": "string"
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Inclusive lower bound for the log timestamp. Accepts ISO 8601."
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Inclusive upper bound for the log timestamp. Accepts ISO 8601."
           }
         ],
         "responses": {
@@ -484,6 +554,20 @@ XData OpenAPI [ MimeType = application/json ]
             "type": "integer",
             "format": "int32",
             "default": 500
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Inclusive lower bound for TimeCreated. Accepts ISO 8601."
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Inclusive upper bound for TimeCreated. Accepts ISO 8601."
           }
         ],
         "responses": {
@@ -2033,6 +2117,14 @@ XData OpenAPI [ MimeType = application/json ]
         "errorsOnly": {
           "type": "boolean"
         },
+        "startDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "format": "date-time"
+        },
         "hasMore": {
           "type": "boolean"
         },
@@ -2131,6 +2223,14 @@ XData OpenAPI [ MimeType = application/json ]
         "limit": {
           "type": "integer",
           "format": "int32"
+        },
+        "startDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "format": "date-time"
         },
         "totalCount": {
           "type": "integer",
@@ -2268,6 +2368,14 @@ XData OpenAPI [ MimeType = application/json ]
         "offset": {
           "type": "integer",
           "format": "int32"
+        },
+        "startDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "format": "date-time"
         },
         "hasMore": {
           "type": "boolean"

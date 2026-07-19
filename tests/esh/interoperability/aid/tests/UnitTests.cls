@@ -434,6 +434,17 @@ Method TestGetSpec()
     Do $$$AssertTrue($IsObject(..FindParameter(messageParameters, "messageBodyClassName")), "Spec must expose messageBodyClassName filter")
     Do $$$AssertTrue($IsObject(..FindParameter(messageParameters, "sessionId")), "Spec must expose sessionId filter")
     Do $$$AssertTrue($IsObject(..FindParameter(messageParameters, "errorsOnly")), "Spec must expose errorsOnly filter")
+    Do $$$AssertTrue($IsObject(..FindParameter(messageParameters, "startDate")), "Spec must expose message startDate filter")
+    Do $$$AssertTrue($IsObject(..FindParameter(messageParameters, "endDate")), "Spec must expose message endDate filter")
+    Set messageFacetParameters = spec.paths.%Get("/messages/facets").get.parameters
+    Do $$$AssertTrue($IsObject(..FindParameter(messageFacetParameters, "startDate")), "Spec must expose message facets startDate filter")
+    Do $$$AssertTrue($IsObject(..FindParameter(messageFacetParameters, "endDate")), "Spec must expose message facets endDate filter")
+    Set logParameters = spec.paths.%Get("/logs").get.parameters
+    Do $$$AssertTrue($IsObject(..FindParameter(logParameters, "startDate")), "Spec must expose logs startDate filter")
+    Do $$$AssertTrue($IsObject(..FindParameter(logParameters, "endDate")), "Spec must expose logs endDate filter")
+    Set productionLogParameters = spec.paths.%Get("/productions/{productionName}/logs").get.parameters
+    Do $$$AssertTrue($IsObject(..FindParameter(productionLogParameters, "startDate")), "Spec must expose production logs startDate filter")
+    Do $$$AssertTrue($IsObject(..FindParameter(productionLogParameters, "endDate")), "Spec must expose production logs endDate filter")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageDetailResponse"), "Spec must define MessageDetailResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessagePayloadMetadataResponse"), "Spec must define MessagePayloadMetadataResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessagePayloadPreviewResponse"), "Spec must define MessagePayloadPreviewResponse")
@@ -746,6 +757,14 @@ Method TestListMessages()
     Do $$$AssertEquals(filtered.messageBodyClassName, "Body.Class", "Message body class filter mismatch")
     Do $$$AssertEquals(filtered.sessionId, "123", "Message session filter mismatch")
     Do $$$AssertEquals(filtered.errorsOnly, 1, "Message errorsOnly filter mismatch")
+    Set dateFiltered = ##class(esh.interoperability.aid.api.impl).ListMessages("", 5, 0, "", "", "", "", 0, "2026-07-18T00:00:00Z", "2026-07-19")
+    Do $$$AssertEquals(dateFiltered.startDate, "2026-07-18 00:00:00", "Message startDate filter mismatch")
+    Do $$$AssertEquals(dateFiltered.endDate, "2026-07-19 23:59:59", "Message endDate filter mismatch")
+    Do ..InitRequestResponse()
+    Set invalid = ##class(esh.interoperability.aid.api.impl).ListMessages("", 5, 0, "", "", "", "", 0, "2026-07-20", "2026-07-19")
+    Do $$$AssertTrue($IsObject(invalid), "Invalid date filter response must be an object")
+    Do $$$AssertEquals(%response.Status, 400, "Invalid date range should set 400")
+    Do $$$AssertEquals(invalid.error.code, "INVALID_DATE_FILTER", "Invalid date filter error code mismatch")
 }
 
 Method TestListMessagesForProduction()
@@ -794,6 +813,9 @@ Method TestListMessageFacets()
     Do $$$AssertTrue($IsObject(result.messageBodyClassNames), "Message facets must include body classes")
     Do $$$AssertTrue($IsObject(result.sessionIds), "Message facets must include session ids")
     Do $$$AssertTrue($IsObject(result.componentNames), "Message facets must include component names")
+    Set dateFiltered = ##class(esh.interoperability.aid.api.impl).ListMessageFacets("esh.interoperability.aid.tests.DemoProduction", 25, "2026-07-18T00:00:00", "2026-07-19T23:59:59")
+    Do $$$AssertEquals(dateFiltered.startDate, "2026-07-18 00:00:00", "Message facets startDate filter mismatch")
+    Do $$$AssertEquals(dateFiltered.endDate, "2026-07-19 23:59:59", "Message facets endDate filter mismatch")
 }
 
 Method TestListProductionMessageFacets()
@@ -830,6 +852,9 @@ Method TestListProductionLogs()
         Do $$$AssertEquals(result.metrics.hasMore, result.hasMore, "Production log metrics hasMore mismatch")
         Do $$$AssertEquals(result.metrics.warningCount, result.warnings.%Size(), "Production log metrics warning count mismatch")
     }
+    Set dateFiltered = ##class(esh.interoperability.aid.api.impl).ListProductionLogs("esh.interoperability.aid.tests.DemoProduction", 5, 0, "", "", "", "2026-07-18T00:00:00Z", "2026-07-19")
+    Do $$$AssertEquals(dateFiltered.startDate, "2026-07-18 00:00:00", "Production log startDate filter mismatch")
+    Do $$$AssertEquals(dateFiltered.endDate, "2026-07-19 23:59:59", "Production log endDate filter mismatch")
 }
 
 Method TestListProductionLogsInvalidName()
