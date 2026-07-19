@@ -280,7 +280,7 @@ ClassMethod GetProductionRAGContext(productionName As %VarString, question As %V
     return result
 }
 
-ClassMethod RebuildProductionRAGIndex(productionName As %VarString) As %DynamicObject
+ClassMethod RebuildProductionRAGIndex(productionName As %VarString, request As %DynamicObject = "") As %DynamicObject
 {
     Set analysis = ..GetProductionAnalysis(productionName)
     If analysis.%IsDefined("errorCode") {
@@ -288,10 +288,26 @@ ClassMethod RebuildProductionRAGIndex(productionName As %VarString) As %DynamicO
     }
 
     Set chunks = ..BuildProductionRAGChunks(analysis)
+    Set options = ..NormalizeRAGIndexOptions(request)
+    Set runtimeChunks = []
+    If options.includeRuntime {
+        Set runtimeChunks = ..BuildRuntimeRAGChunks(productionName, options)
+        For runtimeIndex = 0:1:runtimeChunks.%Size()-1 {
+            Do chunks.%Push(runtimeChunks.%Get(runtimeIndex))
+        }
+    }
     Set result = {}
     Set result.namespace = $Namespace
     Set result.productionName = productionName
     Set result.chunkCount = chunks.%Size()
+    Set result.includeRuntime = options.includeRuntime
+    Set result.runtimeStartDate = options.startDate
+    Set result.runtimeEndDate = options.endDate
+    Set result.runtimeMaxMessages = options.maxMessages
+    Set result.runtimeMaxLogs = options.maxLogs
+    Set result.includePayload = options.includePayload
+    Set result.payloadMaxFields = options.maxPayloadFields
+    Set result.runtimeChunkCount = runtimeChunks.%Size()
     Set result.warnings = analysis.warnings
     Set result.evidence = []
     Set result.confidence = "inferred"
@@ -353,6 +369,9 @@ ClassMethod RebuildProductionRAGIndex(productionName As %VarString) As %DynamicO
     Set result.status = run.Status
     Set result.metrics = ..BuildStoredRAGMetrics(productionName, runId)
     Do result.evidence.%Push(..NewEvidence("rag-index", productionName, productionName, "runId", runId, "confirmed"))
+    If options.includeRuntime {
+        Do result.evidence.%Push(..NewEvidence("runtime-rag", productionName, productionName, "runtimeChunkCount", runtimeChunks.%Size(), "observed"))
+    }
     return result
 }
 
@@ -412,6 +431,175 @@ ClassMethod GetProductionRAGIndexStatus(productionName As %VarString) As %Dynami
     Do result.evidence.%Push(..NewEvidence("rag-index", productionName, productionName, "runId", runId, "confirmed"))
     Do result.evidence.%Push(..NewEvidence("class-metadata", "%Dictionary.CompiledClass", sourceStamp.className, "TimeChanged", sourceStamp.changedAt, "confirmed"))
     return result
+}
+
+ClassMethod NormalizeRAGIndexOptions(request As %DynamicObject = "") As %DynamicObject [ Private ]
+{
+    Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
+    Set options = {}
+    Set options.includeRuntime = settings.ragRuntimeDataEnabled
+    Set options.lookbackHours = settings.ragRuntimeLookbackHours
+    Set options.maxMessages = settings.ragRuntimeMaxMessages
+    Set options.maxLogs = settings.ragRuntimeMaxLogs
+    Set options.includePayload = settings.ragPayloadIndexingEnabled
+    Set options.maxPayloadFields = settings.ragPayloadMaxFields
+    Set options.startDate = ""
+    Set options.endDate = ""
+
+    If $IsObject(request) {
+        If request.%IsDefined("includeRuntime") {
+            Set options.includeRuntime = ..NormalizeBoolean(request.%Get("includeRuntime"), options.includeRuntime)
+        }
+        If request.%IsDefined("lookbackHours") {
+            Set options.lookbackHours = ..NormalizeInteger(request.%Get("lookbackHours"), options.lookbackHours)
+        }
+        If request.%IsDefined("maxMessages") {
+            Set options.maxMessages = ..NormalizeInteger(request.%Get("maxMessages"), options.maxMessages)
+        }
+        If request.%IsDefined("maxLogs") {
+            Set options.maxLogs = ..NormalizeInteger(request.%Get("maxLogs"), options.maxLogs)
+        }
+        If request.%IsDefined("includePayload") {
+            Set options.includePayload = ..NormalizeBoolean(request.%Get("includePayload"), options.includePayload)
+        }
+        If request.%IsDefined("maxPayloadFields") {
+            Set options.maxPayloadFields = ..NormalizeInteger(request.%Get("maxPayloadFields"), options.maxPayloadFields)
+        }
+        If request.%IsDefined("startDate") {
+            Set options.startDate = $ZStrip($Extract(request.%Get("startDate"), 1, 50), "<>W")
+        }
+        If request.%IsDefined("endDate") {
+            Set options.endDate = $ZStrip($Extract(request.%Get("endDate"), 1, 50), "<>W")
+        }
+    }
+    If options.lookbackHours < 1 {
+        Set options.lookbackHours = 24
+    }
+    If options.lookbackHours > 720 {
+        Set options.lookbackHours = 720
+    }
+    If options.maxMessages < 0 {
+        Set options.maxMessages = 0
+    }
+    If options.maxMessages > 1000 {
+        Set options.maxMessages = 1000
+    }
+    If options.maxLogs < 0 {
+        Set options.maxLogs = 0
+    }
+    If options.maxLogs > 1000 {
+        Set options.maxLogs = 1000
+    }
+    If options.maxPayloadFields < 1 {
+        Set options.maxPayloadFields = 50
+    }
+    If options.maxPayloadFields > 200 {
+        Set options.maxPayloadFields = 200
+    }
+    If options.includeRuntime && (options.startDate = "") && (options.endDate = "") {
+        Set options.startDate = ..HorologToTimestamp(..HorologAddSeconds($Horolog, -(options.lookbackHours * 3600)))
+        Set options.endDate = $ZDateTime($Horolog, 3, 1)
+    }
+    return options
+}
+
+ClassMethod BuildRuntimeRAGChunks(productionName As %VarString, options As %DynamicObject) As %DynamicArray [ Private ]
+{
+    Set chunks = []
+    If options.maxMessages > 0 {
+        Set messages = ..ListMessages(productionName, options.maxMessages, 0, "", "", "", "", 0, options.startDate, options.endDate)
+        If $IsObject(messages) && 'messages.%IsDefined("errorCode") && $IsObject(messages.items) {
+            For index = 0:1:messages.items.%Size()-1 {
+                Set message = messages.items.%Get(index)
+                Continue:'$IsObject(message)
+                Do chunks.%Push(..NewMessageRAGChunk(message, productionName))
+                If options.includePayload {
+                    Set payloadChunk = ..NewPayloadRAGChunk(message, productionName, options)
+                    If $IsObject(payloadChunk) {
+                        Do chunks.%Push(payloadChunk)
+                    }
+                }
+            }
+        }
+    }
+    If options.maxLogs > 0 {
+        Set logs = ..ListProductionLogs(productionName, options.maxLogs, 0, "", "", "", options.startDate, options.endDate)
+        If $IsObject(logs) && 'logs.%IsDefined("errorCode") && $IsObject(logs.items) {
+            For index = 0:1:logs.items.%Size()-1 {
+                Set log = logs.items.%Get(index)
+                Continue:'$IsObject(log)
+                Do chunks.%Push(..NewLogRAGChunk(log, productionName))
+            }
+        }
+    }
+    return chunks
+}
+
+ClassMethod NewMessageRAGChunk(message As %DynamicObject, productionName As %VarString) As %DynamicObject [ Private ]
+{
+    Set text = "Runtime message "_message.messageId_" in production "_productionName_". Session: "_message.sessionId_". Source: "_message.sourceConfigName_". Target: "_message.targetConfigName_". Body class: "_message.messageBodyClassName_". Status: "_message.status_". Is error: "_message.isError_". Created: "_message.timeCreated_"."
+    If message.errorStatus '= "" {
+        Set text = text_" Error status: "_message.errorStatus_"."
+    }
+    Set evidence = []
+    Do evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", message.messageId, "MessageId", message.messageId, "observed"))
+    return ..NewRAGChunk("message-"_message.messageId, "message", "Message "_message.messageId, text, "Ens.MessageHeader", message.sourceConfigName, "observed", evidence)
+}
+
+ClassMethod NewPayloadRAGChunk(message As %DynamicObject, productionName As %VarString, options As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
+    If 'settings.payloadInspectionEnabled {
+        return ""
+    }
+    If (message.messageBodyClassName = "") || (message.messageBodyId = "") {
+        return ""
+    }
+    If '..ClassExists(message.messageBodyClassName) {
+        return ""
+    }
+    Set body = ""
+    Try {
+        Set body = $classmethod(message.messageBodyClassName, "%OpenId", message.messageBodyId)
+    } Catch ex {
+        Set body = ""
+    }
+    If '$IsObject(body) {
+        return ""
+    }
+    Set fields = []
+    Set evidence = []
+    Do ..AddPayloadPreviewFields(body, message.messageBodyClassName, settings.fieldRedactionPatterns, fields, evidence)
+    If fields.%Size() = 0 {
+        return ""
+    }
+    Set text = "Redacted scalar payload preview for message "_message.messageId_" in production "_productionName_". Body class: "_message.messageBodyClassName_". Body id: "_message.messageBodyId_"."
+    Set fieldCount = 0
+    Set redactedCount = 0
+    For index = 0:1:fields.%Size()-1 {
+        Quit:(fieldCount >= options.maxPayloadFields)
+        Set field = fields.%Get(index)
+        Continue:'$IsObject(field)
+        Set text = text_" "_field.name_"="
+        If field.redacted {
+            Set text = text_"[redacted]"
+            Set redactedCount = redactedCount + 1
+        } Else {
+            Set text = text_field.value
+        }
+        Set fieldCount = fieldCount + 1
+    }
+    Set text = text_". Indexed fields: "_fieldCount_". Redacted fields: "_redactedCount_"."
+    Do evidence.%Push(..NewEvidence("payload-preview", message.messageBodyClassName, message.messageId, "MessageBodyId", message.messageBodyId, "observed"))
+    return ..NewRAGChunk("payload-"_message.messageId, "payload", "Payload "_message.messageId, text, message.messageBodyClassName, message.sourceConfigName, "observed", evidence)
+}
+
+ClassMethod NewLogRAGChunk(log As %DynamicObject, productionName As %VarString) As %DynamicObject [ Private ]
+{
+    Set text = "Runtime log "_log.logId_" in production "_productionName_". Time: "_log.timeLogged_". Type: "_log.type_". Source: "_log.source_". Session: "_log.sessionId_". Job: "_log.job_". Text: "_$Extract(log.text, 1, 1200)
+    Set evidence = []
+    Do evidence.%Push(..NewEvidence("production-log", "interoperability-log", log.logId, "LogId", log.logId, "observed"))
+    return ..NewRAGChunk("log-"_log.logId, "log", "Log "_log.logId, text, "interoperability-log", log.source, "observed", evidence)
 }
 
 ClassMethod ListProductionRAGChunks(productionName As %VarString, limit As %Integer = 50, offset As %Integer = 0, kind As %VarString = "", componentName As %VarString = "") As %DynamicObject
@@ -3077,6 +3265,10 @@ ClassMethod BuildRAGContextMetrics(context As %DynamicObject) As %DynamicObject 
     Set metrics.externalSystemChunkCount = 0
     Set metrics.transformationChunkCount = 0
     Set metrics.businessProcessChunkCount = 0
+    Set metrics.messageChunkCount = 0
+    Set metrics.logChunkCount = 0
+    Set metrics.payloadChunkCount = 0
+    Set metrics.runtimeChunkCount = 0
     Set metrics.warningChunkCount = 0
     If $IsObject(context.chunks) {
         For index = 0:1:context.chunks.%Size()-1 {
@@ -3102,6 +3294,18 @@ ClassMethod BuildRAGContextMetrics(context As %DynamicObject) As %DynamicObject 
             }
             If chunk.kind = "business-process" {
                 Set metrics.businessProcessChunkCount = metrics.businessProcessChunkCount + 1
+            }
+            If chunk.kind = "message" {
+                Set metrics.messageChunkCount = metrics.messageChunkCount + 1
+                Set metrics.runtimeChunkCount = metrics.runtimeChunkCount + 1
+            }
+            If chunk.kind = "log" {
+                Set metrics.logChunkCount = metrics.logChunkCount + 1
+                Set metrics.runtimeChunkCount = metrics.runtimeChunkCount + 1
+            }
+            If chunk.kind = "payload" {
+                Set metrics.payloadChunkCount = metrics.payloadChunkCount + 1
+                Set metrics.runtimeChunkCount = metrics.runtimeChunkCount + 1
             }
             If chunk.kind = "warning" {
                 Set metrics.warningChunkCount = metrics.warningChunkCount + 1
@@ -3227,6 +3431,21 @@ ClassMethod HorologSeconds(horologValue As %VarString) As %Numeric [ Private ]
     return (+$Piece(horologValue, ",", 1) * 86400) + (+$Piece(horologValue, ",", 2))
 }
 
+ClassMethod HorologAddSeconds(horologValue As %VarString, deltaSeconds As %Integer) As %VarString [ Private ]
+{
+    Set days = +$Piece(horologValue, ",", 1)
+    Set seconds = +$Piece(horologValue, ",", 2) + deltaSeconds
+    While seconds < 0 {
+        Set days = days - 1
+        Set seconds = seconds + 86400
+    }
+    While seconds >= 86400 {
+        Set days = days + 1
+        Set seconds = seconds - 86400
+    }
+    return days_","_seconds
+}
+
 ClassMethod DynamicArrayContains(items As %DynamicArray, value As %VarString) As %Boolean [ Private ]
 {
     For index = 0:1:items.%Size()-1 {
@@ -3307,6 +3526,10 @@ ClassMethod BuildStoredRAGMetrics(productionName As %VarString, runId As %VarStr
     Set metrics.externalSystemChunkCount = 0
     Set metrics.transformationChunkCount = 0
     Set metrics.businessProcessChunkCount = 0
+    Set metrics.messageChunkCount = 0
+    Set metrics.logChunkCount = 0
+    Set metrics.payloadChunkCount = 0
+    Set metrics.runtimeChunkCount = 0
     Set metrics.warningChunkCount = 0
     If runId = "" {
         return metrics
@@ -3344,6 +3567,18 @@ ClassMethod BuildStoredRAGMetrics(productionName As %VarString, runId As %VarStr
         }
         If kind = "BUSINESS-PROCESS" {
             Set metrics.businessProcessChunkCount = metrics.businessProcessChunkCount + count
+        }
+        If kind = "MESSAGE" {
+            Set metrics.messageChunkCount = metrics.messageChunkCount + count
+            Set metrics.runtimeChunkCount = metrics.runtimeChunkCount + count
+        }
+        If kind = "LOG" {
+            Set metrics.logChunkCount = metrics.logChunkCount + count
+            Set metrics.runtimeChunkCount = metrics.runtimeChunkCount + count
+        }
+        If kind = "PAYLOAD" {
+            Set metrics.payloadChunkCount = metrics.payloadChunkCount + count
+            Set metrics.runtimeChunkCount = metrics.runtimeChunkCount + count
         }
         If kind = "WARNING" {
             Set metrics.warningChunkCount = metrics.warningChunkCount + count
@@ -5427,7 +5662,7 @@ ClassMethod BuildSettingsMetrics(settingsResult As %DynamicObject) As %DynamicOb
     Set metrics.inferredEvidenceCount = 0
     Set metrics.unknownEvidenceCount = 0
     If $IsObject(settingsResult.settings) {
-        Set flagNames = ["runtimeMessageAnalysisEnabled","payloadInspectionEnabled","payloadMetadataEnabled","messageResendEnabled","sourceCodeInferenceEnabled","aiProviderEnabled","aiSummaryEnabled"]
+        Set flagNames = ["runtimeMessageAnalysisEnabled","payloadInspectionEnabled","payloadMetadataEnabled","messageResendEnabled","sourceCodeInferenceEnabled","aiProviderEnabled","aiSummaryEnabled","ragRuntimeDataEnabled","ragPayloadIndexingEnabled"]
         For index = 0:1:flagNames.%Size()-1 {
             Set flagName = flagNames.%Get(index)
             Continue:'settingsResult.settings.%IsDefined(flagName)
@@ -5436,7 +5671,7 @@ ClassMethod BuildSettingsMetrics(settingsResult As %DynamicObject) As %DynamicOb
                 Set metrics.enabledFeatureFlagCount = metrics.enabledFeatureFlagCount + 1
             }
         }
-        Set limitNames = ["maxMessagesReturned","maxTraceDepth","defaultMessageLookbackDays"]
+        Set limitNames = ["maxMessagesReturned","maxTraceDepth","defaultMessageLookbackDays","ragRuntimeLookbackHours","ragRuntimeMaxMessages","ragRuntimeMaxLogs","ragPayloadMaxFields"]
         For index = 0:1:limitNames.%Size()-1 {
             Set limitName = limitNames.%Get(index)
             Continue:'settingsResult.settings.%IsDefined(limitName)

@@ -145,7 +145,8 @@ ClassMethod GetProductionRAGContext(productionName As %String, question As %Stri
 ///     productionName<br/>
 ClassMethod RebuildProductionRAGIndex(productionName As %String) As %DynamicObject
 {
-    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).RebuildProductionRAGIndex(productionName)
+    Set request = ..ReadJsonBody()
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).RebuildProductionRAGIndex(productionName, request)
     return ..HandleProductionResult(result)
 }
 

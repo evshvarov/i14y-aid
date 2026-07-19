@@ -107,6 +107,7 @@ curl -X POST "http://localhost:57337/i14y-aid/api/productions/esh.interoperabili
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/rag/context?question=routing%20Patient%20Router&componentName=Patient%20Router&maxChunks=8"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/rag/index"
 curl -X POST "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/rag/index"
+curl -X POST "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/rag/index" -H "Content-Type: application/json" -d '{"includeRuntime":true,"includePayload":true,"lookbackHours":24,"maxMessages":100,"maxLogs":100,"maxPayloadFields":50}'
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/rag/chunks?limit=10&kind=component"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/rag/search?question=routing%20Patient%20Router&componentName=Patient%20Router&maxChunks=8"
 curl -X POST "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/ai/ask" -H "Content-Type: application/json" -d '{"question":"Why does this production route messages?","componentName":"Patient Router","maxChunks":8}'
@@ -123,6 +124,8 @@ curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.t
 AI summaries are disabled by default. To enable them, turn on `aiProviderEnabled` and `aiSummaryEnabled` through `PUT /i14y-aid/api/settings` or the UI settings panel. The OpenAI API key can be supplied through the IRIS process environment as `OPENAI_API_KEY`, or saved from the UI settings panel. The settings API reports only `aiApiKeyConfigured` and `aiApiKeySource`; it never returns the stored key value.
 
 AI ask uses deterministic retrieval over production analysis chunks. When a persisted RAG index exists, AI ask uses that index; otherwise it builds transient chunks for the request. The response includes the retrieved chunks, validated answer citations, invalid citation ids, uncited chunk ids, and evidence used to ground the answer.
+
+Runtime RAG is off by default. Enable it with `ragRuntimeDataEnabled` in settings or pass `includeRuntime: true` to `POST /i14y-aid/api/productions/{productionName}/rag/index`. Runtime indexing adds recent message header chunks and production log chunks. Payload indexing is separately opt-in with `ragPayloadIndexingEnabled` or `includePayload: true`, requires payload inspection to be enabled, and indexes only redacted scalar payload preview fields. Full payload object graphs are not indexed. Runtime bounds can be controlled with `lookbackHours`, `startDate`, `endDate`, `maxMessages`, `maxLogs`, and `maxPayloadFields`.
 
 ## Build And Test
 

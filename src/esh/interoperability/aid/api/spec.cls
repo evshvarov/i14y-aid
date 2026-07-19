@@ -1070,6 +1070,14 @@ XData OpenAPI [ MimeType = application/json ]
             "in": "path",
             "required": true,
             "type": "string"
+          },
+          {
+            "name": "request",
+            "in": "body",
+            "required": false,
+            "schema": {
+              "$ref": "#/definitions/RAGIndexRebuildRequest"
+            }
           }
         ],
         "responses": {
@@ -1104,6 +1112,14 @@ XData OpenAPI [ MimeType = application/json ]
             "in": "path",
             "required": true,
             "type": "string"
+          },
+          {
+            "name": "request",
+            "in": "body",
+            "required": false,
+            "schema": {
+              "$ref": "#/definitions/RAGIndexRebuildRequest"
+            }
           }
         ],
         "responses": {
@@ -1412,6 +1428,14 @@ XData OpenAPI [ MimeType = application/json ]
             "in": "path",
             "required": true,
             "type": "string"
+          },
+          {
+            "name": "request",
+            "in": "body",
+            "required": false,
+            "schema": {
+              "$ref": "#/definitions/RAGIndexRebuildRequest"
+            }
           }
         ],
         "responses": {
@@ -1971,6 +1995,28 @@ XData OpenAPI [ MimeType = application/json ]
         },
         "aiEndpoint": {
           "type": "string"
+        },
+        "ragRuntimeDataEnabled": {
+          "type": "boolean"
+        },
+        "ragRuntimeLookbackHours": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "ragRuntimeMaxMessages": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "ragRuntimeMaxLogs": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "ragPayloadIndexingEnabled": {
+          "type": "boolean"
+        },
+        "ragPayloadMaxFields": {
+          "type": "integer",
+          "format": "int32"
         },
         "aiApiKeyConfigured": {
           "type": "boolean"
@@ -4302,6 +4348,22 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "integer",
           "format": "int32"
         },
+        "messageChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "logChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "payloadChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "runtimeChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
         "warningChunkCount": {
           "type": "integer",
           "format": "int32"
@@ -4426,6 +4488,43 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "RAGIndexRebuildRequest": {
+      "type": "object",
+      "properties": {
+        "includeRuntime": {
+          "type": "boolean",
+          "description": "Include recent message and log chunks in the persisted RAG index."
+        },
+        "lookbackHours": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "startDate": {
+          "type": "string",
+          "description": "Inclusive runtime lower bound. Accepts ISO 8601."
+        },
+        "endDate": {
+          "type": "string",
+          "description": "Inclusive runtime upper bound. Accepts ISO 8601."
+        },
+        "maxMessages": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxLogs": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "includePayload": {
+          "type": "boolean",
+          "description": "Include redacted scalar payload preview chunks for indexed messages. Requires payload inspection to be enabled."
+        },
+        "maxPayloadFields": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
     "RAGIndexRebuildResponse": {
       "type": "object",
       "properties": {
@@ -4443,6 +4542,34 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "string"
         },
         "chunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "includeRuntime": {
+          "type": "boolean"
+        },
+        "runtimeStartDate": {
+          "type": "string"
+        },
+        "runtimeEndDate": {
+          "type": "string"
+        },
+        "runtimeMaxMessages": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "runtimeMaxLogs": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "includePayload": {
+          "type": "boolean"
+        },
+        "payloadMaxFields": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "runtimeChunkCount": {
           "type": "integer",
           "format": "int32"
         },

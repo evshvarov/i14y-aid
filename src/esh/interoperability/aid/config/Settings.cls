@@ -37,6 +37,18 @@ Property AIEndpoint As %VarString(MAXLEN = 500) [ InitialExpression = "https://a
 
 Property OpenAIApiKey As %VarString(MAXLEN = 500);
 
+Property RAGRuntimeDataEnabled As %Boolean [ InitialExpression = 0 ];
+
+Property RAGRuntimeLookbackHours As %Integer [ InitialExpression = 24 ];
+
+Property RAGRuntimeMaxMessages As %Integer [ InitialExpression = 100 ];
+
+Property RAGRuntimeMaxLogs As %Integer [ InitialExpression = 100 ];
+
+Property RAGPayloadIndexingEnabled As %Boolean [ InitialExpression = 0 ];
+
+Property RAGPayloadMaxFields As %Integer [ InitialExpression = 50 ];
+
 ClassMethod Defaults() As %DynamicObject
 {
     Set settings = {}
@@ -57,6 +69,12 @@ ClassMethod Defaults() As %DynamicObject
     Set settings.aiProvider = "openai"
     Set settings.aiModel = "gpt-4o-mini"
     Set settings.aiEndpoint = "https://api.openai.com/v1/chat/completions"
+    Set settings.ragRuntimeDataEnabled = 0
+    Set settings.ragRuntimeLookbackHours = 24
+    Set settings.ragRuntimeMaxMessages = 100
+    Set settings.ragRuntimeMaxLogs = 100
+    Set settings.ragPayloadIndexingEnabled = 0
+    Set settings.ragPayloadMaxFields = 50
     Set settings.aiApiKeyConfigured = (..EnvironmentOpenAIKey() '= "")
     Set settings.aiApiKeySource = $Select(settings.aiApiKeyConfigured:"environment",1:"none")
     return settings
@@ -66,7 +84,7 @@ ClassMethod Current() As %DynamicObject
 {
     Set settings = ..Defaults()
     Set stmt = ##class(%SQL.Statement).%New()
-    Set sql = "SELECT TOP 1 RuntimeMessageAnalysisEnabled, PayloadInspectionEnabled, PayloadMetadataEnabled, MessageResendEnabled, MaxMessagesReturned, MaxTraceDepth, DefaultMessageLookbackDays, FieldRedactionPatterns, ClassExclusions, ProductionExclusions, SourceCodeInferenceEnabled, ExplanationVerbosity, AIProviderEnabled, AISummaryEnabled, AIProvider, AIModel, AIEndpoint, OpenAIApiKey FROM esh_interoperability_aid_config.Settings ORDER BY ID"
+    Set sql = "SELECT TOP 1 RuntimeMessageAnalysisEnabled, PayloadInspectionEnabled, PayloadMetadataEnabled, MessageResendEnabled, MaxMessagesReturned, MaxTraceDepth, DefaultMessageLookbackDays, FieldRedactionPatterns, ClassExclusions, ProductionExclusions, SourceCodeInferenceEnabled, ExplanationVerbosity, AIProviderEnabled, AISummaryEnabled, AIProvider, AIModel, AIEndpoint, OpenAIApiKey, RAGRuntimeDataEnabled, RAGRuntimeLookbackHours, RAGRuntimeMaxMessages, RAGRuntimeMaxLogs, RAGPayloadIndexingEnabled, RAGPayloadMaxFields FROM esh_interoperability_aid_config.Settings ORDER BY ID"
     Set sc = stmt.%Prepare(sql)
     If $$$ISERR(sc) {
         return settings
@@ -93,6 +111,12 @@ ClassMethod Current() As %DynamicObject
         Set settings.aiProvider = rset.%Get("AIProvider")
         Set settings.aiModel = rset.%Get("AIModel")
         Set settings.aiEndpoint = rset.%Get("AIEndpoint")
+        Set settings.ragRuntimeDataEnabled = rset.%Get("RAGRuntimeDataEnabled")
+        Set settings.ragRuntimeLookbackHours = rset.%Get("RAGRuntimeLookbackHours")
+        Set settings.ragRuntimeMaxMessages = rset.%Get("RAGRuntimeMaxMessages")
+        Set settings.ragRuntimeMaxLogs = rset.%Get("RAGRuntimeMaxLogs")
+        Set settings.ragPayloadIndexingEnabled = rset.%Get("RAGPayloadIndexingEnabled")
+        Set settings.ragPayloadMaxFields = rset.%Get("RAGPayloadMaxFields")
         Set storedKeyConfigured = (rset.%Get("OpenAIApiKey") '= "")
         Set envKeyConfigured = (..EnvironmentOpenAIKey() '= "")
         Set settings.aiApiKeyConfigured = $Select(envKeyConfigured:1,storedKeyConfigured:1,1:0)
@@ -247,6 +271,48 @@ ClassMethod UpdateFromPayload(payload As %DynamicObject) As %DynamicObject
         }
         Set settings.AIEndpoint = value
     }
+    If payload.%IsDefined("ragRuntimeDataEnabled") {
+        Set value = ..NormalizeBooleanValue(payload.%Get("ragRuntimeDataEnabled"), before.ragRuntimeDataEnabled)
+        If value '= before.ragRuntimeDataEnabled {
+            Set result.changed = 1
+        }
+        Set settings.RAGRuntimeDataEnabled = value
+    }
+    If payload.%IsDefined("ragRuntimeLookbackHours") {
+        Set value = ..NormalizeIntegerValue(payload.%Get("ragRuntimeLookbackHours"), before.ragRuntimeLookbackHours, 1, 720)
+        If value '= before.ragRuntimeLookbackHours {
+            Set result.changed = 1
+        }
+        Set settings.RAGRuntimeLookbackHours = value
+    }
+    If payload.%IsDefined("ragRuntimeMaxMessages") {
+        Set value = ..NormalizeIntegerValue(payload.%Get("ragRuntimeMaxMessages"), before.ragRuntimeMaxMessages, 0, 1000)
+        If value '= before.ragRuntimeMaxMessages {
+            Set result.changed = 1
+        }
+        Set settings.RAGRuntimeMaxMessages = value
+    }
+    If payload.%IsDefined("ragRuntimeMaxLogs") {
+        Set value = ..NormalizeIntegerValue(payload.%Get("ragRuntimeMaxLogs"), before.ragRuntimeMaxLogs, 0, 1000)
+        If value '= before.ragRuntimeMaxLogs {
+            Set result.changed = 1
+        }
+        Set settings.RAGRuntimeMaxLogs = value
+    }
+    If payload.%IsDefined("ragPayloadIndexingEnabled") {
+        Set value = ..NormalizeBooleanValue(payload.%Get("ragPayloadIndexingEnabled"), before.ragPayloadIndexingEnabled)
+        If value '= before.ragPayloadIndexingEnabled {
+            Set result.changed = 1
+        }
+        Set settings.RAGPayloadIndexingEnabled = value
+    }
+    If payload.%IsDefined("ragPayloadMaxFields") {
+        Set value = ..NormalizeIntegerValue(payload.%Get("ragPayloadMaxFields"), before.ragPayloadMaxFields, 1, 200)
+        If value '= before.ragPayloadMaxFields {
+            Set result.changed = 1
+        }
+        Set settings.RAGPayloadMaxFields = value
+    }
     If payload.%IsDefined("openAIApiKey") {
         Set value = ..NormalizeStringValue(payload.%Get("openAIApiKey"), 500)
         If value '= "" {
@@ -305,6 +371,30 @@ ClassMethod ApplyDefaultBounds(settings As %DynamicObject) [ Private ]
     }
     If settings.aiSummaryEnabled = "" {
         Set settings.aiSummaryEnabled = 0
+    }
+    If settings.ragRuntimeDataEnabled = "" {
+        Set settings.ragRuntimeDataEnabled = 0
+    }
+    If settings.ragRuntimeLookbackHours < 1 {
+        Set settings.ragRuntimeLookbackHours = 24
+    }
+    If settings.ragRuntimeMaxMessages = "" {
+        Set settings.ragRuntimeMaxMessages = 100
+    }
+    If settings.ragRuntimeMaxMessages < 0 {
+        Set settings.ragRuntimeMaxMessages = 0
+    }
+    If settings.ragRuntimeMaxLogs = "" {
+        Set settings.ragRuntimeMaxLogs = 100
+    }
+    If settings.ragRuntimeMaxLogs < 0 {
+        Set settings.ragRuntimeMaxLogs = 0
+    }
+    If settings.ragPayloadIndexingEnabled = "" {
+        Set settings.ragPayloadIndexingEnabled = 0
+    }
+    If settings.ragPayloadMaxFields < 1 {
+        Set settings.ragPayloadMaxFields = 50
     }
     If settings.aiApiKeyConfigured = "" {
         Set envKeyConfigured = (..EnvironmentOpenAIKey() '= "")
@@ -487,6 +577,24 @@ Storage Default
 </Value>
 <Value name="19">
 <Value>PayloadMetadataEnabled</Value>
+</Value>
+<Value name="20">
+<Value>RAGRuntimeDataEnabled</Value>
+</Value>
+<Value name="21">
+<Value>RAGRuntimeLookbackHours</Value>
+</Value>
+<Value name="22">
+<Value>RAGRuntimeMaxMessages</Value>
+</Value>
+<Value name="23">
+<Value>RAGRuntimeMaxLogs</Value>
+</Value>
+<Value name="24">
+<Value>RAGPayloadIndexingEnabled</Value>
+</Value>
+<Value name="25">
+<Value>RAGPayloadMaxFields</Value>
 </Value>
 </Data>
 <DataLocation>^esh.interoperabilCC6D.SettingsD</DataLocation>
