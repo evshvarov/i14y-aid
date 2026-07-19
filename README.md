@@ -2,6 +2,23 @@
 
 `esh-i14y-aid` is an installable InterSystems IRIS module that exposes a REST API for deterministic analysis of interoperability productions in the current namespace.
 
+## How to use
+
+Please install it as an IPM package on any of your IRIS system which has interoperability productions.
+It will expose the api endpoint at /i14y-aid/api
+Don't use your production system for it as this endpoint exposes all the interoperability productions. use only test/dev environment.
+
+Point the UI project https://iris-prod-explorer.lovable.app/ to this dev/test system.
+Make all the necessary settings:
+<img width="737" height="808" alt="Screenshot 2026-07-19 at 16 16 39" src="https://github.com/user-attachments/assets/3bbd6a3d-a3f6-4b26-9b9e-865cff635724" />
+<img width="683" height="701" alt="Screenshot 2026-07-19 at 16 16 49" src="https://github.com/user-attachments/assets/105fd25a-bb6b-427b-bea3-0ed368b9bf37" />
+
+it will show the productions which you can start if you want:
+<img width="1089" height="468" alt="Screenshot 2026-07-19 at 16 17 56" src="https://github.com/user-attachments/assets/6b83ed78-aab2-4a61-b39d-4e3836479735" />
+
+And explore then also using the AI assistent about the production you are interested in.
+
+## Features
 The first implementation increment supports:
 
 - module health and capabilities;
