@@ -20,6 +20,26 @@ ClassMethod Capabilities() As %DynamicObject
     return capabilities
 }
 
+ClassMethod Codes() As %DynamicObject
+{
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.messageStatuses = []
+    Set result.logTypes = []
+
+    For status = 1:1:9 {
+        Do result.messageStatuses.%Push(..NewCodeValue(status, ..MessageStatusLabel(status)))
+    }
+    For type = 1:1:6 {
+        Do result.logTypes.%Push(..NewCodeValue(type, ..LogTypeLabel(type)))
+    }
+
+    Set result.metrics = {}
+    Set result.metrics.messageStatusCount = result.messageStatuses.%Size()
+    Set result.metrics.logTypeCount = result.logTypes.%Size()
+    return result
+}
+
 ClassMethod GetSettings() As %DynamicObject
 {
     Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
@@ -600,7 +620,11 @@ ClassMethod NewPayloadRAGChunk(message As %DynamicObject, productionName As %Var
 
 ClassMethod NewLogRAGChunk(log As %DynamicObject, productionName As %VarString) As %DynamicObject [ Private ]
 {
-    Set text = "Runtime log "_log.logId_" in production "_productionName_". Time: "_log.timeLogged_". Type: "_log.type_". Source: "_log.source_". Session: "_log.sessionId_". Job: "_log.job_". Text: "_$Extract(log.text, 1, 1200)
+    Set text = "Runtime log "_log.logId_" in production "_productionName_". Time: "_log.timeLogged_". Type: "_log.type
+    If log.typeLabel '= "" {
+        Set text = text_" ("_log.typeLabel_")"
+    }
+    Set text = text_". Source: "_log.source_". Session: "_log.sessionId_". Job: "_log.job_". Text: "_$Extract(log.text, 1, 1200)
     Set evidence = []
     Do evidence.%Push(..NewEvidence("production-log", "interoperability-log", log.logId, "LogId", log.logId, "observed"))
     return ..NewRAGChunk("log-"_log.logId, "log", "Log "_log.logId, text, "interoperability-log", log.source, "observed", evidence)
@@ -3171,6 +3195,14 @@ ClassMethod PushLogTypeFacet(items As %DynamicArray, type As %VarString) [ Priva
     return
 }
 
+ClassMethod NewCodeValue(code As %Integer, label As %VarString) As %DynamicObject [ Private ]
+{
+    Set value = {}
+    Set value.code = code
+    Set value.label = label
+    return value
+}
+
 ClassMethod JoinArray(items As %DynamicArray) As %VarString [ Private ]
 {
     Set text = ""
@@ -3241,6 +3273,7 @@ ClassMethod BuildProductionRAGChunks(analysis As %DynamicObject) As %DynamicArra
             Do chunks.%Push(..NewRAGChunk("production-bullets", "summary", "Summary bullets", text, analysis.productionName, analysis.productionName, "confirmed", analysis.evidence))
         }
     }
+    Do ..AddMessageSchemaRAGChunks(analysis, chunks)
     If $IsObject(analysis.components) {
         For index = 0:1:analysis.components.%Size()-1 {
             Set component = analysis.components.%Get(index)
@@ -3349,6 +3382,181 @@ ClassMethod BuildProductionRAGChunks(analysis As %DynamicObject) As %DynamicArra
     return chunks
 }
 
+ClassMethod AddMessageSchemaRAGChunks(analysis As %DynamicObject, chunks As %DynamicArray) [ Private ]
+{
+    Set schemas = []
+    If $IsObject(analysis.messageTypes) {
+        For index = 0:1:analysis.messageTypes.%Size()-1 {
+            Set messageType = analysis.messageTypes.%Get(index)
+            Continue:'$IsObject(messageType)
+            Do ..AddMessageSchemaCandidate(schemas, messageType.messageClass, messageType.component, messageType.direction, "compiled-method")
+        }
+    }
+    If $IsObject(analysis.transformations) {
+        For index = 0:1:analysis.transformations.%Size()-1 {
+            Set transform = analysis.transformations.%Get(index)
+            Continue:'$IsObject(transform)
+            Do ..AddMessageSchemaCandidate(schemas, transform.sourceClass, transform.component, "source", "dtl-transformation")
+            Do ..AddMessageSchemaCandidate(schemas, transform.targetClass, transform.component, "target", "dtl-transformation")
+        }
+    }
+    If $IsObject(analysis.businessProcesses) {
+        For index = 0:1:analysis.businessProcesses.%Size()-1 {
+            Set process = analysis.businessProcesses.%Get(index)
+            Continue:'$IsObject(process)
+            Do ..AddMessageSchemaCandidate(schemas, process.requestClass, process.component, "request", "bpl-process")
+            Do ..AddMessageSchemaCandidate(schemas, process.responseClass, process.component, "response", "bpl-process")
+        }
+    }
+    For index = 0:1:schemas.%Size()-1 {
+        Set schema = schemas.%Get(index)
+        Continue:'$IsObject(schema)
+        Set chunk = ..NewMessageSchemaRAGChunk(schema)
+        If $IsObject(chunk) {
+            Do chunks.%Push(chunk)
+        }
+    }
+    return
+}
+
+ClassMethod AddMessageSchemaCandidate(schemas As %DynamicArray, className As %VarString, componentName As %VarString, direction As %VarString, sourceType As %VarString) [ Private ]
+{
+    Set className = ..NormalizeClassName(className)
+    If className = "" {
+        return
+    }
+    If $Extract(className, 1, 1) = "%" {
+        return
+    }
+    If '..ClassExists(className) {
+        return
+    }
+    If '(..ClassExtends(className, "Ens.MessageBody") || ..ClassExtends(className, "Ens.Request") || ..ClassExtends(className, "Ens.Response")) {
+        return
+    }
+
+    Set schema = ""
+    For index = 0:1:schemas.%Size()-1 {
+        Set candidate = schemas.%Get(index)
+        Continue:'$IsObject(candidate)
+        If candidate.className = className {
+            Set schema = candidate
+            Quit
+        }
+    }
+    If '$IsObject(schema) {
+        Set schema = {}
+        Set schema.className = className
+        Set schema.consumers = []
+        Set schema.producers = []
+        Set schema.components = []
+        Set schema.sources = []
+        Set schema.evidence = []
+        Do schemas.%Push(schema)
+    }
+
+    Set normalizedDirection = $ZConvert(direction, "L")
+    If componentName '= "" {
+        Do ..PushUnique(schema.components, componentName)
+        If (normalizedDirection = "input") || (normalizedDirection = "source") || (normalizedDirection = "request") {
+            Do ..PushUnique(schema.consumers, componentName)
+        } ElseIf (normalizedDirection = "output") || (normalizedDirection = "target") || (normalizedDirection = "response") {
+            Do ..PushUnique(schema.producers, componentName)
+        }
+    }
+    Do ..PushUnique(schema.sources, sourceType)
+    If schema.evidence.%Size() < 20 {
+        Do schema.evidence.%Push(..NewEvidence(sourceType, className, componentName, "messageClass", className_" "_direction, "confirmed"))
+    }
+    return
+}
+
+ClassMethod NewMessageSchemaRAGChunk(schema As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set fields = []
+    Set evidence = schema.evidence
+    Do ..AddMessageSchemaFields(schema.className, fields, evidence)
+    If fields.%Size() = 0 {
+        return ""
+    }
+
+    Set text = "Message body class "_schema.className_" metadata-only schema for payload data fields and message structure. It defines fields: "
+    Set maxFields = 80
+    For index = 0:1:fields.%Size()-1 {
+        Quit:(index >= maxFields)
+        Set field = fields.%Get(index)
+        Continue:'$IsObject(field)
+        If index > 0 {
+            Set text = text_", "
+        }
+        Set text = text_field.name_" ("_field.type_", "_field.category
+        If field.collection '= "" {
+            Set text = text_" "_field.collection
+        }
+        Set text = text_")"
+    }
+    If fields.%Size() > maxFields {
+        Set text = text_", and "_(fields.%Size()-maxFields)_" more"
+    }
+    Set text = text_". Field count: "_fields.%Size()_"."
+    If schema.consumers.%Size() > 0 {
+        Set text = text_" Consumed by components: "_..JoinArrayWithSeparator(schema.consumers, ", ")_"."
+    }
+    If schema.producers.%Size() > 0 {
+        Set text = text_" Produced by components: "_..JoinArrayWithSeparator(schema.producers, ", ")_"."
+    }
+    If schema.components.%Size() > 0 {
+        Set text = text_" Related components: "_..JoinArrayWithSeparator(schema.components, ", ")_"."
+    }
+    Set text = text_" No live payload values are included in this chunk."
+    return ..NewRAGChunk("message-schema-"_schema.className, "message-schema", "Message schema "_schema.className, text, "%Dictionary.CompiledProperty", ..FirstArrayValue(schema.components), "confirmed", evidence)
+}
+
+ClassMethod AddMessageSchemaFields(bodyClassName As %VarString, fields As %DynamicArray, evidence As %DynamicArray) [ Private ]
+{
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sql = "SELECT Name, Type, Collection FROM %Dictionary.CompiledProperty WHERE Parent = ? ORDER BY Name"
+    Set sc = stmt.%Prepare(sql)
+    If $$$ISERR(sc) {
+        return
+    }
+    Set rset = stmt.%Execute(bodyClassName)
+    If rset.%SQLCODE < 0 {
+        return
+    }
+
+    While rset.%Next() {
+        Set propertyName = rset.%Get("Name")
+        Set propertyType = rset.%Get("Type")
+        Set collection = rset.%Get("Collection")
+        Continue:(propertyName = "")
+        Continue:($Extract(propertyName, 1) = "%")
+
+        Set field = {}
+        Set field.name = propertyName
+        Set field.type = propertyType
+        Set field.collection = collection
+        Set field.scalar = (collection = "") && ..IsPreviewScalarType(propertyType)
+        Set field.object = (collection = "") && 'field.scalar
+        Set field.collectionFlag = (collection '= "")
+        Set field.category = $Select(field.collectionFlag:"collection",field.scalar:"scalar",1:"object")
+        Do fields.%Push(field)
+        Do evidence.%Push(..NewEvidence("message-schema-property", bodyClassName, propertyName, "Type", propertyType_" "_field.category, "confirmed"))
+    }
+    return
+}
+
+ClassMethod FirstArrayValue(items As %DynamicArray) As %VarString [ Private ]
+{
+    If '$IsObject(items) {
+        return ""
+    }
+    If items.%Size() = 0 {
+        return ""
+    }
+    return items.%Get(0)
+}
+
 ClassMethod NewRAGChunk(chunkId As %VarString, kind As %VarString, title As %VarString, text As %VarString, source As %VarString, component As %VarString, confidence As %VarString, evidence) As %DynamicObject [ Private ]
 {
     Set chunk = {}
@@ -3370,9 +3578,9 @@ ClassMethod NewRAGChunk(chunkId As %VarString, kind As %VarString, title As %Var
 ClassMethod RetrieveRAGChunks(chunks As %DynamicArray, question As %VarString, componentName As %VarString, maxChunks As %Integer) As %DynamicArray [ Private ]
 {
     Set result = []
+    Set candidates = []
     Set normalizedQuestion = $ZConvert(question, "L")
     For index = 0:1:chunks.%Size()-1 {
-        Quit:(result.%Size() >= maxChunks)
         Set chunk = chunks.%Get(index)
         Continue:'$IsObject(chunk)
         If componentName '= "" {
@@ -3381,7 +3589,25 @@ ClassMethod RetrieveRAGChunks(chunks As %DynamicArray, question As %VarString, c
         Set score = ..RAGChunkScore(chunk, normalizedQuestion)
         Continue:(score < 1)
         Set chunk.score = score
-        Do result.%Push(chunk)
+        Do candidates.%Push(chunk)
+    }
+    Set used = []
+    For {
+        Quit:(result.%Size() >= maxChunks)
+        Set bestIndex = -1
+        Set bestScore = -1
+        For index = 0:1:candidates.%Size()-1 {
+            Continue:..DynamicArrayContains(used, index)
+            Set chunk = candidates.%Get(index)
+            Continue:'$IsObject(chunk)
+            If chunk.score > bestScore {
+                Set bestScore = chunk.score
+                Set bestIndex = index
+            }
+        }
+        Quit:(bestIndex < 0)
+        Do used.%Push(bestIndex)
+        Do result.%Push(candidates.%Get(bestIndex))
     }
     If result.%Size() = 0 {
         For index = 0:1:chunks.%Size()-1 {
@@ -3427,6 +3653,7 @@ ClassMethod BuildRAGContextMetrics(context As %DynamicObject) As %DynamicObject 
     Set metrics.messageChunkCount = 0
     Set metrics.logChunkCount = 0
     Set metrics.payloadChunkCount = 0
+    Set metrics.messageSchemaChunkCount = 0
     Set metrics.runtimeChunkCount = 0
     Set metrics.warningChunkCount = 0
     If $IsObject(context.chunks) {
@@ -3465,6 +3692,9 @@ ClassMethod BuildRAGContextMetrics(context As %DynamicObject) As %DynamicObject 
             If chunk.kind = "payload" {
                 Set metrics.payloadChunkCount = metrics.payloadChunkCount + 1
                 Set metrics.runtimeChunkCount = metrics.runtimeChunkCount + 1
+            }
+            If chunk.kind = "message-schema" {
+                Set metrics.messageSchemaChunkCount = metrics.messageSchemaChunkCount + 1
             }
             If chunk.kind = "warning" {
                 Set metrics.warningChunkCount = metrics.warningChunkCount + 1
@@ -3688,6 +3918,7 @@ ClassMethod BuildStoredRAGMetrics(productionName As %VarString, runId As %VarStr
     Set metrics.messageChunkCount = 0
     Set metrics.logChunkCount = 0
     Set metrics.payloadChunkCount = 0
+    Set metrics.messageSchemaChunkCount = 0
     Set metrics.runtimeChunkCount = 0
     Set metrics.warningChunkCount = 0
     If runId = "" {
@@ -3739,6 +3970,9 @@ ClassMethod BuildStoredRAGMetrics(productionName As %VarString, runId As %VarStr
             Set metrics.payloadChunkCount = metrics.payloadChunkCount + count
             Set metrics.runtimeChunkCount = metrics.runtimeChunkCount + count
         }
+        If kind = "MESSAGE-SCHEMA" {
+            Set metrics.messageSchemaChunkCount = metrics.messageSchemaChunkCount + count
+        }
         If kind = "WARNING" {
             Set metrics.warningChunkCount = metrics.warningChunkCount + count
         }
@@ -3755,6 +3989,11 @@ ClassMethod RAGChunkScore(chunk As %DynamicObject, normalizedQuestion As %VarStr
         Continue:($Length(term) < 3)
         If haystack [ term {
             Set score = score + 1
+        }
+    }
+    If chunk.kind = "message-schema" {
+        If (normalizedQuestion["data") || (normalizedQuestion["field") || (normalizedQuestion["payload") || (normalizedQuestion["schema") || (normalizedQuestion["structure") {
+            Set score = score + 3
         }
     }
     If score = 0 {

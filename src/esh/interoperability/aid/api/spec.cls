@@ -64,6 +64,20 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "/codes": {
+      "get": {
+        "summary": "Get IRIS code mappings used by the API",
+        "operationId": "Codes",
+        "responses": {
+          "200": {
+            "description": "IRIS code mappings",
+            "schema": {
+              "$ref": "#/definitions/CodesResponse"
+            }
+          }
+        }
+      }
+    },
     "/settings": {
       "get": {
         "summary": "Get module analysis settings",
@@ -1573,7 +1587,8 @@ XData OpenAPI [ MimeType = application/json ]
             "name": "kind",
             "in": "query",
             "required": false,
-            "type": "string"
+            "type": "string",
+            "description": "Optional chunk kind filter. Use message-schema to list metadata-only message body class schema chunks."
           },
           {
             "name": "componentName",
@@ -2010,6 +2025,56 @@ XData OpenAPI [ MimeType = application/json ]
           "format": "int32"
         },
         "unknownEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "CodesResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "messageStatuses": {
+          "type": "array",
+          "description": "IRIS Ens.MessageHeader status code mappings.",
+          "items": {
+            "$ref": "#/definitions/CodeValue"
+          }
+        },
+        "logTypes": {
+          "type": "array",
+          "description": "IRIS interoperability event log type code mappings.",
+          "items": {
+            "$ref": "#/definitions/CodeValue"
+          }
+        },
+        "metrics": {
+          "$ref": "#/definitions/CodesMetrics"
+        }
+      }
+    },
+    "CodeValue": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "CodesMetrics": {
+      "type": "object",
+      "properties": {
+        "messageStatusCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "logTypeCount": {
           "type": "integer",
           "format": "int32"
         }
@@ -2689,7 +2754,8 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "string"
         },
         "statusLabel": {
-          "type": "string"
+          "type": "string",
+          "description": "Readable label for the IRIS Ens.MessageHeader status code."
         },
         "isError": {
           "type": "boolean"
@@ -2785,6 +2851,7 @@ XData OpenAPI [ MimeType = application/json ]
         },
         "statusFacets": {
           "type": "array",
+          "description": "Structured message status facets containing raw IRIS status codes and readable labels.",
           "items": {
             "type": "object",
             "properties": {
@@ -2792,7 +2859,8 @@ XData OpenAPI [ MimeType = application/json ]
                 "type": "string"
               },
               "statusLabel": {
-                "type": "string"
+                "type": "string",
+                "description": "Readable label for the IRIS Ens.MessageHeader status code."
               }
             }
           }
@@ -2937,6 +3005,7 @@ XData OpenAPI [ MimeType = application/json ]
         },
         "typeFacets": {
           "type": "array",
+          "description": "Structured log type facets containing raw IRIS log type codes and readable labels.",
           "items": {
             "type": "object",
             "properties": {
@@ -2944,7 +3013,8 @@ XData OpenAPI [ MimeType = application/json ]
                 "type": "string"
               },
               "typeLabel": {
-                "type": "string"
+                "type": "string",
+                "description": "Readable label for the IRIS interoperability log type code."
               }
             }
           }
@@ -2977,7 +3047,8 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "string"
         },
         "typeLabel": {
-          "type": "string"
+          "type": "string",
+          "description": "Readable label for the IRIS interoperability log type code."
         },
         "source": {
           "type": "string"
@@ -3170,7 +3241,8 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "string"
         },
         "statusLabel": {
-          "type": "string"
+          "type": "string",
+          "description": "Readable label for message status or log type."
         },
         "isError": {
           "type": "boolean"
@@ -4065,7 +4137,8 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "string"
         },
         "statusLabel": {
-          "type": "string"
+          "type": "string",
+          "description": "Readable label for the IRIS Ens.MessageHeader status code."
         },
         "isError": {
           "type": "boolean"
@@ -4661,6 +4734,10 @@ XData OpenAPI [ MimeType = application/json ]
           "format": "int32"
         },
         "payloadChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "messageSchemaChunkCount": {
           "type": "integer",
           "format": "int32"
         },

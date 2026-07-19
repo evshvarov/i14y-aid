@@ -66,6 +66,7 @@ Implemented endpoints:
 GET /i14y-aid/api/_spec
 GET /i14y-aid/api/health
 GET /i14y-aid/api/capabilities
+GET /i14y-aid/api/codes
 GET /i14y-aid/api/settings
 PUT /i14y-aid/api/settings
 GET /i14y-aid/api/messages
@@ -111,6 +112,7 @@ Example:
 ```sh
 curl http://localhost:57337/i14y-aid/api/health
 curl http://localhost:57337/i14y-aid/api/capabilities
+curl http://localhost:57337/i14y-aid/api/codes
 curl http://localhost:57337/i14y-aid/api/settings
 curl -X PUT http://localhost:57337/i14y-aid/api/settings -H "Content-Type: application/json" -d '{"maxTraceDepth":25,"explanationVerbosity":"brief"}'
 curl "http://localhost:57337/i14y-aid/api/messages?limit=10"
@@ -127,11 +129,15 @@ curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.t
 curl -X POST "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/rag/index"
 curl -X POST "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/rag/index" -H "Content-Type: application/json" -d '{"includeRuntime":true,"includePayload":true,"lookbackHours":24,"maxMessages":100,"maxLogs":100,"maxPayloadFields":50}'
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/rag/chunks?limit=10&kind=component"
+curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/rag/chunks?limit=10&kind=message-schema"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/rag/search?question=routing%20Patient%20Router&componentName=Patient%20Router&maxChunks=8"
+curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/rag/search?question=what%20payload%20fields%20does%20DemoMessage%20move&maxChunks=8"
 curl -X POST "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/ai/ask" -H "Content-Type: application/json" -d '{"question":"Why does this production route messages?","componentName":"Patient Router","maxChunks":8}'
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/graph"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/logs?limit=10"
+curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/logs?limit=10&type=Error"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages?limit=10"
+curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages?limit=10&status=Completed"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages/facets?limit=100"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages/1"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages/1/trace"
@@ -144,6 +150,37 @@ AI summaries are disabled by default. To enable them, turn on `aiProviderEnabled
 AI ask uses deterministic retrieval over production analysis chunks. When a persisted RAG index exists, AI ask uses that index; otherwise it builds transient chunks for the request. The response includes the retrieved chunks, validated answer citations, invalid citation ids, uncited chunk ids, and evidence used to ground the answer.
 
 Runtime RAG is off by default. Enable it with `ragRuntimeDataEnabled` in settings or pass `includeRuntime: true` to `POST /i14y-aid/api/productions/{productionName}/rag/index`. Runtime indexing adds recent message header chunks and production log chunks. Payload indexing is separately opt-in with `ragPayloadIndexingEnabled` or `includePayload: true`, requires payload inspection to be enabled, and indexes only redacted scalar payload preview fields. Full payload object graphs are not indexed. Runtime bounds can be controlled with `lookbackHours`, `startDate`, `endDate`, `maxMessages`, `maxLogs`, and `maxPayloadFields`.
+
+Static RAG indexing also creates metadata-only `message-schema` chunks for discovered message body classes. These chunks come from `%Dictionary.CompiledProperty` and include class names, field names, field types, scalar/object/collection classification, and source components inferred from message signatures, DTL transformations, and BPL processes. They never include live payload values. Rebuild the index, then call `GET /i14y-aid/api/productions/{productionName}/rag/chunks?kind=message-schema` to inspect schema-based evidence. Frontends can show a "schema-based" hint whenever retrieved chunks have `kind=message-schema`.
+
+Message APIs return both raw IRIS status codes and readable `statusLabel` values. The `status` query filter accepts either value, such as `status=9` or `status=Completed`. Message facets include `statusNames` and structured `statusFacets`. Frontends can also call `GET /i14y-aid/api/codes` to load the mappings dynamically.
+
+Message status labels:
+
+```text
+1 Created
+2 Queued
+3 Delivered
+4 Discarded
+5 Suspended
+6 Deferred
+7 Aborted
+8 Error
+9 Completed
+```
+
+Log APIs return raw IRIS log `type` values and readable `typeLabel` values. The `type` query filter accepts either value, such as `type=2` or `type=Error`. Log responses include structured `typeFacets`. Frontends can also call `GET /i14y-aid/api/codes` to load the mappings dynamically.
+
+Log type labels:
+
+```text
+1 Assert
+2 Error
+3 Warning
+4 Info
+5 Trace
+6 Alert
+```
 
 ## Build And Test
 

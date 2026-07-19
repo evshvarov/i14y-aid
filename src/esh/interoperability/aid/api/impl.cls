@@ -34,6 +34,12 @@ ClassMethod Capabilities() As %DynamicObject
     return ##class(esh.interoperability.aid.service.ProductionDiscovery).Capabilities()
 }
 
+/// Get IRIS code mappings used by the API
+ClassMethod Codes() As %DynamicObject
+{
+    return ##class(esh.interoperability.aid.service.ProductionDiscovery).Codes()
+}
+
 /// Get module analysis settings
 ClassMethod GetSettings() As %DynamicObject
 {

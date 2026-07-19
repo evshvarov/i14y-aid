@@ -31,6 +31,7 @@ printf 'zn "USER"\nzpm "install esh-i14y-csv"\nhalt\n' | docker compose exec -T 
 ```sh
 curl http://localhost:57337/i14y-aid/api/health
 curl http://localhost:57337/i14y-aid/api/capabilities
+curl http://localhost:57337/i14y-aid/api/codes
 curl http://localhost:57337/i14y-aid/api/settings
 ```
 
@@ -116,12 +117,14 @@ List production-scoped messages:
 
 ```sh
 curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/messages?limit=25"
+curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/messages?limit=25&status=Completed"
 ```
 
 List production-scoped event logs:
 
 ```sh
 curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/logs?limit=25"
+curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/logs?limit=25&type=Error"
 ```
 
 List message facets for filters:
@@ -129,6 +132,9 @@ List message facets for filters:
 ```sh
 curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/messages/facets?limit=100"
 ```
+
+Message filters accept either IRIS status codes or labels, for example `status=9` and `status=Completed`. Responses include `statusLabel` and structured `statusFacets`. The `GET /i14y-aid/api/codes` endpoint returns the status mappings.
+Log filters accept either IRIS log type codes or labels, for example `type=2` and `type=Error`. Responses include `typeLabel` and structured `typeFacets`. The `GET /i14y-aid/api/codes` endpoint returns the log type mappings.
 
 Pick a `messageId` from the response, then inspect detail, trace, explanation, and payload metadata:
 
@@ -153,7 +159,31 @@ curl -X PUT http://localhost:57337/i14y-aid/api/settings \
 curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/messages/1/payload/preview"
 ```
 
-## 7. Use The UI
+## 7. Rebuild RAG Evidence
+
+Build a persisted deterministic RAG index that includes static schema evidence, recent messages, recent logs, and optional redacted scalar payload previews:
+
+```sh
+curl -X POST "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/rag/index" \
+  -H "Content-Type: application/json" \
+  -d '{"includeRuntime":true,"includePayload":true,"lookbackHours":24,"maxMessages":100,"maxLogs":100,"maxPayloadFields":50}'
+```
+
+List metadata-only message body schemas:
+
+```sh
+curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/rag/chunks?kind=message-schema&limit=25"
+```
+
+Search for field and payload structure evidence:
+
+```sh
+curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction/rag/search?question=what%20payload%20fields%20and%20data%20structure%20does%20this%20production%20move&maxChunks=8"
+```
+
+`message-schema` chunks are schema-based evidence from compiled class metadata. They include field names and types, but no live payload values.
+
+## 8. Use The UI
 
 From the sibling UI project:
 
@@ -178,8 +208,9 @@ Recommended UI path:
 5. Open the Messages window.
 6. Select a runtime message to inspect trace, payload metadata, and payload preview when enabled.
 7. Adjust Runtime Settings only when you want to change query limits or verbosity.
+8. When AI answers cite `message-schema` chunks, label the evidence as schema-based.
 
-## 8. Reset Settings After Experiments
+## 9. Reset Settings After Experiments
 
 ```sh
 curl -X PUT http://localhost:57337/i14y-aid/api/settings \

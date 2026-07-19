@@ -398,6 +398,8 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.paths.%IsDefined("/_spec"), "Spec must expose /_spec")
     Do $$$AssertTrue(spec.paths.%IsDefined("/health"), "Spec must expose /health")
     Do $$$AssertTrue(spec.paths.%IsDefined("/capabilities"), "Spec must expose capabilities endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/codes"), "Spec must expose codes endpoint")
+    Do $$$AssertEquals(spec.paths.%Get("/codes").get.operationId, "Codes", "Codes operationId mismatch")
     Do $$$AssertTrue(spec.paths.%IsDefined("/settings"), "Spec must expose settings endpoint")
     Do $$$AssertTrue(spec.paths.%Get("/settings").%IsDefined("put"), "Spec must expose settings update endpoint")
     Do $$$AssertEquals(spec.paths.%Get("/settings").put.operationId, "UpdateSettings", "Settings update operationId mismatch")
@@ -492,6 +494,10 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.definitions.MessageDetailResponse.properties.%IsDefined("metrics"), "Message detail response must expose metrics")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageDetailMetrics"), "Spec must define MessageDetailMetrics")
     Do $$$AssertTrue(spec.definitions.MessageDetailMetrics.properties.%IsDefined("payloadEvidenceCount"), "MessageDetailMetrics must expose payloadEvidenceCount")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("CodesResponse"), "Spec must define CodesResponse")
+    Do $$$AssertTrue(spec.definitions.CodesResponse.properties.%IsDefined("messageStatuses"), "Codes response must expose messageStatuses")
+    Do $$$AssertTrue(spec.definitions.CodesResponse.properties.%IsDefined("logTypes"), "Codes response must expose logTypes")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("CodeValue"), "Spec must define CodeValue")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageFacetResponse"), "Spec must define MessageFacetResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageListMetrics"), "Spec must define MessageListMetrics")
     Do $$$AssertTrue(spec.definitions.MessageHeader.properties.%IsDefined("statusLabel"), "MessageHeader must expose statusLabel")
@@ -597,6 +603,7 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.definitions.RAGContextMetrics.properties.%IsDefined("messageChunkCount"), "RAG metrics must expose message chunk count")
     Do $$$AssertTrue(spec.definitions.RAGContextMetrics.properties.%IsDefined("logChunkCount"), "RAG metrics must expose log chunk count")
     Do $$$AssertTrue(spec.definitions.RAGContextMetrics.properties.%IsDefined("payloadChunkCount"), "RAG metrics must expose payload chunk count")
+    Do $$$AssertTrue(spec.definitions.RAGContextMetrics.properties.%IsDefined("messageSchemaChunkCount"), "RAG metrics must expose message schema chunk count")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/ai/ask"), "Spec must expose AI ask endpoint")
     Do $$$AssertEquals(spec.paths.%Get("/productions/{productionName}/ai/ask").post.operationId, "AskProductionAI", "AI ask operationId mismatch")
     Do $$$AssertTrue(spec.definitions.%IsDefined("ProductionAIAskRequest"), "Spec must define ProductionAIAskRequest")
@@ -680,6 +687,27 @@ Method TestCapabilities()
     Do $$$AssertTrue(result.%IsDefined("aiSummary"), "Capabilities must include aiSummary")
     Do $$$AssertEquals(result.payloadInspection, result.runtimeTraceAnalysis, "Payload inspection capability mismatch")
     Do $$$AssertEquals(result.payloadPreview, result.runtimeTraceAnalysis, "Payload preview capability mismatch")
+}
+
+Method TestCodes()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).Codes()
+    Do $$$AssertTrue($IsObject(result), "Codes response must be an object")
+    Do $$$AssertEquals(result.namespace, $Namespace, "Codes namespace mismatch")
+    Do $$$AssertTrue($IsObject(result.messageStatuses), "Codes response must include messageStatuses")
+    Do $$$AssertTrue($IsObject(result.logTypes), "Codes response must include logTypes")
+    Do $$$AssertEquals(result.messageStatuses.%Size(), 9, "Message status code count mismatch")
+    Do $$$AssertEquals(result.logTypes.%Size(), 6, "Log type code count mismatch")
+    Do $$$AssertEquals(result.messageStatuses.%Get(8).code, 9, "Completed message status code mismatch")
+    Do $$$AssertEquals(result.messageStatuses.%Get(8).label, "Completed", "Completed message status label mismatch")
+    Do $$$AssertEquals(result.logTypes.%Get(1).code, 2, "Error log type code mismatch")
+    Do $$$AssertEquals(result.logTypes.%Get(1).label, "Error", "Error log type label mismatch")
+    Do $$$AssertTrue($IsObject(result.metrics), "Codes response must include metrics")
+    If $IsObject(result.metrics) {
+        Do $$$AssertEquals(result.metrics.messageStatusCount, result.messageStatuses.%Size(), "Codes message status metric mismatch")
+        Do $$$AssertEquals(result.metrics.logTypeCount, result.logTypes.%Size(), "Codes log type metric mismatch")
+    }
 }
 
 Method TestGetSettings()
@@ -1678,6 +1706,20 @@ Method TestRebuildAndListProductionRAGIndex()
     If listed.items.%Size() > 0 {
         Do $$$AssertEquals(listed.items.%Get(0).kind, "component", "RAG chunk list filter mismatch")
     }
+
+    Do ..InitRequestResponse()
+    Set schemas = ##class(esh.interoperability.aid.api.impl).ListProductionRAGChunks("esh.interoperability.aid.tests.DemoProduction", 10, 0, "message-schema", "")
+    Do $$$AssertTrue($IsObject(schemas), "RAG message schema chunk list response must be an object")
+    Do $$$AssertEquals(schemas.kind, "message-schema", "RAG message schema chunk list kind mismatch")
+    Do $$$AssertTrue(schemas.count > 0, "RAG message schema chunk list should include message-schema chunks")
+    Do $$$AssertTrue(schemas.metrics.messageSchemaChunkCount > 0, "RAG metrics should count message-schema chunks")
+    If schemas.items.%Size() > 0 {
+        Do $$$AssertEquals(schemas.items.%Get(0).kind, "message-schema", "RAG message schema chunk kind mismatch")
+        Do $$$AssertTrue(schemas.items.%Get(0).text [ "metadata-only schema", "RAG message schema chunk text mismatch")
+        Do $$$AssertTrue(schemas.items.%Get(0).text [ "EventType", "RAG message schema chunk should include EventType")
+        Do $$$AssertTrue(schemas.items.%Get(0).text [ "PatientId", "RAG message schema chunk should include PatientId")
+        Do $$$AssertTrue(schemas.items.%Get(0).text [ "No live payload values", "RAG message schema chunk should state metadata-only behavior")
+    }
 }
 
 Method TestRebuildProductionRAGIndexWithRuntimeMessages()
@@ -1750,6 +1792,21 @@ Method TestSearchProductionRAGChunks()
         Do $$$AssertTrue(result.chunks.%Get(0).%IsDefined("id"), "RAG chunk search item should expose id")
         Do $$$AssertTrue(result.chunks.%Get(0).%IsDefined("text"), "RAG chunk search item should expose text")
     }
+
+    Do ..InitRequestResponse()
+    Set schemaResult = ##class(esh.interoperability.aid.api.impl).SearchProductionRAGChunks("esh.interoperability.aid.tests.DemoProduction", "what payload fields and data structure does DemoMessage move", "", 5)
+    Do $$$AssertTrue($IsObject(schemaResult), "RAG message schema search response must be an object")
+    Do $$$AssertTrue(schemaResult.count > 0, "RAG message schema search should return chunks")
+    Set foundSchema = 0
+    For schemaIndex = 0:1:schemaResult.chunks.%Size()-1 {
+        Set schemaChunk = schemaResult.chunks.%Get(schemaIndex)
+        Continue:'$IsObject(schemaChunk)
+        If schemaChunk.kind = "message-schema" {
+            Set foundSchema = 1
+            Quit
+        }
+    }
+    Do $$$AssertEquals(foundSchema, 1, "RAG message schema search should retrieve a message-schema chunk")
 }
 
 Method TestSearchProductionRAGChunksInvalidQuestion()
