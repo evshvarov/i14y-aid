@@ -23,6 +23,7 @@ The first implementation increment supports:
 - settings-gated production-scoped message resend through `Ens.MessageHeader.ResendMessage` when available;
 - deterministic component-level explanations with evidence and confidence;
 - deterministic production summaries;
+- optional OpenAI-assisted production summaries, gated by module settings and server-side key configuration;
 - Swagger 2.0 API documentation at `/_spec`.
 
 The module does not deploy or modify analysed production definitions. Local production start/stop is available through explicit REST endpoints for the current namespace.
@@ -64,6 +65,7 @@ GET /i14y-aid/api/productions/{productionName}/components
 GET /i14y-aid/api/productions/{productionName}/components/{componentName}
 GET /i14y-aid/api/productions/{productionName}/analysis
 GET /i14y-aid/api/productions/{productionName}/summary
+POST /i14y-aid/api/productions/{productionName}/ai/summary
 GET /i14y-aid/api/productions/{productionName}/graph
 GET /i14y-aid/api/productions/{productionName}/status
 GET /i14y-aid/api/productions/{productionName}/logs
@@ -95,6 +97,7 @@ curl http://localhost:57337/i14y-aid/api/productions
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/components"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/analysis"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/summary"
+curl -X POST "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/ai/summary"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/graph"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/logs?limit=10"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages?limit=10"
@@ -104,6 +107,8 @@ curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.t
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages/1/session"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages/1/payload/preview"
 ```
+
+AI summaries are disabled by default. To enable them, turn on `aiProviderEnabled` and `aiSummaryEnabled` through `PUT /i14y-aid/api/settings` or the UI settings panel. The OpenAI API key can be supplied through the IRIS process environment as `OPENAI_API_KEY`, or saved from the UI settings panel. The settings API reports only `aiApiKeyConfigured` and `aiApiKeySource`; it never returns the stored key value.
 
 ## Build And Test
 

@@ -1270,6 +1270,52 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "/productions/{productionName}/ai/summary": {
+      "post": {
+        "summary": "Generate AI-assisted production summary",
+        "operationId": "GetProductionAISummary",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AI-assisted production summary",
+            "schema": {
+              "$ref": "#/definitions/ProductionAISummaryResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request or AI configuration",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "AI provider or summary generation disabled",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "502": {
+            "description": "AI provider request failed",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/productions/{productionName}/status": {
       "get": {
         "summary": "Get production runtime status",
@@ -1466,6 +1512,12 @@ XData OpenAPI [ MimeType = application/json ]
         "productionLogs": {
           "type": "boolean"
         },
+        "aiProvider": {
+          "type": "boolean"
+        },
+        "aiSummary": {
+          "type": "boolean"
+        },
         "openapiVersion": {
           "type": "string"
         }
@@ -1601,6 +1653,31 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "string"
         },
         "aiProviderEnabled": {
+          "type": "boolean"
+        },
+        "aiSummaryEnabled": {
+          "type": "boolean"
+        },
+        "aiProvider": {
+          "type": "string"
+        },
+        "aiModel": {
+          "type": "string"
+        },
+        "aiEndpoint": {
+          "type": "string"
+        },
+        "aiApiKeyConfigured": {
+          "type": "boolean"
+        },
+        "aiApiKeySource": {
+          "type": "string"
+        },
+        "openAIApiKey": {
+          "type": "string",
+          "description": "Write-only OpenAI API key. Accepted by UpdateSettings and never returned by GetSettings."
+        },
+        "clearOpenAIApiKey": {
           "type": "boolean"
         }
       }
@@ -3755,6 +3832,71 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "array",
           "items": {
             "$ref": "#/definitions/Warning"
+          }
+        }
+      }
+    },
+    "ProductionAISummaryResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "generated": {
+          "type": "boolean"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "deterministicSummary": {
+          "type": "string"
+        },
+        "deterministicSummaryBullets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "metrics": {
+          "$ref": "#/definitions/ProductionMetrics"
+        },
+        "aiProviderEnabled": {
+          "type": "boolean"
+        },
+        "aiSummaryEnabled": {
+          "type": "boolean"
+        },
+        "aiApiKeyConfigured": {
+          "type": "boolean"
+        },
+        "aiApiKeySource": {
+          "type": "string"
+        },
+        "rawUsage": {
+          "type": "object"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
           }
         }
       }

@@ -25,6 +25,16 @@ Property ExplanationVerbosity As %VarString [ InitialExpression = "normal" ];
 
 Property AIProviderEnabled As %Boolean [ InitialExpression = 0 ];
 
+Property AISummaryEnabled As %Boolean [ InitialExpression = 0 ];
+
+Property AIProvider As %VarString [ InitialExpression = "openai" ];
+
+Property AIModel As %VarString [ InitialExpression = "gpt-4o-mini" ];
+
+Property AIEndpoint As %VarString(MAXLEN = 500) [ InitialExpression = "https://api.openai.com/v1/chat/completions" ];
+
+Property OpenAIApiKey As %VarString(MAXLEN = 500);
+
 ClassMethod Defaults() As %DynamicObject
 {
     Set settings = {}
@@ -40,6 +50,12 @@ ClassMethod Defaults() As %DynamicObject
     Set settings.sourceCodeInferenceEnabled = 0
     Set settings.explanationVerbosity = "normal"
     Set settings.aiProviderEnabled = 0
+    Set settings.aiSummaryEnabled = 0
+    Set settings.aiProvider = "openai"
+    Set settings.aiModel = "gpt-4o-mini"
+    Set settings.aiEndpoint = "https://api.openai.com/v1/chat/completions"
+    Set settings.aiApiKeyConfigured = (..EnvironmentOpenAIKey() '= "")
+    Set settings.aiApiKeySource = $Select(settings.aiApiKeyConfigured:"environment",1:"none")
     return settings
 }
 
@@ -47,7 +63,7 @@ ClassMethod Current() As %DynamicObject
 {
     Set settings = ..Defaults()
     Set stmt = ##class(%SQL.Statement).%New()
-    Set sql = "SELECT TOP 1 RuntimeMessageAnalysisEnabled, PayloadInspectionEnabled, MessageResendEnabled, MaxMessagesReturned, MaxTraceDepth, DefaultMessageLookbackDays, FieldRedactionPatterns, ClassExclusions, ProductionExclusions, SourceCodeInferenceEnabled, ExplanationVerbosity, AIProviderEnabled FROM esh_interoperability_aid_config.Settings ORDER BY ID"
+    Set sql = "SELECT TOP 1 RuntimeMessageAnalysisEnabled, PayloadInspectionEnabled, MessageResendEnabled, MaxMessagesReturned, MaxTraceDepth, DefaultMessageLookbackDays, FieldRedactionPatterns, ClassExclusions, ProductionExclusions, SourceCodeInferenceEnabled, ExplanationVerbosity, AIProviderEnabled, AISummaryEnabled, AIProvider, AIModel, AIEndpoint, OpenAIApiKey FROM esh_interoperability_aid_config.Settings ORDER BY ID"
     Set sc = stmt.%Prepare(sql)
     If $$$ISERR(sc) {
         return settings
@@ -69,6 +85,14 @@ ClassMethod Current() As %DynamicObject
         Set settings.sourceCodeInferenceEnabled = rset.%Get("SourceCodeInferenceEnabled")
         Set settings.explanationVerbosity = rset.%Get("ExplanationVerbosity")
         Set settings.aiProviderEnabled = rset.%Get("AIProviderEnabled")
+        Set settings.aiSummaryEnabled = rset.%Get("AISummaryEnabled")
+        Set settings.aiProvider = rset.%Get("AIProvider")
+        Set settings.aiModel = rset.%Get("AIModel")
+        Set settings.aiEndpoint = rset.%Get("AIEndpoint")
+        Set storedKeyConfigured = (rset.%Get("OpenAIApiKey") '= "")
+        Set envKeyConfigured = (..EnvironmentOpenAIKey() '= "")
+        Set settings.aiApiKeyConfigured = $Select(envKeyConfigured:1,storedKeyConfigured:1,1:0)
+        Set settings.aiApiKeySource = $Select(envKeyConfigured:"environment",storedKeyConfigured:"settings",1:"none")
     }
     Do ..ApplyDefaultBounds(settings)
     return settings
@@ -178,6 +202,54 @@ ClassMethod UpdateFromPayload(payload As %DynamicObject) As %DynamicObject
         }
         Set settings.AIProviderEnabled = value
     }
+    If payload.%IsDefined("aiSummaryEnabled") {
+        Set value = ..NormalizeBooleanValue(payload.%Get("aiSummaryEnabled"), before.aiSummaryEnabled)
+        If value '= before.aiSummaryEnabled {
+            Set result.changed = 1
+        }
+        Set settings.AISummaryEnabled = value
+    }
+    If payload.%IsDefined("aiProvider") {
+        Set value = ..NormalizeAIProviderValue(payload.%Get("aiProvider"), before.aiProvider)
+        If value '= before.aiProvider {
+            Set result.changed = 1
+        }
+        Set settings.AIProvider = value
+    }
+    If payload.%IsDefined("aiModel") {
+        Set value = ..NormalizeStringValue(payload.%Get("aiModel"), 100)
+        If value = "" {
+            Set value = before.aiModel
+        }
+        If value '= before.aiModel {
+            Set result.changed = 1
+        }
+        Set settings.AIModel = value
+    }
+    If payload.%IsDefined("aiEndpoint") {
+        Set value = ..NormalizeStringValue(payload.%Get("aiEndpoint"), 500)
+        If value = "" {
+            Set value = before.aiEndpoint
+        }
+        If value '= before.aiEndpoint {
+            Set result.changed = 1
+        }
+        Set settings.AIEndpoint = value
+    }
+    If payload.%IsDefined("openAIApiKey") {
+        Set value = ..NormalizeStringValue(payload.%Get("openAIApiKey"), 500)
+        If value '= "" {
+            Set result.changed = 1
+            Set settings.OpenAIApiKey = value
+        }
+    }
+    If payload.%IsDefined("clearOpenAIApiKey") {
+        Set value = ..NormalizeBooleanValue(payload.%Get("clearOpenAIApiKey"), 0)
+        If value {
+            Set result.changed = 1
+            Set settings.OpenAIApiKey = ""
+        }
+    }
 
     Set sc = settings.%Save()
     If $$$ISERR(sc) {
@@ -207,6 +279,23 @@ ClassMethod ApplyDefaultBounds(settings As %DynamicObject) [ Private ]
     }
     If settings.explanationVerbosity = "" {
         Set settings.explanationVerbosity = "normal"
+    }
+    If settings.aiProvider = "" {
+        Set settings.aiProvider = "openai"
+    }
+    If settings.aiModel = "" {
+        Set settings.aiModel = "gpt-4o-mini"
+    }
+    If settings.aiEndpoint = "" {
+        Set settings.aiEndpoint = "https://api.openai.com/v1/chat/completions"
+    }
+    If settings.aiSummaryEnabled = "" {
+        Set settings.aiSummaryEnabled = 0
+    }
+    If settings.aiApiKeyConfigured = "" {
+        Set envKeyConfigured = (..EnvironmentOpenAIKey() '= "")
+        Set settings.aiApiKeyConfigured = envKeyConfigured
+        Set settings.aiApiKeySource = $Select(envKeyConfigured:"environment",1:"none")
     }
     return
 }
@@ -270,6 +359,41 @@ ClassMethod NormalizeVerbosityValue(value, defaultValue As %VarString = "normal"
     return defaultValue
 }
 
+ClassMethod NormalizeAIProviderValue(value, defaultValue As %VarString = "openai") As %VarString [ Private ]
+{
+    Set normalized = $ZConvert(value, "L")
+    If normalized = "openai" {
+        return normalized
+    }
+    return defaultValue
+}
+
+ClassMethod EnvironmentOpenAIKey() As %VarString
+{
+    return $System.Util.GetEnviron("OPENAI_API_KEY")
+}
+
+ClassMethod EffectiveOpenAIKey() As %VarString
+{
+    Set envKey = ..EnvironmentOpenAIKey()
+    If envKey '= "" {
+        return envKey
+    }
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sc = stmt.%Prepare("SELECT TOP 1 OpenAIApiKey FROM esh_interoperability_aid_config.Settings ORDER BY ID")
+    If $$$ISERR(sc) {
+        return ""
+    }
+    Set rset = stmt.%Execute()
+    If rset.%SQLCODE < 0 {
+        return ""
+    }
+    If rset.%Next() {
+        return rset.%Get("OpenAIApiKey")
+    }
+    return ""
+}
+
 ClassMethod NewEvidence(evidenceType As %VarString, source As %VarString, component As %VarString, field As %VarString, value As %VarString, confidence As %VarString) As %DynamicObject [ Private ]
 {
     Set evidence = {}
@@ -331,6 +455,21 @@ Storage Default
 </Value>
 <Value name="13">
 <Value>MessageResendEnabled</Value>
+</Value>
+<Value name="14">
+<Value>AISummaryEnabled</Value>
+</Value>
+<Value name="15">
+<Value>AIProvider</Value>
+</Value>
+<Value name="16">
+<Value>AIModel</Value>
+</Value>
+<Value name="17">
+<Value>AIEndpoint</Value>
+</Value>
+<Value name="18">
+<Value>OpenAIApiKey</Value>
 </Value>
 </Data>
 <DataLocation>^esh.interoperabilCC6D.SettingsD</DataLocation>

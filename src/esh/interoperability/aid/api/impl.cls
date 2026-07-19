@@ -128,6 +128,15 @@ ClassMethod GetProductionGraph(productionName As %String) As %DynamicObject
     return ..HandleProductionResult(result)
 }
 
+/// Generate AI-assisted production summary
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+ClassMethod GetProductionAISummary(productionName As %String) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionAISummary(productionName)
+    return ..HandleAIResult(result)
+}
+
 /// Get production runtime status<br/>
 /// The method arguments hold values for:<br/>
 ///     productionName<br/>
@@ -563,6 +572,40 @@ ClassMethod HandleSettingsResult(result As %DynamicObject) As %DynamicObject [ P
         }
         If result.errorCode = "STATUS_ERROR" {
             return ..Error(500, "STATUS_ERROR", result.%Get("statusText"))
+        }
+    }
+    return result
+}
+
+ClassMethod HandleAIResult(result As %DynamicObject) As %DynamicObject [ Private ]
+{
+    If result.%IsDefined("errorCode") {
+        If result.errorCode = "INVALID_PRODUCTION_NAME" {
+            return ..Error(400, "INVALID_PRODUCTION_NAME", "Invalid productionName.")
+        }
+        If result.errorCode = "PRODUCTION_NOT_FOUND" {
+            return ..Error(404, "PRODUCTION_NOT_FOUND", "The requested interoperability production was not found.")
+        }
+        If result.errorCode = "AI_PROVIDER_DISABLED" {
+            return ..Error(403, "AI_PROVIDER_DISABLED", "AI provider is disabled in module settings.")
+        }
+        If result.errorCode = "AI_SUMMARY_DISABLED" {
+            return ..Error(403, "AI_SUMMARY_DISABLED", "AI summary generation is disabled in module settings.")
+        }
+        If result.errorCode = "AI_API_KEY_NOT_CONFIGURED" {
+            return ..Error(400, "AI_API_KEY_NOT_CONFIGURED", "OpenAI API key is not configured on the server.")
+        }
+        If result.errorCode = "AI_PROVIDER_UNSUPPORTED" {
+            return ..Error(400, "AI_PROVIDER_UNSUPPORTED", "Only the OpenAI provider is supported.")
+        }
+        If result.errorCode = "AI_ENDPOINT_INVALID" {
+            return ..Error(400, "AI_ENDPOINT_INVALID", result.%Get("statusText"))
+        }
+        If result.errorCode = "AI_REQUEST_FAILED" {
+            return ..Error(502, "AI_REQUEST_FAILED", result.%Get("statusText"))
+        }
+        If result.errorCode = "AI_RESPONSE_PARSE_FAILED" {
+            return ..Error(502, "AI_RESPONSE_PARSE_FAILED", result.%Get("statusText"))
         }
     }
     return result

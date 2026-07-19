@@ -14,6 +14,8 @@ ClassMethod Capabilities() As %DynamicObject
     Set capabilities.payloadInspection = capabilities.runtimeTraceAnalysis
     Set capabilities.payloadPreview = capabilities.runtimeTraceAnalysis
     Set capabilities.productionLogs = (..ProductionLogClassName() '= "")
+    Set capabilities.aiProvider = 1
+    Set capabilities.aiSummary = 1
     Set capabilities.openapiVersion = "2.0"
     return capabilities
 }
@@ -237,6 +239,79 @@ ClassMethod GetProductionGraph(productionName As %VarString) As %DynamicObject
     Do ..AddGraphEdges(analysis.connections, analysis.messageTypes, analysis.connectionExplanations, result.edges)
     Set result.metrics = ..BuildGraphMetrics(analysis, result.nodes, result.edges)
     Set result.summaryBullets = ..BuildGraphSummaryBullets(analysis, result.nodes, result.edges)
+    return result
+}
+
+ClassMethod GetProductionAISummary(productionName As %VarString) As %DynamicObject
+{
+    Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.productionName = productionName
+    Set result.provider = settings.aiProvider
+    Set result.model = settings.aiModel
+    Set result.generated = 0
+    Set result.aiProviderEnabled = settings.aiProviderEnabled
+    Set result.aiSummaryEnabled = settings.aiSummaryEnabled
+    Set result.aiApiKeyConfigured = settings.aiApiKeyConfigured
+    Set result.aiApiKeySource = settings.aiApiKeySource
+    Set result.warnings = []
+    Set result.evidence = []
+    Set result.confidence = "inferred"
+
+    If '..IsValidClassName(productionName) {
+        Do result.%Set("errorCode", "INVALID_PRODUCTION_NAME")
+        return result
+    }
+    If '..ClassExtends(productionName, "Ens.Production") {
+        Do result.%Set("errorCode", "PRODUCTION_NOT_FOUND")
+        return result
+    }
+    If 'settings.aiProviderEnabled {
+        Do result.%Set("errorCode", "AI_PROVIDER_DISABLED")
+        Do result.warnings.%Push(..NewWarning("AI_PROVIDER_DISABLED", "AI provider is disabled in module settings."))
+        return result
+    }
+    If 'settings.aiSummaryEnabled {
+        Do result.%Set("errorCode", "AI_SUMMARY_DISABLED")
+        Do result.warnings.%Push(..NewWarning("AI_SUMMARY_DISABLED", "AI summary generation is disabled in module settings."))
+        return result
+    }
+    If settings.aiProvider '= "openai" {
+        Do result.%Set("errorCode", "AI_PROVIDER_UNSUPPORTED")
+        Do result.warnings.%Push(..NewWarning("AI_PROVIDER_UNSUPPORTED", "Only the OpenAI provider is supported in this release."))
+        return result
+    }
+
+    Set apiKey = ##class(esh.interoperability.aid.config.Settings).EffectiveOpenAIKey()
+    If apiKey = "" {
+        Do result.%Set("errorCode", "AI_API_KEY_NOT_CONFIGURED")
+        Do result.warnings.%Push(..NewWarning("AI_API_KEY_NOT_CONFIGURED", "Set OPENAI_API_KEY in the IRIS environment or save an OpenAI key in settings."))
+        return result
+    }
+
+    Set analysis = ..GetProductionAnalysis(productionName)
+    If analysis.%IsDefined("errorCode") {
+        return analysis
+    }
+    Set result.deterministicSummary = analysis.summary
+    Set result.deterministicSummaryBullets = analysis.summaryBullets
+    Set result.metrics = analysis.metrics
+    Do result.evidence.%Push(..NewEvidence("analysis", productionName, productionName, "ProductionAnalysis", "AI summary prompt grounded in deterministic production analysis", "confirmed"))
+
+    Set prompt = ..BuildAISummaryPrompt(analysis)
+    Set aiResponse = ..CallOpenAIChat(settings.aiEndpoint, settings.aiModel, apiKey, prompt)
+    If aiResponse.%IsDefined("errorCode") {
+        Do result.%Set("errorCode", aiResponse.errorCode)
+        Do result.%Set("statusText", aiResponse.statusText)
+        Do result.warnings.%Push(..NewWarning(aiResponse.errorCode, aiResponse.statusText))
+        return result
+    }
+
+    Set result.generated = 1
+    Set result.summary = aiResponse.text
+    Set result.rawUsage = aiResponse.usage
+    Do result.evidence.%Push(..NewEvidence("ai-provider", settings.aiProvider, productionName, "model", settings.aiModel, "inferred"))
     return result
 }
 
@@ -2344,6 +2419,135 @@ ClassMethod JoinArrayWithSeparator(items As %DynamicArray, separator As %VarStri
     return text
 }
 
+ClassMethod BuildAISummaryPrompt(analysis As %DynamicObject) As %VarString [ Private ]
+{
+    Set prompt = "You are explaining an InterSystems IRIS interoperability production to an engineer. Use only the deterministic facts below. Return concise Markdown with sections: Overview, Runtime shape, Key flows, Risks or gaps. Do not invent components or external systems."_$Char(10,10)
+    Set prompt = prompt_"Production: "_analysis.productionName_$Char(10)
+    Set prompt = prompt_"Deterministic summary: "_analysis.summary_$Char(10)
+    If $IsObject(analysis.metrics) {
+        Set prompt = prompt_"Metrics: components="_analysis.metrics.componentCount_", services="_analysis.metrics.serviceCount_", processes="_analysis.metrics.processCount_", operations="_analysis.metrics.operationCount_", connections="_analysis.metrics.connectionCount_", rules="_analysis.metrics.ruleCount_", transforms="_analysis.metrics.transformationCount_", BPL="_analysis.metrics.businessProcessCount_$Char(10)
+    }
+    Set prompt = prompt_$Char(10)_"Components:"_$Char(10)
+    If $IsObject(analysis.components) {
+        For index = 0:1:analysis.components.%Size()-1 {
+            Set component = analysis.components.%Get(index)
+            Continue:'$IsObject(component)
+            Set prompt = prompt_"- "_component.name_" ("_component.type_") class="_component.className_" enabled="_component.enabled_$Char(10)
+        }
+    }
+    Set prompt = prompt_$Char(10)_"Connections:"_$Char(10)
+    If $IsObject(analysis.connections) {
+        For index = 0:1:analysis.connections.%Size()-1 {
+            Set connection = analysis.connections.%Get(index)
+            Continue:'$IsObject(connection)
+            Set prompt = prompt_"- "_connection.from_" -> "_connection.to_" via "_connection.kind_$Char(10)
+        }
+    }
+    If $IsObject(analysis.warnings),analysis.warnings.%Size() > 0 {
+        Set prompt = prompt_$Char(10)_"Warnings:"_$Char(10)
+        For index = 0:1:analysis.warnings.%Size()-1 {
+            Set warning = analysis.warnings.%Get(index)
+            Continue:'$IsObject(warning)
+            Set prompt = prompt_"- "_warning.code_": "_warning.message_$Char(10)
+        }
+    }
+    return $Extract(prompt, 1, 12000)
+}
+
+ClassMethod CallOpenAIChat(endpoint As %VarString, model As %VarString, apiKey As %VarString, prompt As %VarString) As %DynamicObject [ Private ]
+{
+    Set result = {}
+    Set result.text = ""
+    Set result.usage = {}
+
+    Set endpointParts = ..ParseEndpoint(endpoint)
+    If endpointParts.%IsDefined("errorCode") {
+        return endpointParts
+    }
+
+    Set request = ##class(%Net.HttpRequest).%New()
+    Set request.Server = endpointParts.server
+    Set request.Port = endpointParts.port
+    Set request.Https = endpointParts.https
+    If request.Https {
+        Set request.SSLConfiguration = "DefaultSSL"
+    }
+    Set request.ContentType = "application/json"
+    Do request.SetHeader("Authorization", "Bearer "_apiKey)
+    Do request.SetHeader("Accept", "application/json")
+
+    Set payload = {}
+    Set payload.model = model
+    Set payload.temperature = 0.2
+    Set payload.messages = []
+    Do payload.messages.%Push({"role":"system","content":"You summarize deterministic IRIS interoperability analysis. Keep secrets out of the answer."})
+    Do payload.messages.%Push({"role":"user","content":(prompt)})
+    Do request.EntityBody.Write(payload.%ToJSON())
+
+    Set sc = request.Post(endpointParts.path)
+    If $$$ISERR(sc) {
+        Do result.%Set("errorCode", "AI_REQUEST_FAILED")
+        Do result.%Set("statusText", $System.Status.GetErrorText(sc))
+        return result
+    }
+    If (request.HttpResponse.StatusCode < 200) || (request.HttpResponse.StatusCode > 299) {
+        Do result.%Set("errorCode", "AI_REQUEST_FAILED")
+        Do result.%Set("statusText", "OpenAI request failed with HTTP "_request.HttpResponse.StatusCode_".")
+        return result
+    }
+
+    Try {
+        Set response = {}.%FromJSON(request.HttpResponse.Data)
+    } Catch ex {
+        Do result.%Set("errorCode", "AI_RESPONSE_PARSE_FAILED")
+        Do result.%Set("statusText", "OpenAI response was not valid JSON.")
+        return result
+    }
+
+    If response.%IsDefined("usage") {
+        Set result.usage = response.usage
+    }
+    If response.%IsDefined("choices"),response.choices.%Size() > 0 {
+        Set choice = response.choices.%Get(0)
+        If $IsObject(choice),choice.%IsDefined("message"),$IsObject(choice.message),choice.message.%IsDefined("content") {
+            Set result.text = choice.message.content
+            return result
+        }
+    }
+
+    Do result.%Set("errorCode", "AI_RESPONSE_PARSE_FAILED")
+    Do result.%Set("statusText", "OpenAI response did not include message content.")
+    return result
+}
+
+ClassMethod ParseEndpoint(endpoint As %VarString) As %DynamicObject [ Private ]
+{
+    Set result = {}
+    Do ##class(%Net.URLParser).Parse(endpoint, .parts)
+    If '$Data(parts("host")) {
+        Do result.%Set("errorCode", "AI_ENDPOINT_INVALID")
+        Do result.%Set("statusText", "AI endpoint must be an absolute URL.")
+        return result
+    }
+    Set scheme = $ZConvert(parts("scheme"), "L")
+    Set result.https = $Select(scheme="https":1,1:0)
+    Set result.server = parts("host")
+    If $Data(parts("port")) {
+        Set result.port = +parts("port")
+    } Else {
+        Set result.port = $Select(result.https:443,1:80)
+    }
+    Set path = "/"
+    If $Data(parts("path")) {
+        Set path = parts("path")
+    }
+    If $Data(parts("query")) {
+        Set path = path_"?"_parts("query")
+    }
+    Set result.path = path
+    return result
+}
+
 ClassMethod MessageHandlerMethod(componentType As %VarString) As %VarString [ Private ]
 {
     If componentType = "business-service" {
@@ -4161,7 +4365,7 @@ ClassMethod BuildSettingsMetrics(settingsResult As %DynamicObject) As %DynamicOb
     Set metrics.inferredEvidenceCount = 0
     Set metrics.unknownEvidenceCount = 0
     If $IsObject(settingsResult.settings) {
-        Set flagNames = ["runtimeMessageAnalysisEnabled","payloadInspectionEnabled","messageResendEnabled","sourceCodeInferenceEnabled","aiProviderEnabled"]
+        Set flagNames = ["runtimeMessageAnalysisEnabled","payloadInspectionEnabled","messageResendEnabled","sourceCodeInferenceEnabled","aiProviderEnabled","aiSummaryEnabled"]
         For index = 0:1:flagNames.%Size()-1 {
             Set flagName = flagNames.%Get(index)
             Continue:'settingsResult.settings.%IsDefined(flagName)

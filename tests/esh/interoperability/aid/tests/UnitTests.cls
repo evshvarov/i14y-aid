@@ -526,8 +526,14 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.definitions.GraphNode.properties.%IsDefined("text"), "Graph node must expose explanation text")
     Do $$$AssertTrue(spec.definitions.%IsDefined("GraphEdge"), "Spec must define GraphEdge")
     Do $$$AssertTrue(spec.definitions.GraphEdge.properties.%IsDefined("text"), "Graph edge must expose explanation text")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/ai/summary"), "Spec must expose AI summary endpoint")
+    Do $$$AssertEquals(spec.paths.%Get("/productions/{productionName}/ai/summary").post.operationId, "GetProductionAISummary", "AI summary operationId mismatch")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("ProductionAISummaryResponse"), "Spec must define ProductionAISummaryResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("AnalysisSettings"), "Spec must define AnalysisSettings")
     Do $$$AssertTrue(spec.definitions.AnalysisSettings.properties.%IsDefined("messageResendEnabled"), "Spec settings must expose messageResendEnabled")
+    Do $$$AssertTrue(spec.definitions.AnalysisSettings.properties.%IsDefined("aiSummaryEnabled"), "Spec settings must expose aiSummaryEnabled")
+    Do $$$AssertTrue(spec.definitions.AnalysisSettings.properties.%IsDefined("aiApiKeyConfigured"), "Spec settings must expose AI key status")
+    Do $$$AssertTrue(spec.definitions.AnalysisSettings.properties.%IsDefined("openAIApiKey"), "Spec settings must accept write-only OpenAI key")
     Do $$$AssertTrue(spec.definitions.%IsDefined("SettingsResponse"), "Spec must define SettingsResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("SettingsUpdateResponse"), "Spec must define SettingsUpdateResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("SettingsMetrics"), "Spec must define SettingsMetrics")
@@ -580,6 +586,8 @@ Method TestCapabilities()
     Do $$$AssertTrue(result.%IsDefined("productionDiscovery"), "Capabilities must include productionDiscovery")
     Do $$$AssertTrue(result.%IsDefined("runtimeTraceAnalysis"), "Capabilities must include runtimeTraceAnalysis")
     Do $$$AssertTrue(result.%IsDefined("productionLogs"), "Capabilities must include productionLogs")
+    Do $$$AssertTrue(result.%IsDefined("aiProvider"), "Capabilities must include aiProvider")
+    Do $$$AssertTrue(result.%IsDefined("aiSummary"), "Capabilities must include aiSummary")
     Do $$$AssertEquals(result.payloadInspection, result.runtimeTraceAnalysis, "Payload inspection capability mismatch")
     Do $$$AssertEquals(result.payloadPreview, result.runtimeTraceAnalysis, "Payload preview capability mismatch")
 }
@@ -587,7 +595,7 @@ Method TestCapabilities()
 Method TestGetSettings()
 {
     Do ..InitRequestResponse()
-    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}
+    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0,"aiSummaryEnabled":0,"aiProvider":"openai","aiModel":"gpt-4o-mini","aiEndpoint":"https://api.openai.com/v1/chat/completions","clearOpenAIApiKey":1}
     Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
     Do ..InitRequestResponse()
     Set result = ##class(esh.interoperability.aid.api.impl).GetSettings()
@@ -599,10 +607,16 @@ Method TestGetSettings()
     Do $$$AssertEquals(result.settings.messageResendEnabled, 0, "Message resend default mismatch")
     Do $$$AssertEquals(result.settings.maxMessagesReturned, 100, "Max messages default mismatch")
     Do $$$AssertEquals(result.settings.maxTraceDepth, 50, "Max trace depth default mismatch")
+    Do $$$AssertEquals(result.settings.aiProviderEnabled, 0, "AI provider default mismatch")
+    Do $$$AssertEquals(result.settings.aiSummaryEnabled, 0, "AI summary default mismatch")
+    Do $$$AssertEquals(result.settings.aiProvider, "openai", "AI provider name mismatch")
+    Do $$$AssertEquals(result.settings.aiModel, "gpt-4o-mini", "AI model default mismatch")
+    Do $$$AssertTrue(result.settings.%IsDefined("aiApiKeyConfigured"), "Settings must expose AI key status")
+    Do $$$AssertEquals(result.settings.%IsDefined("openAIApiKey"), 0, "Settings must not return OpenAI API key")
     Do $$$AssertTrue($IsObject(result.evidence), "Settings response must include evidence")
     Do $$$AssertTrue($IsObject(result.metrics), "Settings response must include metrics")
     If $IsObject(result.metrics) {
-        Do $$$AssertEquals(result.metrics.featureFlagCount, 5, "Settings metrics feature flag count mismatch")
+        Do $$$AssertEquals(result.metrics.featureFlagCount, 6, "Settings metrics feature flag count mismatch")
         Do $$$AssertEquals(result.metrics.enabledFeatureFlagCount, 1, "Settings metrics enabled feature flag count mismatch")
         Do $$$AssertEquals(result.metrics.limitSettingCount, 3, "Settings metrics limit count mismatch")
         Do $$$AssertEquals(result.metrics.warningCount, 0, "Settings metrics warning count mismatch")
@@ -616,7 +630,7 @@ Method TestUpdateSettings()
     Do ..InitRequestResponse()
     Set payload = {"messageResendEnabled":1,"maxTraceDepth":25,"explanationVerbosity":"brief"}
     Set result = ##class(esh.interoperability.aid.api.impl).UpdateSettings(payload)
-    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}
+    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0,"aiSummaryEnabled":0,"aiProvider":"openai","aiModel":"gpt-4o-mini","aiEndpoint":"https://api.openai.com/v1/chat/completions","clearOpenAIApiKey":1}
     Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
     Do $$$AssertTrue($IsObject(result), "Settings update response must be an object")
     Do $$$AssertEquals(result.namespace, $Namespace, "Settings update namespace mismatch")
@@ -624,12 +638,13 @@ Method TestUpdateSettings()
     Do $$$AssertEquals(result.settings.messageResendEnabled, 1, "Settings messageResendEnabled update mismatch")
     Do $$$AssertEquals(result.settings.maxTraceDepth, 25, "Settings maxTraceDepth update mismatch")
     Do $$$AssertEquals(result.settings.explanationVerbosity, "brief", "Settings explanation verbosity update mismatch")
+    Do $$$AssertEquals(result.settings.%IsDefined("openAIApiKey"), 0, "Settings update must not return OpenAI API key")
     Do $$$AssertTrue($IsObject(result.warnings), "Settings update must include warnings")
     Do $$$AssertEquals(result.warnings.%Size(), 0, "Enabling implemented resend should not emit warnings")
     Do $$$AssertTrue($IsObject(result.evidence), "Settings update must include evidence")
     Do $$$AssertTrue($IsObject(result.metrics), "Settings update must include metrics")
     If $IsObject(result.metrics) {
-        Do $$$AssertEquals(result.metrics.featureFlagCount, 5, "Settings update metrics feature flag count mismatch")
+        Do $$$AssertEquals(result.metrics.featureFlagCount, 6, "Settings update metrics feature flag count mismatch")
         Do $$$AssertEquals(result.metrics.enabledFeatureFlagCount, 2, "Settings update metrics enabled feature flag count mismatch")
         Do $$$AssertEquals(result.metrics.limitSettingCount, 3, "Settings update metrics limit count mismatch")
         Do $$$AssertEquals(result.metrics.warningCount, 0, "Settings update metrics warning count mismatch")
@@ -878,7 +893,7 @@ Method TestGetMessageTraceInvalidId()
 Method TestGetProductionMessageTraceStaticContext()
 {
     Do ..InitRequestResponse()
-    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}
+    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0,"aiSummaryEnabled":0,"aiProvider":"openai","aiModel":"gpt-4o-mini","aiEndpoint":"https://api.openai.com/v1/chat/completions","clearOpenAIApiKey":1}
     Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
     Set fixture = ..CreateRuntimeMessage("Patient Router", "FHIR Operation")
     Do $$$AssertTrue('fixture.%IsDefined("errorCode"), "Trace fixture should save successfully")
@@ -928,7 +943,7 @@ Method TestGetMessageExplanationInvalidId()
 Method TestGetProductionMessageExplanationMetrics()
 {
     Do ..InitRequestResponse()
-    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}
+    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0,"aiSummaryEnabled":0,"aiProvider":"openai","aiModel":"gpt-4o-mini","aiEndpoint":"https://api.openai.com/v1/chat/completions","clearOpenAIApiKey":1}
     Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
     Set fixture = ..CreateRuntimeMessage("Patient Router", "FHIR Operation")
     Do $$$AssertTrue('fixture.%IsDefined("errorCode"), "Message explanation fixture should save successfully")
@@ -969,7 +984,7 @@ Method TestGetMessagePayloadPreviewInvalidId()
 Method TestGetMessagePayloadPreview()
 {
     Do ..InitRequestResponse()
-    Set enable = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":1,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}
+    Set enable = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":1,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0,"aiSummaryEnabled":0,"aiProvider":"openai","aiModel":"gpt-4o-mini","aiEndpoint":"https://api.openai.com/v1/chat/completions","clearOpenAIApiKey":1}
     Set update = ##class(esh.interoperability.aid.api.impl).UpdateSettings(enable)
     Set fixture = ..CreatePayloadPreviewMessage()
     Do $$$AssertTrue('fixture.%IsDefined("errorCode"), "Payload preview fixture should save successfully")
@@ -990,7 +1005,7 @@ Method TestGetMessagePayloadPreview()
 
     Do ..InitRequestResponse()
     Set result = ##class(esh.interoperability.aid.api.impl).GetProductionMessagePayloadPreview("esh.interoperability.aid.tests.DemoProduction", fixture.messageId)
-    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}
+    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0,"aiSummaryEnabled":0,"aiProvider":"openai","aiModel":"gpt-4o-mini","aiEndpoint":"https://api.openai.com/v1/chat/completions","clearOpenAIApiKey":1}
     Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
 
     Do $$$AssertTrue($IsObject(result), "Payload preview response must be an object")
@@ -1036,7 +1051,7 @@ Method TestGetMessageInvalidId()
 Method TestGetMessagePayloadMetadataMetrics()
 {
     Do ..InitRequestResponse()
-    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}
+    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0,"aiSummaryEnabled":0,"aiProvider":"openai","aiModel":"gpt-4o-mini","aiEndpoint":"https://api.openai.com/v1/chat/completions","clearOpenAIApiKey":1}
     Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
     Set fixture = ..CreateRuntimeMessage("CSV Patient Service", "Patient Router")
     Do $$$AssertTrue('fixture.%IsDefined("errorCode"), "Message detail fixture should save successfully")
@@ -1118,7 +1133,7 @@ Method TestGetProductionMessageSessionSummaryInvalidId()
 Method TestGetProductionMessageSessionSummaryStaticContext()
 {
     Do ..InitRequestResponse()
-    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}
+    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0,"aiSummaryEnabled":0,"aiProvider":"openai","aiModel":"gpt-4o-mini","aiEndpoint":"https://api.openai.com/v1/chat/completions","clearOpenAIApiKey":1}
     Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
     Set fixture = ..CreateRuntimeMessage("Patient Router", "FHIR Operation")
     Do $$$AssertTrue('fixture.%IsDefined("errorCode"), "Session fixture should save successfully")
@@ -1158,7 +1173,7 @@ Method TestResendProductionMessageInvalidId()
 Method TestResendProductionMessageDisabledMetrics()
 {
     Do ..InitRequestResponse()
-    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0}
+    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0,"aiSummaryEnabled":0,"aiProvider":"openai","aiModel":"gpt-4o-mini","aiEndpoint":"https://api.openai.com/v1/chat/completions","clearOpenAIApiKey":1}
     Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
     Set fixture = ..CreateRuntimeMessage("Patient Router", "FHIR Operation")
     Do $$$AssertTrue('fixture.%IsDefined("errorCode"), "Disabled resend fixture should save successfully")
@@ -1418,6 +1433,18 @@ Method TestGetProductionSummary()
         Do $$$AssertEquals(result.metrics.messageTypeCount, 9, "Summary metrics message type count mismatch")
     }
     Do $$$AssertEquals(result.confidence, "confirmed", "Summary confidence mismatch")
+}
+
+Method TestGetProductionAISummaryDisabled()
+{
+    Do ..InitRequestResponse()
+    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0,"aiSummaryEnabled":0,"aiProvider":"openai","aiModel":"gpt-4o-mini","aiEndpoint":"https://api.openai.com/v1/chat/completions","clearOpenAIApiKey":1}
+    Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetProductionAISummary("esh.interoperability.aid.tests.DemoProduction")
+    Do $$$AssertTrue($IsObject(result), "Disabled AI summary response must be an object")
+    Do $$$AssertEquals(%response.Status, 403, "Disabled AI provider should set 403")
+    Do $$$AssertEquals(result.error.code, "AI_PROVIDER_DISABLED", "Disabled AI provider error code mismatch")
 }
 
 Method TestGetProductionGraph()
