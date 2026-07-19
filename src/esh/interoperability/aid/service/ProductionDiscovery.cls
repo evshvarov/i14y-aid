@@ -280,6 +280,274 @@ ClassMethod GetProductionRAGContext(productionName As %VarString, question As %V
     return result
 }
 
+ClassMethod RebuildProductionRAGIndex(productionName As %VarString) As %DynamicObject
+{
+    Set analysis = ..GetProductionAnalysis(productionName)
+    If analysis.%IsDefined("errorCode") {
+        return analysis
+    }
+
+    Set chunks = ..BuildProductionRAGChunks(analysis)
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.productionName = productionName
+    Set result.chunkCount = chunks.%Size()
+    Set result.warnings = analysis.warnings
+    Set result.evidence = []
+    Set result.confidence = "inferred"
+
+    Set run = ##class(esh.interoperability.aid.rag.IndexRun).%New()
+    Set run.Namespace = $Namespace
+    Set run.ProductionName = productionName
+    Set run.RunTimestamp = $ZDateTime($Horolog, 3, 1)
+    Set run.ChunkCount = chunks.%Size()
+    Set run.Status = "building"
+    Set sc = run.%Save()
+    If $$$ISERR(sc) {
+        Do result.%Set("errorCode", "STATUS_ERROR")
+        Do result.%Set("statusText", $System.Status.GetErrorText(sc))
+        return result
+    }
+    Set runId = run.%Id()
+    Do ..DeleteRAGChunksForProduction(productionName)
+
+    For index = 0:1:chunks.%Size()-1 {
+        Set chunk = chunks.%Get(index)
+        Continue:'$IsObject(chunk)
+        Set stored = ##class(esh.interoperability.aid.rag.Chunk).%New()
+        Set stored.Namespace = $Namespace
+        Set stored.ProductionName = productionName
+        Set stored.RunId = runId
+        Set stored.ChunkId = chunk.id
+        Set stored.Kind = chunk.kind
+        Set stored.Title = chunk.title
+        Set stored.Source = chunk.source
+        Set stored.Component = chunk.component
+        Set stored.Confidence = chunk.confidence
+        Set stored.Score = $Select(chunk.%IsDefined("score"):chunk.score,1:0)
+        Set stored.CreatedAt = $ZDateTime($Horolog, 3, 1)
+        Set stored.Text = ##class(%Stream.GlobalCharacter).%New()
+        Do stored.Text.Write(chunk.text)
+        Set stored.EvidenceJSON = ##class(%Stream.GlobalCharacter).%New()
+        Do stored.EvidenceJSON.Write($Select($IsObject(chunk.evidence):chunk.evidence.%ToJSON(),1:"[]"))
+        Set sc = stored.%Save()
+        If $$$ISERR(sc) {
+            Set run.Status = "error"
+            Set run.StatusText = $System.Status.GetErrorText(sc)
+            Do run.%Save()
+            Do result.%Set("errorCode", "STATUS_ERROR")
+            Do result.%Set("statusText", $System.Status.GetErrorText(sc))
+            return result
+        }
+    }
+    Set run.Status = "complete"
+    Set run.ChunkCount = chunks.%Size()
+    Set sc = run.%Save()
+    If $$$ISERR(sc) {
+        Do result.%Set("errorCode", "STATUS_ERROR")
+        Do result.%Set("statusText", $System.Status.GetErrorText(sc))
+        return result
+    }
+
+    Set result.runId = runId
+    Set result.status = run.Status
+    Set result.metrics = ..BuildStoredRAGMetrics(productionName, runId)
+    Do result.evidence.%Push(..NewEvidence("rag-index", productionName, productionName, "runId", runId, "confirmed"))
+    return result
+}
+
+ClassMethod GetProductionRAGIndexStatus(productionName As %VarString) As %DynamicObject
+{
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.productionName = productionName
+    Set result.indexed = 0
+    Set result.stale = 0
+    Set result.status = "not-built"
+    Set result.chunkCount = 0
+    Set result.warnings = []
+    Set result.evidence = []
+
+    If '..IsValidClassName(productionName) {
+        Do result.%Set("errorCode", "INVALID_PRODUCTION_NAME")
+        return result
+    }
+    If '..ClassExtends(productionName, "Ens.Production") {
+        Do result.%Set("errorCode", "PRODUCTION_NOT_FOUND")
+        return result
+    }
+
+    Set runId = ..LatestRAGRunId(productionName)
+    Set sourceStamp = ..LatestProductionSourceStamp(productionName)
+    Set result.sourceClassCount = sourceStamp.classCount
+    Set result.latestSourceClassName = sourceStamp.className
+    Set result.latestSourceChangedAt = sourceStamp.changedAt
+
+    If runId = "" {
+        Do result.warnings.%Push(..NewWarning("RAG_INDEX_NOT_BUILT", "No persisted RAG index exists for this production. Rebuild the RAG index first."))
+        Set result.metrics = ..BuildStoredRAGMetrics(productionName, runId)
+        Do result.evidence.%Push(..NewEvidence("class-metadata", "%Dictionary.CompiledClass", productionName, "latestSourceChangedAt", result.latestSourceChangedAt, "confirmed"))
+        return result
+    }
+
+    Set run = ##class(esh.interoperability.aid.rag.IndexRun).%OpenId(runId)
+    If '$IsObject(run) {
+        Do result.warnings.%Push(..NewWarning("RAG_INDEX_NOT_FOUND", "The latest RAG index run record could not be opened."))
+        Set result.metrics = ..BuildStoredRAGMetrics(productionName, "")
+        return result
+    }
+
+    Set result.indexed = 1
+    Set result.runId = runId
+    Set result.status = run.Status
+    Set result.runTimestamp = run.RunTimestamp
+    Set result.chunkCount = run.ChunkCount
+    Set result.statusText = run.StatusText
+    Set runHorolog = ..TimestampToHorolog(run.RunTimestamp)
+    Set result.stale = ..HorologSeconds(sourceStamp.changedAtHorolog) > ..HorologSeconds(runHorolog)
+    If result.stale {
+        Do result.warnings.%Push(..NewWarning("RAG_INDEX_STALE", "Production source metadata changed after the latest RAG index run. Rebuild the RAG index."))
+    }
+    Set result.metrics = ..BuildStoredRAGMetrics(productionName, runId)
+    Do result.evidence.%Push(..NewEvidence("rag-index", productionName, productionName, "runId", runId, "confirmed"))
+    Do result.evidence.%Push(..NewEvidence("class-metadata", "%Dictionary.CompiledClass", sourceStamp.className, "TimeChanged", sourceStamp.changedAt, "confirmed"))
+    return result
+}
+
+ClassMethod ListProductionRAGChunks(productionName As %VarString, limit As %Integer = 50, offset As %Integer = 0, kind As %VarString = "", componentName As %VarString = "") As %DynamicObject
+{
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.productionName = productionName
+    Set result.limit = ..NormalizeLimit(limit)
+    Set result.offset = ..NormalizeOffset(offset)
+    Set kindFilter = $ZConvert(kind, "U")
+    Set result.kind = kind
+    Set result.componentName = componentName
+    Set result.items = []
+    Set result.count = 0
+    Set result.totalCount = 0
+    Set result.hasMore = 0
+    Set result.warnings = []
+    Set result.evidence = []
+
+    If '..IsValidClassName(productionName) {
+        Do result.%Set("errorCode", "INVALID_PRODUCTION_NAME")
+        return result
+    }
+    If '..ClassExtends(productionName, "Ens.Production") {
+        Do result.%Set("errorCode", "PRODUCTION_NOT_FOUND")
+        return result
+    }
+
+    Set runId = ..LatestRAGRunId(productionName)
+    If runId = "" {
+        Do result.warnings.%Push(..NewWarning("RAG_INDEX_NOT_BUILT", "No persisted RAG index exists for this production. Rebuild the RAG index first."))
+        Set result.metrics = ..BuildStoredRAGMetrics(productionName, runId)
+        return result
+    }
+    Set result.runId = runId
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sql = "SELECT %ID AS ID, ChunkId, Kind, Title, Source, Component, Confidence, Score FROM esh_interoperability_aid_rag.Chunk WHERE Namespace = ? AND ProductionName = ? AND RunId = ?"
+    If kindFilter '= "" {
+        Set sql = sql_" AND Kind = ?"
+    }
+    If componentName '= "" {
+        Set sql = sql_" AND Component = ?"
+    }
+    Set sql = sql_" ORDER BY Kind, Title"
+    Set sc = stmt.%Prepare(sql)
+    If $$$ISERR(sc) {
+        Do result.%Set("errorCode", "STATUS_ERROR")
+        Do result.%Set("statusText", $System.Status.GetErrorText(sc))
+        return result
+    }
+    If (kindFilter '= "") && (componentName '= "") {
+        Set rset = stmt.%Execute($Namespace, productionName, runId, kindFilter, componentName)
+    } ElseIf kindFilter '= "" {
+        Set rset = stmt.%Execute($Namespace, productionName, runId, kindFilter)
+    } ElseIf componentName '= "" {
+        Set rset = stmt.%Execute($Namespace, productionName, runId, componentName)
+    } Else {
+        Set rset = stmt.%Execute($Namespace, productionName, runId)
+    }
+    If rset.%SQLCODE < 0 {
+        Do result.%Set("errorCode", "STATUS_ERROR")
+        Do result.%Set("statusText", rset.%Message)
+        return result
+    }
+
+    Set skipped = 0
+    While rset.%Next() {
+        Set result.totalCount = result.totalCount + 1
+        If skipped < result.offset {
+            Set skipped = skipped + 1
+            Continue
+        }
+        If result.items.%Size() >= result.limit {
+            Set result.hasMore = 1
+            Continue
+        }
+        Set item = ..OpenStoredRAGChunk(rset.%Get("ID"))
+        If $IsObject(item) {
+            Do result.items.%Push(item)
+        }
+    }
+    Set result.count = result.items.%Size()
+    Set result.metrics = ..BuildStoredRAGMetrics(productionName, runId)
+    Do result.evidence.%Push(..NewEvidence("rag-index", productionName, productionName, "runId", runId, "confirmed"))
+    return result
+}
+
+ClassMethod SearchProductionRAGChunks(productionName As %VarString, question As %VarString = "", componentName As %VarString = "", maxChunks As %Integer = 12) As %DynamicObject
+{
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.productionName = productionName
+    Set result.question = $ZStrip($Extract(question, 1, 1000), "<>W")
+    Set result.componentName = $ZStrip($Extract(componentName, 1, 200), "<>W")
+    Set result.maxChunks = maxChunks
+    Set result.chunks = []
+    Set result.count = 0
+    Set result.totalChunkCount = 0
+    Set result.warnings = []
+    Set result.evidence = []
+    Set result.confidence = "inferred"
+
+    If '..IsValidClassName(productionName) {
+        Do result.%Set("errorCode", "INVALID_PRODUCTION_NAME")
+        return result
+    }
+    If '..ClassExtends(productionName, "Ens.Production") {
+        Do result.%Set("errorCode", "PRODUCTION_NOT_FOUND")
+        return result
+    }
+    If result.question = "" {
+        Do result.%Set("errorCode", "INVALID_AI_QUESTION")
+        return result
+    }
+    If result.maxChunks < 1 {
+        Set result.maxChunks = 12
+    }
+    If result.maxChunks > 100 {
+        Set result.maxChunks = 100
+    }
+
+    Set runId = ..LatestRAGRunId(productionName)
+    If runId = "" {
+        Do result.warnings.%Push(..NewWarning("RAG_INDEX_NOT_BUILT", "No persisted RAG index exists for this production. Rebuild the RAG index first."))
+        return result
+    }
+    Set result.runId = runId
+    Set allChunks = ..OpenStoredRAGChunksForRun(productionName, runId)
+    Set result.totalChunkCount = allChunks.%Size()
+    Set result.chunks = ..RetrieveRAGChunks(allChunks, result.question, result.componentName, result.maxChunks)
+    Set result.count = result.chunks.%Size()
+    Set result.metrics = ..BuildStoredRAGMetrics(productionName, runId)
+    Do result.evidence.%Push(..NewEvidence("rag-index", productionName, productionName, "runId", runId, "confirmed"))
+    return result
+}
+
 ClassMethod GetProductionAISummary(productionName As %VarString) As %DynamicObject
 {
     Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
@@ -418,11 +686,20 @@ ClassMethod AskProductionAI(productionName As %VarString, request As %DynamicObj
         return result
     }
 
-    Set analysis = ..GetProductionAnalysis(productionName)
-    If analysis.%IsDefined("errorCode") {
-        return analysis
+    Set runId = ..LatestRAGRunId(productionName)
+    If runId '= "" {
+        Set allChunks = ..OpenStoredRAGChunksForRun(productionName, runId)
+        Set result.runId = runId
+        Set result.chunkSource = "persisted"
+    } Else {
+        Set analysis = ..GetProductionAnalysis(productionName)
+        If analysis.%IsDefined("errorCode") {
+            return analysis
+        }
+        Set allChunks = ..BuildProductionRAGChunks(analysis)
+        Set result.chunkSource = "transient"
+        Do result.warnings.%Push(..NewWarning("RAG_INDEX_NOT_BUILT", "No persisted RAG index exists for this production. Built transient chunks for this request."))
     }
-    Set allChunks = ..BuildProductionRAGChunks(analysis)
     Set result.chunks = ..RetrieveRAGChunks(allChunks, question, componentName, maxChunks)
     Set result.chunkCount = result.chunks.%Size()
     Set result.totalChunkCount = allChunks.%Size()
@@ -2810,6 +3087,247 @@ ClassMethod BuildRAGContextMetrics(context As %DynamicObject) As %DynamicObject 
             If chunk.kind = "warning" {
                 Set metrics.warningChunkCount = metrics.warningChunkCount + 1
             }
+        }
+    }
+    return metrics
+}
+
+ClassMethod DeleteRAGChunksForProduction(productionName As %VarString) [ Private ]
+{
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sc = stmt.%Prepare("SELECT %ID AS ID FROM esh_interoperability_aid_rag.Chunk WHERE Namespace = ? AND ProductionName = ?")
+    If $$$ISERR(sc) {
+        return
+    }
+    Set rset = stmt.%Execute($Namespace, productionName)
+    If rset.%SQLCODE < 0 {
+        return
+    }
+    While rset.%Next() {
+        Do ##class(esh.interoperability.aid.rag.Chunk).%DeleteId(rset.%Get("ID"))
+    }
+    return
+}
+
+ClassMethod LatestRAGRunId(productionName As %VarString) As %VarString [ Private ]
+{
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sc = stmt.%Prepare("SELECT TOP 1 %ID AS ID FROM esh_interoperability_aid_rag.IndexRun WHERE Namespace = ? AND ProductionName = ? AND Status = ? ORDER BY RunTimestamp DESC, %ID DESC")
+    If $$$ISERR(sc) {
+        return ""
+    }
+    Set rset = stmt.%Execute($Namespace, productionName, "complete")
+    If rset.%SQLCODE < 0 {
+        return ""
+    }
+    If rset.%Next() {
+        return rset.%Get("ID")
+    }
+    return ""
+}
+
+ClassMethod LatestProductionSourceStamp(productionName As %VarString) As %DynamicObject [ Private ]
+{
+    Set stamp = {}
+    Set stamp.className = productionName
+    Set stamp.changedAtHorolog = ..ClassChangedHorolog(productionName)
+    Set stamp.changedAt = ..HorologToTimestamp(stamp.changedAtHorolog)
+    Set stamp.classCount = 1
+    Set classNames = []
+    Do classNames.%Push(productionName)
+    Set analysis = ..GetProductionAnalysis(productionName)
+    If $IsObject(analysis) && 'analysis.%IsDefined("errorCode") && $IsObject(analysis.components) {
+        For index = 0:1:analysis.components.%Size()-1 {
+            Set component = analysis.components.%Get(index)
+            Continue:'$IsObject(component)
+            Set className = component.className
+            Continue:(className = "")
+            Continue:..DynamicArrayContains(classNames, className)
+            Do classNames.%Push(className)
+        }
+    }
+    Set stamp.classCount = classNames.%Size()
+    For index = 0:1:classNames.%Size()-1 {
+        Set className = classNames.%Get(index)
+        Set changedAtHorolog = ..ClassChangedHorolog(className)
+        If ..HorologSeconds(changedAtHorolog) > ..HorologSeconds(stamp.changedAtHorolog) {
+            Set stamp.className = className
+            Set stamp.changedAtHorolog = changedAtHorolog
+            Set stamp.changedAt = ..HorologToTimestamp(changedAtHorolog)
+        }
+    }
+    return stamp
+}
+
+ClassMethod ClassChangedHorolog(className As %VarString) As %VarString [ Private ]
+{
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sc = stmt.%Prepare("SELECT TimeChanged FROM %Dictionary.CompiledClass WHERE Name = ?")
+    If $$$ISERR(sc) {
+        return "0,0"
+    }
+    Set rset = stmt.%Execute(className)
+    If rset.%SQLCODE < 0 {
+        return "0,0"
+    }
+    If rset.%Next() {
+        return rset.%Get("TimeChanged")
+    }
+    return "0,0"
+}
+
+ClassMethod TimestampToHorolog(timestamp As %VarString) As %VarString [ Private ]
+{
+    If timestamp = "" {
+        return "0,0"
+    }
+    Try {
+        return $ZDateTimeH(timestamp, 3, 1)
+    } Catch ex {
+        return "0,0"
+    }
+}
+
+ClassMethod HorologToTimestamp(horologValue As %VarString) As %VarString [ Private ]
+{
+    If horologValue = "" {
+        return ""
+    }
+    Try {
+        return $ZDateTime(horologValue, 3, 1)
+    } Catch ex {
+        return ""
+    }
+}
+
+ClassMethod HorologSeconds(horologValue As %VarString) As %Numeric [ Private ]
+{
+    If horologValue = "" {
+        return 0
+    }
+    return (+$Piece(horologValue, ",", 1) * 86400) + (+$Piece(horologValue, ",", 2))
+}
+
+ClassMethod DynamicArrayContains(items As %DynamicArray, value As %VarString) As %Boolean [ Private ]
+{
+    For index = 0:1:items.%Size()-1 {
+        If items.%Get(index) = value {
+            return 1
+        }
+    }
+    return 0
+}
+
+ClassMethod OpenStoredRAGChunk(chunkInternalId As %Integer) As %DynamicObject [ Private ]
+{
+    Set stored = ##class(esh.interoperability.aid.rag.Chunk).%OpenId(chunkInternalId)
+    If '$IsObject(stored) {
+        return ""
+    }
+    Set chunk = {}
+    Set chunk.id = stored.ChunkId
+    Set chunk.kind = stored.Kind
+    Set chunk.title = stored.Title
+    Set chunk.source = stored.Source
+    Set chunk.component = stored.Component
+    Set chunk.confidence = stored.Confidence
+    Set chunk.score = stored.Score
+    Set chunk.text = ""
+    If $IsObject(stored.Text) {
+        Do stored.Text.Rewind()
+        While 'stored.Text.AtEnd {
+            Set chunk.text = chunk.text _ stored.Text.Read(32000)
+        }
+    }
+    If $IsObject(stored.EvidenceJSON) {
+        Set evidenceJson = ""
+        Do stored.EvidenceJSON.Rewind()
+        While 'stored.EvidenceJSON.AtEnd {
+            Set evidenceJson = evidenceJson _ stored.EvidenceJSON.Read(32000)
+        }
+        Try {
+            Set chunk.evidence = [].%FromJSON(evidenceJson)
+        } Catch ex {
+            Set chunk.evidence = []
+        }
+    } Else {
+        Set chunk.evidence = []
+    }
+    return chunk
+}
+
+ClassMethod OpenStoredRAGChunksForRun(productionName As %VarString, runId As %VarString) As %DynamicArray [ Private ]
+{
+    Set chunks = []
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sc = stmt.%Prepare("SELECT %ID AS ID FROM esh_interoperability_aid_rag.Chunk WHERE Namespace = ? AND ProductionName = ? AND RunId = ? ORDER BY Kind, Title")
+    If $$$ISERR(sc) {
+        return chunks
+    }
+    Set rset = stmt.%Execute($Namespace, productionName, runId)
+    If rset.%SQLCODE < 0 {
+        return chunks
+    }
+    While rset.%Next() {
+        Set chunk = ..OpenStoredRAGChunk(rset.%Get("ID"))
+        If $IsObject(chunk) {
+            Do chunks.%Push(chunk)
+        }
+    }
+    return chunks
+}
+
+ClassMethod BuildStoredRAGMetrics(productionName As %VarString, runId As %VarString) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.chunkCount = 0
+    Set metrics.componentChunkCount = 0
+    Set metrics.connectionChunkCount = 0
+    Set metrics.ruleChunkCount = 0
+    Set metrics.messageTypeChunkCount = 0
+    Set metrics.externalSystemChunkCount = 0
+    Set metrics.transformationChunkCount = 0
+    Set metrics.businessProcessChunkCount = 0
+    Set metrics.warningChunkCount = 0
+    If runId = "" {
+        return metrics
+    }
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sc = stmt.%Prepare("SELECT Kind, COUNT(*) AS Cnt FROM esh_interoperability_aid_rag.Chunk WHERE Namespace = ? AND ProductionName = ? AND RunId = ? GROUP BY Kind")
+    If $$$ISERR(sc) {
+        return metrics
+    }
+    Set rset = stmt.%Execute($Namespace, productionName, runId)
+    If rset.%SQLCODE < 0 {
+        return metrics
+    }
+    While rset.%Next() {
+        Set kind = rset.%Get("Kind")
+        Set count = rset.%Get("Cnt")
+        Set metrics.chunkCount = metrics.chunkCount + count
+        If kind = "COMPONENT" {
+            Set metrics.componentChunkCount = metrics.componentChunkCount + count
+        }
+        If (kind = "CONNECTION") || (kind = "CONNECTION-EXPLANATION") {
+            Set metrics.connectionChunkCount = metrics.connectionChunkCount + count
+        }
+        If (kind = "ROUTING-RULE") || (kind = "ROUTING-RULE-EXPLANATION") {
+            Set metrics.ruleChunkCount = metrics.ruleChunkCount + count
+        }
+        If kind = "MESSAGE-TYPE" {
+            Set metrics.messageTypeChunkCount = metrics.messageTypeChunkCount + count
+        }
+        If kind = "EXTERNAL-SYSTEM" {
+            Set metrics.externalSystemChunkCount = metrics.externalSystemChunkCount + count
+        }
+        If kind = "TRANSFORMATION" {
+            Set metrics.transformationChunkCount = metrics.transformationChunkCount + count
+        }
+        If kind = "BUSINESS-PROCESS" {
+            Set metrics.businessProcessChunkCount = metrics.businessProcessChunkCount + count
+        }
+        If kind = "WARNING" {
+            Set metrics.warningChunkCount = metrics.warningChunkCount + count
         }
     }
     return metrics

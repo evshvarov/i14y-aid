@@ -140,6 +140,53 @@ ClassMethod GetProductionRAGContext(productionName As %String, question As %Stri
     return ..HandleProductionResult(result)
 }
 
+/// Rebuild persisted deterministic production RAG chunk index<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+ClassMethod RebuildProductionRAGIndex(productionName As %String) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).RebuildProductionRAGIndex(productionName)
+    return ..HandleProductionResult(result)
+}
+
+/// Get persisted deterministic production RAG index status<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+ClassMethod GetProductionRAGIndexStatus(productionName As %String) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionRAGIndexStatus(productionName)
+    return ..HandleProductionResult(result)
+}
+
+/// List persisted deterministic production RAG chunks<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     limit<br/>
+///     offset<br/>
+///     kind<br/>
+///     componentName<br/>
+ClassMethod ListProductionRAGChunks(productionName As %String, limit As %Integer = 50, offset As %Integer = 0, kind As %String = "", componentName As %String = "") As %DynamicObject
+{
+    Set kind = $Get(kind)
+    Set componentName = $Get(componentName)
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListProductionRAGChunks(productionName, limit, offset, kind, componentName)
+    return ..HandleProductionResult(result)
+}
+
+/// Search persisted deterministic production RAG chunks<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     question<br/>
+///     componentName<br/>
+///     maxChunks<br/>
+ClassMethod SearchProductionRAGChunks(productionName As %String, question As %String = "", componentName As %String = "", maxChunks As %Integer = 12) As %DynamicObject
+{
+    Set question = $Get(question)
+    Set componentName = $Get(componentName)
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).SearchProductionRAGChunks(productionName, question, componentName, maxChunks)
+    return ..HandleProductionResult(result)
+}
+
 /// Generate AI-assisted production summary
 /// The method arguments hold values for:<br/>
 ///     productionName<br/>
@@ -544,6 +591,9 @@ ClassMethod HandleProductionResult(result As %DynamicObject) As %DynamicObject [
         }
         If result.errorCode = "COMPONENT_NOT_FOUND" {
             return ..Error(404, "COMPONENT_NOT_FOUND", "The requested production component was not found.")
+        }
+        If result.errorCode = "INVALID_AI_QUESTION" {
+            return ..Error(400, "INVALID_AI_QUESTION", "RAG search requires a non-empty question.")
         }
     }
     return result

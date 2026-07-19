@@ -1370,6 +1370,200 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "/productions/{productionName}/rag/index": {
+      "get": {
+        "summary": "Get persisted deterministic production RAG index status",
+        "operationId": "GetProductionRAGIndexStatus",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Persisted RAG index status",
+            "schema": {
+              "$ref": "#/definitions/RAGIndexStatusResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid production name",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Rebuild persisted deterministic production RAG chunk index",
+        "operationId": "RebuildProductionRAGIndex",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Persisted RAG index rebuild result",
+            "schema": {
+              "$ref": "#/definitions/RAGIndexRebuildResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid production name",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "RAG index rebuild failed",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/productions/{productionName}/rag/chunks": {
+      "get": {
+        "summary": "List persisted deterministic production RAG chunks",
+        "operationId": "ListProductionRAGChunks",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 50
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "componentName",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Persisted RAG chunks",
+            "schema": {
+              "$ref": "#/definitions/RAGChunkListResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid production name",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "RAG chunk query failed",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/productions/{productionName}/rag/search": {
+      "get": {
+        "summary": "Search persisted deterministic production RAG chunks",
+        "operationId": "SearchProductionRAGChunks",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "question",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "componentName",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "maxChunks",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 12
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Persisted RAG chunk search result",
+            "schema": {
+              "$ref": "#/definitions/RAGChunkSearchResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/productions/{productionName}/ai/ask": {
       "post": {
         "summary": "Ask an AI-assisted question grounded in production analysis chunks",
@@ -4173,6 +4367,223 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "RAGIndexStatusResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "indexed": {
+          "type": "boolean"
+        },
+        "stale": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "runTimestamp": {
+          "type": "string"
+        },
+        "chunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "statusText": {
+          "type": "string"
+        },
+        "latestSourceChangedAt": {
+          "type": "string"
+        },
+        "latestSourceClassName": {
+          "type": "string"
+        },
+        "sourceClassCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "metrics": {
+          "$ref": "#/definitions/RAGContextMetrics"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "RAGIndexRebuildResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "status": {
+          "type": "string"
+        },
+        "chunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "metrics": {
+          "$ref": "#/definitions/RAGContextMetrics"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "RAGChunkListResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "limit": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "offset": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "count": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "componentName": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RAGChunk"
+          }
+        },
+        "metrics": {
+          "$ref": "#/definitions/RAGContextMetrics"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "RAGChunkSearchResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "question": {
+          "type": "string"
+        },
+        "componentName": {
+          "type": "string"
+        },
+        "maxChunks": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "count": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "totalChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "chunks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RAGChunk"
+          }
+        },
+        "metrics": {
+          "$ref": "#/definitions/RAGContextMetrics"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
     "ProductionAIAskResponse": {
       "type": "object",
       "properties": {
@@ -4198,6 +4609,13 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "boolean"
         },
         "answer": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "chunkSource": {
           "type": "string"
         },
         "chunkCount": {
