@@ -2655,6 +2655,9 @@ XData OpenAPI [ MimeType = application/json ]
         "status": {
           "type": "string"
         },
+        "statusLabel": {
+          "type": "string"
+        },
         "isError": {
           "type": "boolean"
         },
@@ -3090,6 +3093,9 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "string"
         },
         "status": {
+          "type": "string"
+        },
+        "statusLabel": {
           "type": "string"
         },
         "isError": {
@@ -3982,6 +3988,9 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "string"
         },
         "status": {
+          "type": "string"
+        },
+        "statusLabel": {
           "type": "string"
         },
         "isError": {

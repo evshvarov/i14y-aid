@@ -2646,6 +2646,9 @@
         "status": {
           "type": "string"
         },
+        "statusLabel": {
+          "type": "string"
+        },
         "isError": {
           "type": "boolean"
         },
@@ -3081,6 +3084,9 @@
           "type": "string"
         },
         "status": {
+          "type": "string"
+        },
+        "statusLabel": {
           "type": "string"
         },
         "isError": {
@@ -3973,6 +3979,9 @@
           "type": "string"
         },
         "status": {
+          "type": "string"
+        },
+        "statusLabel": {
           "type": "string"
         },
         "isError": {

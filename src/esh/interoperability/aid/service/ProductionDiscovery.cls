@@ -423,7 +423,7 @@ ClassMethod GetProductionRAGIndexStatus(productionName As %VarString) As %Dynami
     Set result.chunkCount = run.ChunkCount
     Set result.statusText = run.StatusText
     Set runHorolog = ..TimestampToHorolog(run.RunTimestamp)
-    Set result.stale = ..HorologSeconds(sourceStamp.changedAtHorolog) > ..HorologSeconds(runHorolog)
+    Set result.stale = ..HorologSeconds(sourceStamp.changedAtHorolog) > (..HorologSeconds(runHorolog) + 1)
     If result.stale {
         Do result.warnings.%Push(..NewWarning("RAG_INDEX_STALE", "Production source metadata changed after the latest RAG index run. Rebuild the RAG index."))
     }
@@ -537,7 +537,11 @@ ClassMethod BuildRuntimeRAGChunks(productionName As %VarString, options As %Dyna
 
 ClassMethod NewMessageRAGChunk(message As %DynamicObject, productionName As %VarString) As %DynamicObject [ Private ]
 {
-    Set text = "Runtime message "_message.messageId_" in production "_productionName_". Session: "_message.sessionId_". Source: "_message.sourceConfigName_". Target: "_message.targetConfigName_". Body class: "_message.messageBodyClassName_". Status: "_message.status_". Is error: "_message.isError_". Created: "_message.timeCreated_"."
+    Set text = "Runtime message "_message.messageId_" in production "_productionName_". Session: "_message.sessionId_". Source: "_message.sourceConfigName_". Target: "_message.targetConfigName_". Body class: "_message.messageBodyClassName_". Status: "_message.status
+    If message.statusLabel '= "" {
+        Set text = text_" ("_message.statusLabel_")"
+    }
+    Set text = text_". Is error: "_message.isError_". Created: "_message.timeCreated_"."
     If message.errorStatus '= "" {
         Set text = text_" Error status: "_message.errorStatus_"."
     }
@@ -4594,6 +4598,7 @@ ClassMethod NewMessageHeaderFromRow(rset As %SQL.IResultSet) As %DynamicObject [
     Set header.messageBodyClassName = rset.%Get("MessageBodyClassName")
     Set header.messageBodyId = rset.%Get("MessageBodyId")
     Set header.status = rset.%Get("Status")
+    Set header.statusLabel = ..MessageStatusLabel(header.status)
     Set header.isError = rset.%Get("IsError")
     Set header.errorStatus = rset.%Get("ErrorStatus")
     Set header.type = rset.%Get("Type")
@@ -4604,6 +4609,38 @@ ClassMethod NewMessageHeaderFromRow(rset As %SQL.IResultSet) As %DynamicObject [
     Set header.evidence = []
     Do header.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", header.messageId, "MessageBodyClassName", header.messageBodyClassName, "observed"))
     return header
+}
+
+ClassMethod MessageStatusLabel(status As %VarString) As %VarString [ Private ]
+{
+    If status = 1 {
+        return "Created"
+    }
+    If status = 2 {
+        return "Queued"
+    }
+    If status = 3 {
+        return "Delivered"
+    }
+    If status = 4 {
+        return "Discarded"
+    }
+    If status = 5 {
+        return "Suspended"
+    }
+    If status = 6 {
+        return "Deferred"
+    }
+    If status = 7 {
+        return "Aborted"
+    }
+    If status = 8 {
+        return "Error"
+    }
+    If status = 9 {
+        return "Completed"
+    }
+    return ""
 }
 
 ClassMethod NewProductionLogEntryFromRow(rset As %SQL.IResultSet, productionName As %VarString = "") As %DynamicObject [ Private ]
@@ -4682,6 +4719,7 @@ ClassMethod NewSessionTimelineMessageEvent(message As %DynamicObject, sequence A
     Set event.source = message.sourceConfigName
     Set event.target = message.targetConfigName
     Set event.status = message.status
+    Set event.statusLabel = message.statusLabel
     Set event.isError = message.isError
     Set event.text = "Message "_message.messageId_" moved from "_$Select(message.sourceConfigName'="":message.sourceConfigName,1:"unknown source")_" to "_$Select(message.targetConfigName'="":message.targetConfigName,1:"unknown target")_". Payload body content was not returned."
     Set event.confidence = "observed"
@@ -4930,6 +4968,7 @@ ClassMethod NewTraceStep(header As %DynamicObject, sequence As %Integer) As %Dyn
     Set step.target = header.targetConfigName
     Set step.messageBodyClassName = header.messageBodyClassName
     Set step.status = header.status
+    Set step.statusLabel = header.statusLabel
     Set step.isError = header.isError
     Set step.invocation = header.invocation
     Set step.correspondingMessageId = header.correspondingMessageId
@@ -4954,6 +4993,9 @@ ClassMethod BuildTraceStepText(header As %DynamicObject, sequence As %Integer) A
         Set text = text_". The message header is marked as an error"
     } Else {
         Set text = text_". The message header is not marked as an error"
+    }
+    If header.statusLabel '= "" {
+        Set text = text_" and has status "_header.status_" ("_header.statusLabel_")"
     }
     Set text = text_". Payload body content was not returned."
     return text
