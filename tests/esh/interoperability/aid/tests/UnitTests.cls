@@ -531,6 +531,12 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/ai/summary"), "Spec must expose AI summary endpoint")
     Do $$$AssertEquals(spec.paths.%Get("/productions/{productionName}/ai/summary").post.operationId, "GetProductionAISummary", "AI summary operationId mismatch")
     Do $$$AssertTrue(spec.definitions.%IsDefined("ProductionAISummaryResponse"), "Spec must define ProductionAISummaryResponse")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/ai/ask"), "Spec must expose AI ask endpoint")
+    Do $$$AssertEquals(spec.paths.%Get("/productions/{productionName}/ai/ask").post.operationId, "AskProductionAI", "AI ask operationId mismatch")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("ProductionAIAskRequest"), "Spec must define ProductionAIAskRequest")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("ProductionAIAskResponse"), "Spec must define ProductionAIAskResponse")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("RAGChunk"), "Spec must define RAGChunk")
+    Do $$$AssertTrue(spec.definitions.ProductionAIAskResponse.properties.%IsDefined("chunks"), "AI ask response must expose retrieved chunks")
     Do $$$AssertTrue(spec.definitions.%IsDefined("AnalysisSettings"), "Spec must define AnalysisSettings")
     Do $$$AssertTrue(spec.definitions.AnalysisSettings.properties.%IsDefined("messageResendEnabled"), "Spec settings must expose messageResendEnabled")
     Do $$$AssertTrue(spec.definitions.AnalysisSettings.properties.%IsDefined("payloadMetadataEnabled"), "Spec settings must expose payloadMetadataEnabled")
@@ -1457,6 +1463,28 @@ Method TestGetProductionAISummaryDisabled()
     Do $$$AssertTrue($IsObject(result), "Disabled AI summary response must be an object")
     Do $$$AssertEquals(%response.Status, 403, "Disabled AI provider should set 403")
     Do $$$AssertEquals(result.error.code, "AI_PROVIDER_DISABLED", "Disabled AI provider error code mismatch")
+}
+
+Method TestAskProductionAIInvalidQuestion()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).AskProductionAI("esh.interoperability.aid.tests.DemoProduction", {})
+    Do $$$AssertTrue($IsObject(result), "Invalid AI ask response must be an object")
+    Do $$$AssertEquals(%response.Status, 400, "Invalid AI ask should set 400")
+    Do $$$AssertEquals(result.error.code, "INVALID_AI_QUESTION", "Invalid AI ask error code mismatch")
+}
+
+Method TestAskProductionAIDisabled()
+{
+    Do ..InitRequestResponse()
+    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"payloadMetadataEnabled":1,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0,"aiSummaryEnabled":0,"aiProvider":"openai","aiModel":"gpt-4o-mini","aiEndpoint":"https://api.openai.com/v1/chat/completions","clearOpenAIApiKey":1}
+    Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
+    Do ..InitRequestResponse()
+    Set request = {"question":"Why does the production route messages?","componentName":"Patient Router","maxChunks":5}
+    Set result = ##class(esh.interoperability.aid.api.impl).AskProductionAI("esh.interoperability.aid.tests.DemoProduction", request)
+    Do $$$AssertTrue($IsObject(result), "Disabled AI ask response must be an object")
+    Do $$$AssertEquals(%response.Status, 403, "Disabled AI ask should set 403")
+    Do $$$AssertEquals(result.error.code, "AI_PROVIDER_DISABLED", "Disabled AI ask error code mismatch")
 }
 
 Method TestGetProductionGraph()

@@ -137,6 +137,19 @@ ClassMethod GetProductionAISummary(productionName As %String) As %DynamicObject
     return ..HandleAIResult(result)
 }
 
+/// Ask an AI-assisted question grounded in production analysis chunks
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     request<br/>
+ClassMethod AskProductionAI(productionName As %String, request As %DynamicObject) As %DynamicObject
+{
+    If '$IsObject(request) {
+        Set request = ..ReadJsonBody()
+    }
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).AskProductionAI(productionName, request)
+    return ..HandleAIResult(result)
+}
+
 /// Get production runtime status<br/>
 /// The method arguments hold values for:<br/>
 ///     productionName<br/>
@@ -588,6 +601,9 @@ ClassMethod HandleAIResult(result As %DynamicObject) As %DynamicObject [ Private
         }
         If result.errorCode = "AI_PROVIDER_DISABLED" {
             return ..Error(403, "AI_PROVIDER_DISABLED", "AI provider is disabled in module settings.")
+        }
+        If result.errorCode = "INVALID_AI_QUESTION" {
+            return ..Error(400, "INVALID_AI_QUESTION", "AI ask request requires a non-empty question.")
         }
         If result.errorCode = "AI_SUMMARY_DISABLED" {
             return ..Error(403, "AI_SUMMARY_DISABLED", "AI summary generation is disabled in module settings.")

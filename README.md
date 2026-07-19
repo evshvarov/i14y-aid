@@ -66,6 +66,7 @@ GET /i14y-aid/api/productions/{productionName}/components/{componentName}
 GET /i14y-aid/api/productions/{productionName}/analysis
 GET /i14y-aid/api/productions/{productionName}/summary
 POST /i14y-aid/api/productions/{productionName}/ai/summary
+POST /i14y-aid/api/productions/{productionName}/ai/ask
 GET /i14y-aid/api/productions/{productionName}/graph
 GET /i14y-aid/api/productions/{productionName}/status
 GET /i14y-aid/api/productions/{productionName}/logs
@@ -98,6 +99,7 @@ curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.t
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/analysis"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/summary"
 curl -X POST "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/ai/summary"
+curl -X POST "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/ai/ask" -H "Content-Type: application/json" -d '{"question":"Why does this production route messages?","componentName":"Patient Router","maxChunks":8}'
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/graph"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/logs?limit=10"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/messages?limit=10"
@@ -109,6 +111,8 @@ curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.t
 ```
 
 AI summaries are disabled by default. To enable them, turn on `aiProviderEnabled` and `aiSummaryEnabled` through `PUT /i14y-aid/api/settings` or the UI settings panel. The OpenAI API key can be supplied through the IRIS process environment as `OPENAI_API_KEY`, or saved from the UI settings panel. The settings API reports only `aiApiKeyConfigured` and `aiApiKeySource`; it never returns the stored key value.
+
+AI ask uses deterministic retrieval over production analysis chunks. The response includes the retrieved chunks and evidence used to ground the answer.
 
 ## Build And Test
 

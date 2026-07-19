@@ -1316,6 +1316,60 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "/productions/{productionName}/ai/ask": {
+      "post": {
+        "summary": "Ask an AI-assisted question grounded in production analysis chunks",
+        "operationId": "AskProductionAI",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ProductionAIAskRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AI-assisted production answer",
+            "schema": {
+              "$ref": "#/definitions/ProductionAIAskResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request or AI configuration",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "AI provider disabled",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "502": {
+            "description": "AI provider request failed",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/productions/{productionName}/status": {
       "get": {
         "summary": "Get production runtime status",
@@ -3882,6 +3936,127 @@ XData OpenAPI [ MimeType = application/json ]
           "type": "boolean"
         },
         "aiSummaryEnabled": {
+          "type": "boolean"
+        },
+        "aiApiKeyConfigured": {
+          "type": "boolean"
+        },
+        "aiApiKeySource": {
+          "type": "string"
+        },
+        "rawUsage": {
+          "type": "object"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "ProductionAIAskRequest": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string"
+        },
+        "componentName": {
+          "type": "string"
+        },
+        "maxChunks": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "RAGChunk": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "component": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "score": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "ProductionAIAskResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "question": {
+          "type": "string"
+        },
+        "componentName": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "generated": {
+          "type": "boolean"
+        },
+        "answer": {
+          "type": "string"
+        },
+        "chunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "totalChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "chunks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RAGChunk"
+          }
+        },
+        "aiProviderEnabled": {
           "type": "boolean"
         },
         "aiApiKeyConfigured": {

@@ -315,6 +315,98 @@ ClassMethod GetProductionAISummary(productionName As %VarString) As %DynamicObje
     return result
 }
 
+ClassMethod AskProductionAI(productionName As %VarString, request As %DynamicObject) As %DynamicObject
+{
+    Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.productionName = productionName
+    Set result.provider = settings.aiProvider
+    Set result.model = settings.aiModel
+    Set result.generated = 0
+    Set result.aiProviderEnabled = settings.aiProviderEnabled
+    Set result.aiApiKeyConfigured = settings.aiApiKeyConfigured
+    Set result.aiApiKeySource = settings.aiApiKeySource
+    Set result.warnings = []
+    Set result.evidence = []
+    Set result.chunks = []
+    Set result.confidence = "inferred"
+
+    If '..IsValidClassName(productionName) {
+        Do result.%Set("errorCode", "INVALID_PRODUCTION_NAME")
+        return result
+    }
+    If '..ClassExtends(productionName, "Ens.Production") {
+        Do result.%Set("errorCode", "PRODUCTION_NOT_FOUND")
+        return result
+    }
+    If '$IsObject(request) {
+        Do result.%Set("errorCode", "INVALID_AI_QUESTION")
+        return result
+    }
+
+    Set question = $ZStrip($Extract(request.%Get("question"), 1, 1000), "<>W")
+    If question = "" {
+        Do result.%Set("errorCode", "INVALID_AI_QUESTION")
+        return result
+    }
+    Set componentName = $ZStrip($Extract(request.%Get("componentName"), 1, 200), "<>W")
+    Set maxChunks = +request.%Get("maxChunks")
+    If maxChunks < 1 {
+        Set maxChunks = 12
+    }
+    If maxChunks > 30 {
+        Set maxChunks = 30
+    }
+    Set result.question = question
+    Set result.componentName = componentName
+    Set result.maxChunks = maxChunks
+
+    If 'settings.aiProviderEnabled {
+        Do result.%Set("errorCode", "AI_PROVIDER_DISABLED")
+        Do result.warnings.%Push(..NewWarning("AI_PROVIDER_DISABLED", "AI provider is disabled in module settings."))
+        return result
+    }
+    If settings.aiProvider '= "openai" {
+        Do result.%Set("errorCode", "AI_PROVIDER_UNSUPPORTED")
+        Do result.warnings.%Push(..NewWarning("AI_PROVIDER_UNSUPPORTED", "Only the OpenAI provider is supported in this release."))
+        return result
+    }
+
+    Set apiKey = ##class(esh.interoperability.aid.config.Settings).EffectiveOpenAIKey()
+    If apiKey = "" {
+        Do result.%Set("errorCode", "AI_API_KEY_NOT_CONFIGURED")
+        Do result.warnings.%Push(..NewWarning("AI_API_KEY_NOT_CONFIGURED", "Set OPENAI_API_KEY in the IRIS environment or save an OpenAI key in settings."))
+        return result
+    }
+
+    Set analysis = ..GetProductionAnalysis(productionName)
+    If analysis.%IsDefined("errorCode") {
+        return analysis
+    }
+    Set allChunks = ..BuildProductionRAGChunks(analysis)
+    Set result.chunks = ..RetrieveRAGChunks(allChunks, question, componentName, maxChunks)
+    Set result.chunkCount = result.chunks.%Size()
+    Set result.totalChunkCount = allChunks.%Size()
+    Do result.evidence.%Push(..NewEvidence("rag-index", productionName, productionName, "chunks", result.chunks.%Size()_" of "_allChunks.%Size(), "inferred"))
+
+    Set prompt = ..BuildAIAskPrompt(question, result.chunks)
+    Set systemPrompt = "Answer questions about an InterSystems IRIS interoperability production using only the provided retrieved chunks. If the chunks do not contain enough evidence, say what is missing. Do not invent components, routes, payloads, credentials, or runtime facts."
+    Set aiResponse = ..CallOpenAIChat(settings.aiEndpoint, settings.aiModel, apiKey, prompt, systemPrompt)
+    If aiResponse.%IsDefined("errorCode") {
+        Do result.%Set("errorCode", aiResponse.errorCode)
+        Do result.%Set("statusText", aiResponse.statusText)
+        Do result.warnings.%Push(..NewWarning(aiResponse.errorCode, aiResponse.statusText))
+        return result
+    }
+
+    Set result.generated = 1
+    Set result.answer = aiResponse.text
+    Set result.rawUsage = aiResponse.usage
+    Do result.evidence.%Push(..NewEvidence("ai-provider", settings.aiProvider, productionName, "model", settings.aiModel, "inferred"))
+    return result
+}
+
 ClassMethod GetComponentDetail(productionName As %VarString, componentName As %VarString) As %DynamicObject
 {
     Set result = {}
@@ -2457,7 +2549,221 @@ ClassMethod BuildAISummaryPrompt(analysis As %DynamicObject) As %VarString [ Pri
     return $Extract(prompt, 1, 12000)
 }
 
-ClassMethod CallOpenAIChat(endpoint As %VarString, model As %VarString, apiKey As %VarString, prompt As %VarString) As %DynamicObject [ Private ]
+ClassMethod BuildProductionRAGChunks(analysis As %DynamicObject) As %DynamicArray [ Private ]
+{
+    Set chunks = []
+    Do chunks.%Push(..NewRAGChunk("production-summary", "summary", analysis.productionName, analysis.summary, analysis.productionName, analysis.productionName, "confirmed", analysis.evidence))
+
+    If $IsObject(analysis.summaryBullets) {
+        Set text = ..JoinArrayWithSeparator(analysis.summaryBullets, "; ")
+        If text '= "" {
+            Do chunks.%Push(..NewRAGChunk("production-bullets", "summary", "Summary bullets", text, analysis.productionName, analysis.productionName, "confirmed", analysis.evidence))
+        }
+    }
+    If $IsObject(analysis.components) {
+        For index = 0:1:analysis.components.%Size()-1 {
+            Set component = analysis.components.%Get(index)
+            Continue:'$IsObject(component)
+            Set text = "Component "_component.name_" is a "_component.type_" using class "_component.className_". Enabled: "_component.enabled_"."
+            If component.%IsDefined("adapterClass") && (component.adapterClass '= "") {
+                Set text = text_" Adapter: "_component.adapterClass_"."
+            }
+            If component.%IsDefined("protocol") && (component.protocol '= "") {
+                Set text = text_" Protocol: "_component.protocol_"."
+            }
+            Do chunks.%Push(..NewRAGChunk("component-"_component.name, "component", component.name, text, component.className, component.name, component.confidence, component.evidence))
+        }
+    }
+    If $IsObject(analysis.componentExplanations) {
+        For index = 0:1:analysis.componentExplanations.%Size()-1 {
+            Set explanation = analysis.componentExplanations.%Get(index)
+            Continue:'$IsObject(explanation)
+            Do chunks.%Push(..NewRAGChunk("component-explanation-"_explanation.component, "component-explanation", explanation.component, explanation.text, "component-explanation", explanation.component, explanation.confidence, explanation.evidence))
+        }
+    }
+    If $IsObject(analysis.connections) {
+        For index = 0:1:analysis.connections.%Size()-1 {
+            Set connection = analysis.connections.%Get(index)
+            Continue:'$IsObject(connection)
+            Set text = connection.from_" connects to "_connection.to_" via "_connection.kind_"."
+            If connection.%IsDefined("ruleName") && (connection.ruleName '= "") {
+                Set text = text_" Rule: "_connection.ruleName_"."
+            }
+            If connection.%IsDefined("processClass") && (connection.processClass '= "") {
+                Set text = text_" Process class: "_connection.processClass_"."
+            }
+            Do chunks.%Push(..NewRAGChunk("connection-"_index, "connection", connection.from_" to "_connection.to, text, analysis.productionName, connection.from, connection.confidence, connection.evidence))
+        }
+    }
+    If $IsObject(analysis.connectionExplanations) {
+        For index = 0:1:analysis.connectionExplanations.%Size()-1 {
+            Set explanation = analysis.connectionExplanations.%Get(index)
+            Continue:'$IsObject(explanation)
+            Do chunks.%Push(..NewRAGChunk("connection-explanation-"_index, "connection-explanation", explanation.from_" to "_explanation.to, explanation.text, "connection-explanation", explanation.from, explanation.confidence, explanation.evidence))
+        }
+    }
+    If $IsObject(analysis.externalSystems) {
+        For index = 0:1:analysis.externalSystems.%Size()-1 {
+            Set external = analysis.externalSystems.%Get(index)
+            Continue:'$IsObject(external)
+            Set text = external.component_" has external "_external.kind_" setting "_external.field_" = "_external.value_"."
+            Do chunks.%Push(..NewRAGChunk("external-"_index, "external-system", external.component_" "_external.field, text, external.source, external.component, external.confidence, external.evidence))
+        }
+    }
+    If $IsObject(analysis.rules) {
+        For index = 0:1:analysis.rules.%Size()-1 {
+            Set rule = analysis.rules.%Get(index)
+            Continue:'$IsObject(rule)
+            Set text = "Routing rule "_rule.name_" is used by "_rule.component_"."
+            If $IsObject(rule.sends) {
+                Set targets = []
+                For sendIndex = 0:1:rule.sends.%Size()-1 {
+                    Set send = rule.sends.%Get(sendIndex)
+                    Continue:'$IsObject(send)
+                    Do targets.%Push(send.target)
+                }
+                Set text = text_" Targets: "_..JoinArrayWithSeparator(targets, ", ")_"."
+            }
+            Do chunks.%Push(..NewRAGChunk("rule-"_rule.name, "routing-rule", rule.name, text, rule.name, rule.component, rule.confidence, rule.evidence))
+        }
+    }
+    If $IsObject(analysis.ruleExplanations) {
+        For index = 0:1:analysis.ruleExplanations.%Size()-1 {
+            Set explanation = analysis.ruleExplanations.%Get(index)
+            Continue:'$IsObject(explanation)
+            Do chunks.%Push(..NewRAGChunk("rule-explanation-"_explanation.name, "routing-rule-explanation", explanation.name, explanation.text, explanation.name, explanation.component, explanation.confidence, explanation.evidence))
+        }
+    }
+    If $IsObject(analysis.messageTypes) {
+        For index = 0:1:analysis.messageTypes.%Size()-1 {
+            Set messageType = analysis.messageTypes.%Get(index)
+            Continue:'$IsObject(messageType)
+            Set text = messageType.component_" "_messageType.direction_" message type "_messageType.messageClass_" from "_messageType.method_"."
+            Do chunks.%Push(..NewRAGChunk("message-type-"_index, "message-type", messageType.component_" "_messageType.messageClass, text, messageType.className, messageType.component, messageType.confidence, messageType.evidence))
+        }
+    }
+    If $IsObject(analysis.transformations) {
+        For index = 0:1:analysis.transformations.%Size()-1 {
+            Set transform = analysis.transformations.%Get(index)
+            Continue:'$IsObject(transform)
+            Set text = "DTL "_transform.name_" maps "_transform.sourceClass_" to "_transform.targetClass_" for "_transform.component_". Assignment count: "_transform.assignmentCount_"."
+            Do chunks.%Push(..NewRAGChunk("transformation-"_transform.name, "transformation", transform.name, text, transform.name, transform.component, transform.confidence, transform.evidence))
+        }
+    }
+    If $IsObject(analysis.businessProcesses) {
+        For index = 0:1:analysis.businessProcesses.%Size()-1 {
+            Set process = analysis.businessProcesses.%Get(index)
+            Continue:'$IsObject(process)
+            Set text = "Business process "_process.name_" for component "_process.component_" has "_process.callCount_" calls and "_process.assignCount_" assignments."
+            Do chunks.%Push(..NewRAGChunk("business-process-"_process.name, "business-process", process.name, text, process.name, process.component, process.confidence, process.evidence))
+        }
+    }
+    If $IsObject(analysis.warnings) {
+        For index = 0:1:analysis.warnings.%Size()-1 {
+            Set warning = analysis.warnings.%Get(index)
+            Continue:'$IsObject(warning)
+            Do chunks.%Push(..NewRAGChunk("warning-"_index, "warning", warning.code, warning.message, analysis.productionName, analysis.productionName, "observed", []))
+        }
+    }
+    return chunks
+}
+
+ClassMethod NewRAGChunk(chunkId As %VarString, kind As %VarString, title As %VarString, text As %VarString, source As %VarString, component As %VarString, confidence As %VarString, evidence) As %DynamicObject [ Private ]
+{
+    Set chunk = {}
+    Set chunk.id = chunkId
+    Set chunk.kind = kind
+    Set chunk.title = title
+    Set chunk.text = $Extract(text, 1, 2000)
+    Set chunk.source = source
+    Set chunk.component = component
+    Set chunk.confidence = $Select(confidence'="":confidence,1:"inferred")
+    If $IsObject(evidence) {
+        Set chunk.evidence = evidence
+    } Else {
+        Set chunk.evidence = []
+    }
+    return chunk
+}
+
+ClassMethod RetrieveRAGChunks(chunks As %DynamicArray, question As %VarString, componentName As %VarString, maxChunks As %Integer) As %DynamicArray [ Private ]
+{
+    Set result = []
+    Set normalizedQuestion = $ZConvert(question, "L")
+    For index = 0:1:chunks.%Size()-1 {
+        Quit:(result.%Size() >= maxChunks)
+        Set chunk = chunks.%Get(index)
+        Continue:'$IsObject(chunk)
+        If componentName '= "" {
+            Continue:'..RAGChunkMatchesComponent(chunk, componentName)
+        }
+        Set score = ..RAGChunkScore(chunk, normalizedQuestion)
+        Continue:(score < 1)
+        Set chunk.score = score
+        Do result.%Push(chunk)
+    }
+    If result.%Size() = 0 {
+        For index = 0:1:chunks.%Size()-1 {
+            Quit:(result.%Size() >= maxChunks)
+            Set chunk = chunks.%Get(index)
+            Continue:'$IsObject(chunk)
+            If componentName '= "" {
+                Continue:'..RAGChunkMatchesComponent(chunk, componentName)
+            }
+            Set chunk.score = 0
+            Do result.%Push(chunk)
+        }
+    }
+    return result
+}
+
+ClassMethod RAGChunkMatchesComponent(chunk As %DynamicObject, componentName As %VarString) As %Boolean [ Private ]
+{
+    If chunk.component = componentName {
+        return 1
+    }
+    If chunk.text [ componentName {
+        return 1
+    }
+    If chunk.title [ componentName {
+        return 1
+    }
+    return 0
+}
+
+ClassMethod RAGChunkScore(chunk As %DynamicObject, normalizedQuestion As %VarString) As %Integer [ Private ]
+{
+    Set haystack = $ZConvert(chunk.kind_" "_chunk.title_" "_chunk.text_" "_chunk.component, "L")
+    Set score = 0
+    For index = 1:1:$Length(normalizedQuestion, " ") {
+        Set term = $ZStrip($Piece(normalizedQuestion, " ", index), "<>P")
+        Continue:($Length(term) < 3)
+        If haystack [ term {
+            Set score = score + 1
+        }
+    }
+    If score = 0 {
+        If (chunk.kind = "summary") || (chunk.kind = "component") || (chunk.kind = "connection") {
+            Set score = 1
+        }
+    }
+    return score
+}
+
+ClassMethod BuildAIAskPrompt(question As %VarString, chunks As %DynamicArray) As %VarString [ Private ]
+{
+    Set prompt = "Question: "_question_$Char(10,10)_"Retrieved chunks:"_$Char(10)
+    For index = 0:1:chunks.%Size()-1 {
+        Set chunk = chunks.%Get(index)
+        Continue:'$IsObject(chunk)
+        Set prompt = prompt_"["_(index+1)_"] id="_chunk.id_"; kind="_chunk.kind_"; component="_chunk.component_"; source="_chunk.source_"; confidence="_chunk.confidence_$Char(10)
+        Set prompt = prompt_chunk.text_$Char(10,10)
+    }
+    Set prompt = prompt_"Answer with concise paragraphs. Include chunk ids in parentheses when making factual claims."
+    return $Extract(prompt, 1, 12000)
+}
+
+ClassMethod CallOpenAIChat(endpoint As %VarString, model As %VarString, apiKey As %VarString, prompt As %VarString, systemPrompt As %VarString = "") As %DynamicObject [ Private ]
 {
     Set result = {}
     Set result.text = ""
@@ -2473,7 +2779,7 @@ ClassMethod CallOpenAIChat(endpoint As %VarString, model As %VarString, apiKey A
     Set request.Port = endpointParts.port
     Set request.Https = endpointParts.https
     If request.Https {
-        Set request.SSLConfiguration = "DefaultSSL"
+        Set request.SSLConfiguration = "default"
     }
     Set request.ContentType = "application/json"
     Do request.SetHeader("Authorization", "Bearer "_apiKey)
@@ -2483,7 +2789,10 @@ ClassMethod CallOpenAIChat(endpoint As %VarString, model As %VarString, apiKey A
     Set payload.model = model
     Set payload.temperature = 0.2
     Set payload.messages = []
-    Do payload.messages.%Push({"role":"system","content":"You summarize deterministic IRIS interoperability analysis. Keep secrets out of the answer."})
+    If systemPrompt = "" {
+        Set systemPrompt = "You summarize deterministic IRIS interoperability analysis. Keep secrets out of the answer."
+    }
+    Do payload.messages.%Push({"role":"system","content":(systemPrompt)})
     Do payload.messages.%Push({"role":"user","content":(prompt)})
     Do request.EntityBody.Write(payload.%ToJSON())
 
