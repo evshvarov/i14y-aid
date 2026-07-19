@@ -803,6 +803,68 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "/productions/{productionName}/sessions/{sessionId}/timeline": {
+      "get": {
+        "summary": "Get production-scoped session timeline from messages and logs",
+        "operationId": "GetProductionSessionTimeline",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 100
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Production-scoped session timeline",
+            "schema": {
+              "$ref": "#/definitions/SessionTimelineResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/productions/{productionName}/messages/{messageId}/resend": {
       "post": {
         "summary": "Request production-scoped message resend",
@@ -1070,14 +1132,6 @@ XData OpenAPI [ MimeType = application/json ]
             "in": "path",
             "required": true,
             "type": "string"
-          },
-          {
-            "name": "request",
-            "in": "body",
-            "required": false,
-            "schema": {
-              "$ref": "#/definitions/RAGIndexRebuildRequest"
-            }
           }
         ],
         "responses": {
@@ -1112,14 +1166,6 @@ XData OpenAPI [ MimeType = application/json ]
             "in": "path",
             "required": true,
             "type": "string"
-          },
-          {
-            "name": "request",
-            "in": "body",
-            "required": false,
-            "schema": {
-              "$ref": "#/definitions/RAGIndexRebuildRequest"
-            }
           }
         ],
         "responses": {
@@ -2904,6 +2950,181 @@ XData OpenAPI [ MimeType = application/json ]
           "format": "int32"
         },
         "typeFacetCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "warningCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "evidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "confirmedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "observedEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "inferredEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "unknownEvidenceCount": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "SessionTimelineResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "startDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payloadReturned": {
+          "type": "boolean"
+        },
+        "runtimeMessageAnalysisEnabled": {
+          "type": "boolean"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessageHeader"
+          }
+        },
+        "logs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProductionLogEntry"
+          }
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SessionTimelineEvent"
+          }
+        },
+        "messageCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "logCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "eventCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "metrics": {
+          "$ref": "#/definitions/SessionTimelineMetrics"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        },
+        "confidence": {
+          "type": "string"
+        }
+      }
+    },
+    "SessionTimelineEvent": {
+      "type": "object",
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "type": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "messageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "logId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "isError": {
+          "type": "boolean"
+        },
+        "text": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "SessionTimelineMetrics": {
+      "type": "object",
+      "properties": {
+        "messageCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "logCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "eventCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "errorCount": {
           "type": "integer",
           "format": "int32"
         },
@@ -4822,6 +5043,12 @@ XData OpenAPI [ MimeType = application/json ]
       "properties": {
         "chunkId": {
           "type": "string"
+        },
+        "originalCitation": {
+          "type": "string"
+        },
+        "normalized": {
+          "type": "boolean"
         },
         "kind": {
           "type": "string"

@@ -82,6 +82,7 @@ GET /i14y-aid/api/productions/{productionName}/messages/{messageId}/payload
 GET /i14y-aid/api/productions/{productionName}/messages/{messageId}/payload/preview
 GET /i14y-aid/api/productions/{productionName}/messages/{messageId}/trace
 GET /i14y-aid/api/productions/{productionName}/messages/{messageId}/session
+GET /i14y-aid/api/productions/{productionName}/sessions/{sessionId}/timeline
 GET /i14y-aid/api/productions/{productionName}/messages/{messageId}/explanation
 POST /i14y-aid/api/productions/{productionName}/messages/{messageId}/resend
 POST /i14y-aid/api/productions/{productionName}/start

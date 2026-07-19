@@ -136,6 +136,15 @@ ClassMethod GetProductionGraph(productionName As %String) As %DynamicObject
 ///     maxChunks<br/>
 ClassMethod GetProductionRAGContext(productionName As %String, question As %String = "", componentName As %String = "", maxChunks As %Integer = 12) As %DynamicObject
 {
+    If '$Data(question) {
+        Set question = ""
+    }
+    If '$Data(componentName) {
+        Set componentName = ""
+    }
+    If '$Data(maxChunks) {
+        Set maxChunks = 12
+    }
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionRAGContext(productionName, question, componentName, maxChunks)
     return ..HandleProductionResult(result)
 }
@@ -547,6 +556,28 @@ ClassMethod GetProductionMessageSessionSummary(productionName As %String, messag
     return ..HandleRuntimeResult(result)
 }
 
+/// Get production-scoped session timeline from messages and logs<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     sessionId<br/>
+///     limit<br/>
+///     startDate<br/>
+///     endDate<br/>
+ClassMethod GetProductionSessionTimeline(productionName As %String, sessionId As %String, limit As %Integer = 100, startDate As %String, endDate As %String) As %DynamicObject
+{
+    If '$Data(limit) {
+        Set limit = 100
+    }
+    If '$Data(startDate) {
+        Set startDate = ""
+    }
+    If '$Data(endDate) {
+        Set endDate = ""
+    }
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionSessionTimeline(productionName, sessionId, limit, startDate, endDate)
+    return ..HandleRuntimeResult(result)
+}
+
 /// Request production-scoped message resend<br/>
 /// The method arguments hold values for:<br/>
 ///     productionName<br/>
@@ -611,6 +642,9 @@ ClassMethod HandleRuntimeResult(result As %DynamicObject) As %DynamicObject [ Pr
         }
         If result.errorCode = "INVALID_MESSAGE_ID" {
             return ..Error(400, "INVALID_MESSAGE_ID", "Invalid messageId.")
+        }
+        If result.errorCode = "INVALID_SESSION_ID" {
+            return ..Error(400, "INVALID_SESSION_ID", "Invalid sessionId.")
         }
         If result.errorCode = "MESSAGE_NOT_FOUND" {
             return ..Error(404, "MESSAGE_NOT_FOUND", "The requested interoperability message header was not found.")

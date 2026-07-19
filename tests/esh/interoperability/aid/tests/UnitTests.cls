@@ -240,6 +240,22 @@ Method FindParameter(items As %DynamicArray, parameterName As %VarString) As %Dy
     return found
 }
 
+Method HasBodyParameter(items As %DynamicArray) As %Boolean [ Private ]
+{
+    If '$IsObject(items) {
+        return 0
+    }
+    For index = 0:1:items.%Size()-1 {
+        Set item = items.%Get(index)
+        If $IsObject(item) {
+            If item.%Get("in") = "body" {
+                return 1
+            }
+        }
+    }
+    return 0
+}
+
 Method FindPayloadPreviewField(items As %DynamicArray, fieldName As %VarString) As %DynamicObject [ Private ]
 {
     Set found = ""
@@ -367,6 +383,7 @@ Method CreateRuntimeMessage(sourceConfigName As %VarString, targetConfigName As 
     }
 
     Set result.messageId = header.%Id()
+    Set result.sessionId = header.SessionId
     Set result.bodyId = body.%Id()
     return result
 }
@@ -389,7 +406,9 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.definitions.ProductionListResponse.properties.%IsDefined("metrics"), "Production list response must expose metrics")
     Do $$$AssertTrue(spec.definitions.ProductionListMetrics.properties.%IsDefined("runningProductionCount"), "ProductionListMetrics must expose runningProductionCount")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}"), "Spec must expose production detail endpoint")
+    Do $$$AssertTrue('..HasBodyParameter(spec.paths.%Get("/productions/{productionName}").get.parameters), "Production detail GET must not require a request body")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/components"), "Spec must expose component endpoint")
+    Do $$$AssertTrue('..HasBodyParameter(spec.paths.%Get("/productions/{productionName}/components").get.parameters), "Production components GET must not require a request body")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/components/{componentName}"), "Spec must expose component detail endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/analysis"), "Spec must expose production analysis endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/summary"), "Spec must expose production summary endpoint")
@@ -418,6 +437,8 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/{messageId}/payload/preview"), "Spec must expose production-scoped message payload preview endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/{messageId}/trace"), "Spec must expose production-scoped message trace endpoint")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/{messageId}/session"), "Spec must expose production-scoped message session summary endpoint")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/sessions/{sessionId}/timeline"), "Spec must expose production-scoped session timeline endpoint")
+    Do $$$AssertEquals(spec.paths.%Get("/productions/{productionName}/sessions/{sessionId}/timeline").get.operationId, "GetProductionSessionTimeline", "Session timeline operationId mismatch")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/{messageId}/resend"), "Spec must expose production-scoped message resend endpoint")
     Do $$$AssertEquals(spec.paths.%Get("/productions/{productionName}/messages/{messageId}/resend").post.operationId, "ResendProductionMessage", "Message resend operationId mismatch")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/messages/{messageId}/explanation"), "Spec must expose production-scoped message explanation endpoint")
@@ -445,6 +466,9 @@ Method TestGetSpec()
     Set productionLogParameters = spec.paths.%Get("/productions/{productionName}/logs").get.parameters
     Do $$$AssertTrue($IsObject(..FindParameter(productionLogParameters, "startDate")), "Spec must expose production logs startDate filter")
     Do $$$AssertTrue($IsObject(..FindParameter(productionLogParameters, "endDate")), "Spec must expose production logs endDate filter")
+    Set timelineParameters = spec.paths.%Get("/productions/{productionName}/sessions/{sessionId}/timeline").get.parameters
+    Do $$$AssertTrue($IsObject(..FindParameter(timelineParameters, "startDate")), "Spec must expose session timeline startDate filter")
+    Do $$$AssertTrue($IsObject(..FindParameter(timelineParameters, "endDate")), "Spec must expose session timeline endDate filter")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageDetailResponse"), "Spec must define MessageDetailResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessagePayloadMetadataResponse"), "Spec must define MessagePayloadMetadataResponse")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessagePayloadPreviewResponse"), "Spec must define MessagePayloadPreviewResponse")
@@ -466,6 +490,10 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.definitions.MessageFacetResponse.properties.%IsDefined("metrics"), "Message facets response must expose metrics")
     Do $$$AssertTrue(spec.definitions.MessageListMetrics.properties.%IsDefined("errorCount"), "MessageListMetrics must expose errorCount")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageSessionSummaryResponse"), "Spec must define MessageSessionSummaryResponse")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("SessionTimelineResponse"), "Spec must define SessionTimelineResponse")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("SessionTimelineEvent"), "Spec must define SessionTimelineEvent")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("SessionTimelineMetrics"), "Spec must define SessionTimelineMetrics")
+    Do $$$AssertTrue(spec.definitions.SessionTimelineResponse.properties.%IsDefined("metrics"), "Session timeline response must expose metrics")
     Do $$$AssertTrue(spec.definitions.%IsDefined("MessageResendResponse"), "Spec must define MessageResendResponse")
     Do $$$AssertTrue(spec.definitions.MessageResendResponse.properties.%IsDefined("statusText"), "Message resend response must expose statusText")
     Do $$$AssertTrue(spec.definitions.MessageResendResponse.properties.%IsDefined("metrics"), "Message resend response must expose metrics")
@@ -1188,6 +1216,51 @@ Method TestGetProductionMessageSessionSummaryInvalidId()
     Do $$$AssertEquals(result.error.code, "INVALID_MESSAGE_ID", "Invalid production-scoped message session id error code mismatch")
 }
 
+Method TestGetProductionSessionTimelineInvalidSessionId()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetProductionSessionTimeline("esh.interoperability.aid.tests.DemoProduction", "bad", 20)
+    Do $$$AssertTrue($IsObject(result), "Invalid production-scoped session timeline response must be an object")
+    Do $$$AssertEquals(%response.Status, 400, "Invalid production-scoped session timeline session id should set 400")
+    Do $$$AssertEquals(result.error.code, "INVALID_SESSION_ID", "Invalid production-scoped session timeline error code mismatch")
+}
+
+Method TestGetProductionSessionTimeline()
+{
+    Do ..InitRequestResponse()
+    Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"payloadMetadataEnabled":1,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0,"aiSummaryEnabled":0,"aiProvider":"openai","aiModel":"gpt-4o-mini","aiEndpoint":"https://api.openai.com/v1/chat/completions","clearOpenAIApiKey":1}
+    Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)
+    Set fixture = ..CreateRuntimeMessage("Patient Router", "FHIR Operation")
+    Do $$$AssertTrue('fixture.%IsDefined("errorCode"), "Session timeline fixture should save successfully")
+
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetProductionSessionTimeline("esh.interoperability.aid.tests.DemoProduction", fixture.sessionId, 20)
+    Do ##class(Ens.MessageHeader).%DeleteId(fixture.messageId)
+    Do ##class(esh.interoperability.aid.tests.DemoMessage).%DeleteId(fixture.bodyId)
+
+    Do $$$AssertTrue($IsObject(result), "Production-scoped session timeline response must be an object")
+    Do $$$AssertEquals(result.productionName, "esh.interoperability.aid.tests.DemoProduction", "Session timeline production mismatch")
+    Do $$$AssertEquals(result.sessionId, fixture.sessionId, "Session timeline session id mismatch")
+    Do $$$AssertEquals(result.payloadReturned, 0, "Session timeline must not return payload bodies")
+    Do $$$AssertTrue($IsObject(result.messages), "Session timeline messages must be an array")
+    Do $$$AssertTrue($IsObject(result.logs), "Session timeline logs must be an array")
+    Do $$$AssertTrue($IsObject(result.events), "Session timeline events must be an array")
+    Do $$$AssertTrue(result.messageCount > 0, "Session timeline should include message headers")
+    Do $$$AssertTrue(result.eventCount >= result.messageCount, "Session timeline event count should include messages")
+    Do $$$AssertTrue($IsObject(result.metrics), "Session timeline metrics must be an object")
+    If $IsObject(result.metrics) {
+        Do $$$AssertEquals(result.metrics.messageCount, result.messageCount, "Session timeline metric message count mismatch")
+        Do $$$AssertEquals(result.metrics.eventCount, result.eventCount, "Session timeline metric event count mismatch")
+        Do $$$AssertTrue(result.metrics.evidenceCount > 0, "Session timeline metrics evidence count should be populated")
+        Do $$$AssertEquals(result.metrics.evidenceCount, result.metrics.confirmedEvidenceCount + result.metrics.observedEvidenceCount + result.metrics.inferredEvidenceCount + result.metrics.unknownEvidenceCount, "Session timeline metrics evidence confidence total mismatch")
+    }
+    If result.events.%Size() > 0 {
+        Set event = result.events.%Get(0)
+        Do $$$AssertEquals(event.type, "message", "Session timeline first event should be the fixture message")
+        Do $$$AssertEquals(event.messageId, fixture.messageId, "Session timeline first event message id mismatch")
+    }
+}
+
 Method TestGetProductionMessageSessionSummaryStaticContext()
 {
     Do ..InitRequestResponse()
@@ -1522,6 +1595,13 @@ Method TestGetProductionRAGContext()
         Do $$$AssertEquals(result.metrics.retrievedChunkCount, result.retrievedChunkCount, "RAG context metric retrieved count mismatch")
         Do $$$AssertTrue(result.metrics.componentChunkCount > 0, "RAG context should include component chunks")
     }
+
+    Do ..InitRequestResponse()
+    Set omittedComponent = ##class(esh.interoperability.aid.api.impl).GetProductionRAGContext("esh.interoperability.aid.tests.DemoProduction", "How are services connected to operations?", , 8)
+    Do $$$AssertTrue($IsObject(omittedComponent), "RAG context without componentName must be an object")
+    Do $$$AssertEquals(omittedComponent.productionName, "esh.interoperability.aid.tests.DemoProduction", "RAG context without componentName production mismatch")
+    Do $$$AssertEquals(omittedComponent.componentName, "", "RAG context omitted componentName should normalize to blank")
+    Do $$$AssertTrue(omittedComponent.retrievedChunkCount <= 8, "RAG context without componentName should honor maxChunks")
 }
 
 Method TestRebuildAndListProductionRAGIndex()
@@ -1682,6 +1762,16 @@ Method TestValidateAIAnswerCitations()
     Do $$$AssertEquals(grounded.uncitedChunkIds.%Size(), 1, "Grounded uncited chunk count mismatch")
     Do $$$AssertEquals(grounded.uncitedChunkIds.%Get(0), "summary", "Grounded uncited chunk id mismatch")
     Do $$$AssertEquals(grounded.answerGrounded, 1, "Grounded answer flag mismatch")
+
+    Set ordinal = ##class(esh.interoperability.aid.service.ProductionDiscovery).ValidateAIAnswerCitations("The second retrieved chunk describes routing [2].", chunks)
+    Do $$$AssertEquals(ordinal.citationCount, 1, "Ordinal citation count mismatch")
+    Do $$$AssertEquals(ordinal.invalidCitationCount, 0, "Ordinal citation should be normalized, not invalid")
+    Do $$$AssertEquals(ordinal.citations.%Get(0).chunkId, "component-Patient Router", "Ordinal citation canonical chunk id mismatch")
+    Do $$$AssertEquals(ordinal.citations.%Get(0).originalCitation, "2", "Ordinal citation original marker mismatch")
+    Do $$$AssertEquals(ordinal.citations.%Get(0).normalized, 1, "Ordinal citation normalized flag mismatch")
+    Do $$$AssertEquals(ordinal.uncitedChunkIds.%Size(), 1, "Ordinal citation uncited count mismatch")
+    Do $$$AssertEquals(ordinal.uncitedChunkIds.%Get(0), "summary", "Ordinal citation uncited chunk mismatch")
+    Do $$$AssertEquals(ordinal.answerGrounded, 1, "Ordinal citation answer flag mismatch")
 }
 
 Method TestAskProductionAIInvalidQuestion()

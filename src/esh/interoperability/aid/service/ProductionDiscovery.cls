@@ -1659,6 +1659,112 @@ ClassMethod GetProductionMessageSessionSummary(productionName As %VarString, mes
     return ..NewMessageSessionSummaryFromTrace(trace, productionName)
 }
 
+ClassMethod GetProductionSessionTimeline(productionName As %VarString, sessionId As %VarString, limit As %Integer = 100, startDate As %VarString = "", endDate As %VarString = "") As %DynamicObject
+{
+    Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.productionName = productionName
+    Set result.sessionId = sessionId
+    Set result.limit = ..NormalizeLimitWithMaximum(limit, 100, 500)
+    Set result.startDate = ""
+    Set result.endDate = ""
+    Set result.payloadReturned = 0
+    Set result.runtimeMessageAnalysisEnabled = settings.runtimeMessageAnalysisEnabled
+    Set result.messages = []
+    Set result.logs = []
+    Set result.events = []
+    Set result.messageCount = 0
+    Set result.logCount = 0
+    Set result.eventCount = 0
+    Set result.warnings = []
+    Set result.evidence = []
+    Set result.confidence = "observed"
+
+    If 'settings.runtimeMessageAnalysisEnabled {
+        Do result.%Set("errorCode", "RUNTIME_MESSAGE_ANALYSIS_DISABLED")
+        Set result.metrics = ..BuildSessionTimelineMetrics(result)
+        return result
+    }
+    If '..IsValidClassName(productionName) {
+        Do result.%Set("errorCode", "INVALID_PRODUCTION_NAME")
+        Set result.metrics = ..BuildSessionTimelineMetrics(result)
+        return result
+    }
+    If '..ClassExtends(productionName, "Ens.Production") {
+        Do result.%Set("errorCode", "PRODUCTION_NOT_FOUND")
+        Set result.metrics = ..BuildSessionTimelineMetrics(result)
+        return result
+    }
+    If '..IsPositiveInteger(sessionId) {
+        Do result.%Set("errorCode", "INVALID_SESSION_ID")
+        Set result.metrics = ..BuildSessionTimelineMetrics(result)
+        return result
+    }
+
+    Set dateRange = ..NormalizeDateRange(startDate, endDate)
+    If 'dateRange.valid {
+        Do result.%Set("errorCode", "INVALID_DATE_FILTER")
+        Do result.%Set("statusText", dateRange.statusText)
+        Set result.metrics = ..BuildSessionTimelineMetrics(result)
+        return result
+    }
+    Set result.startDate = dateRange.startDate
+    Set result.endDate = dateRange.endDate
+
+    Set messages = ..ListMessages(productionName, result.limit, 0, "", "", "", sessionId, 0, dateRange.startDate, dateRange.endDate)
+    If messages.%IsDefined("errorCode") {
+        Do result.%Set("errorCode", messages.errorCode)
+        If messages.%IsDefined("statusText") {
+            Do result.%Set("statusText", messages.%Get("statusText"))
+        }
+        Set result.metrics = ..BuildSessionTimelineMetrics(result)
+        return result
+    }
+    If $IsObject(messages.items) {
+        For messageIndex = 0:1:messages.items.%Size()-1 {
+            Set message = messages.items.%Get(messageIndex)
+            Continue:'$IsObject(message)
+            Do result.messages.%Push(message)
+            Do result.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", message.messageId, "SessionId", sessionId, "observed"))
+        }
+    }
+
+    Set logs = ..ListProductionLogs(productionName, 500, 0, "", "", "", dateRange.startDate, dateRange.endDate)
+    If logs.%IsDefined("errorCode") {
+        Do result.%Set("errorCode", logs.errorCode)
+        If logs.%IsDefined("statusText") {
+            Do result.%Set("statusText", logs.%Get("statusText"))
+        }
+        Set result.metrics = ..BuildSessionTimelineMetrics(result)
+        return result
+    }
+    If $IsObject(logs.warnings) {
+        For warningIndex = 0:1:logs.warnings.%Size()-1 {
+            Set warning = logs.warnings.%Get(warningIndex)
+            Continue:'$IsObject(warning)
+            Do result.warnings.%Push(warning)
+        }
+    }
+    If $IsObject(logs.items) {
+        For logIndex = 0:1:logs.items.%Size()-1 {
+            Set log = logs.items.%Get(logIndex)
+            Continue:'$IsObject(log)
+            Continue:(""_log.sessionId '= ""_sessionId)
+            Quit:(result.logs.%Size() >= result.limit)
+            Do result.logs.%Push(log)
+            Do result.evidence.%Push(..NewEvidence("production-log", logs.logClassName, log.logId, "SessionId", sessionId, "observed"))
+        }
+    }
+
+    Do ..BuildSessionTimelineEvents(result)
+    Set result.messageCount = result.messages.%Size()
+    Set result.logCount = result.logs.%Size()
+    Set result.eventCount = result.events.%Size()
+    Set result.metrics = ..BuildSessionTimelineMetrics(result)
+    return result
+}
+
 ClassMethod ResendProductionMessage(productionName As %VarString, messageId As %Integer) As %DynamicObject
 {
     Set scoped = ..GetProductionMessage(productionName, messageId)
@@ -3612,10 +3718,10 @@ ClassMethod BuildAIAskPrompt(question As %VarString, chunks As %DynamicArray) As
     For index = 0:1:chunks.%Size()-1 {
         Set chunk = chunks.%Get(index)
         Continue:'$IsObject(chunk)
-        Set prompt = prompt_"["_(index+1)_"] id="_chunk.id_"; kind="_chunk.kind_"; component="_chunk.component_"; source="_chunk.source_"; confidence="_chunk.confidence_$Char(10)
+        Set prompt = prompt_"Chunk id ["_chunk.id_"]; kind="_chunk.kind_"; component="_chunk.component_"; source="_chunk.source_"; confidence="_chunk.confidence_$Char(10)
         Set prompt = prompt_chunk.text_$Char(10,10)
     }
-    Set prompt = prompt_"Answer with concise paragraphs. Cite factual claims with exact bracketed chunk ids from the retrieved chunks, for example [summary] or [component-Patient Router]. If evidence is insufficient, say what is missing and cite the closest relevant chunk ids."
+    Set prompt = prompt_"Answer with concise paragraphs. Cite factual claims with exact bracketed chunk ids from the retrieved chunks, for example [summary] or [component-Patient Router]. Do not cite ordinal numbers like [1] or [2]. If evidence is insufficient, say what is missing and cite the closest relevant chunk ids."
     return $Extract(prompt, 1, 12000)
 }
 
@@ -3630,11 +3736,18 @@ ClassMethod ValidateAIAnswerCitations(answer As %VarString, chunks As %DynamicAr
     Set result.answerGrounded = 0
 
     Set citedIds = ..ExtractCitationIds(answer)
+    Set canonicalCitedIds = []
     For index = 0:1:citedIds.%Size()-1 {
         Set chunkId = citedIds.%Get(index)
-        If ..ChunkIdInArray(chunks, chunkId) {
-            Set citation = ..NewCitation(chunkId, chunks)
+        Set canonicalChunkId = ..CanonicalCitationChunkId(chunkId, chunks)
+        If canonicalChunkId '= "" {
+            Set citation = ..NewCitation(canonicalChunkId, chunks)
+            If canonicalChunkId '= chunkId {
+                Set citation.originalCitation = chunkId
+                Set citation.normalized = 1
+            }
             Do result.citations.%Push(citation)
+            Do ..PushUnique(canonicalCitedIds, canonicalChunkId)
         } Else {
             Do result.invalidCitationIds.%Push(chunkId)
         }
@@ -3642,13 +3755,30 @@ ClassMethod ValidateAIAnswerCitations(answer As %VarString, chunks As %DynamicAr
     For index = 0:1:chunks.%Size()-1 {
         Set chunk = chunks.%Get(index)
         Continue:'$IsObject(chunk)
-        Continue:..DynamicArrayContains(citedIds, chunk.id)
+        Continue:..DynamicArrayContains(canonicalCitedIds, chunk.id)
         Do result.uncitedChunkIds.%Push(chunk.id)
     }
     Set result.citationCount = result.citations.%Size()
     Set result.invalidCitationCount = result.invalidCitationIds.%Size()
     Set result.answerGrounded = (result.citationCount > 0) && (result.invalidCitationCount = 0)
     return result
+}
+
+ClassMethod CanonicalCitationChunkId(citationId As %VarString, chunks As %DynamicArray) As %VarString [ Private ]
+{
+    If ..ChunkIdInArray(chunks, citationId) {
+        return citationId
+    }
+    If citationId?1.N {
+        Set ordinal = +citationId
+        If (ordinal > 0) && (ordinal <= chunks.%Size()) {
+            Set chunk = chunks.%Get(ordinal - 1)
+            If $IsObject(chunk) {
+                return chunk.id
+            }
+        }
+    }
+    return ""
 }
 
 ClassMethod ExtractCitationIds(answer As %VarString) As %DynamicArray
@@ -4492,6 +4622,91 @@ ClassMethod NewProductionLogEntryFromRow(rset As %SQL.IResultSet, productionName
     Set entry.evidence = []
     Do entry.evidence.%Push(..NewEvidence("production-log", "event-log", entry.logId, "Source", entry.source, "observed"))
     return entry
+}
+
+ClassMethod BuildSessionTimelineEvents(result As %DynamicObject) [ Private ]
+{
+    Set messageIndex = 0
+    Set logIndex = 0
+    Set sequence = 1
+    For {
+        Quit:((messageIndex >= result.messages.%Size()) && (logIndex >= result.logs.%Size()))
+        Set useMessage = 0
+        If logIndex >= result.logs.%Size() {
+            Set useMessage = 1
+        } ElseIf messageIndex < result.messages.%Size() {
+            Set message = result.messages.%Get(messageIndex)
+            Set log = result.logs.%Get(logIndex)
+            If ..CompareTimelineTimestamp(message.timeCreated, log.timeLogged) >= 0 {
+                Set useMessage = 1
+            }
+        }
+        If useMessage {
+            Set message = result.messages.%Get(messageIndex)
+            Do result.events.%Push(..NewSessionTimelineMessageEvent(message, sequence))
+            Set messageIndex = messageIndex + 1
+        } Else {
+            Set log = result.logs.%Get(logIndex)
+            Do result.events.%Push(..NewSessionTimelineLogEvent(log, sequence))
+            Set logIndex = logIndex + 1
+        }
+        Set sequence = sequence + 1
+    }
+    return
+}
+
+ClassMethod CompareTimelineTimestamp(left As %VarString, right As %VarString) As %Integer [ Private ]
+{
+    Set leftDate = ..NormalizeDateFilter(left, 0)
+    Set rightDate = ..NormalizeDateFilter(right, 0)
+    If leftDate.valid && rightDate.valid && (leftDate.horolog '= "") && (rightDate.horolog '= "") {
+        return ..CompareHorolog(leftDate.horolog, rightDate.horolog)
+    }
+    If left = right {
+        return 0
+    }
+    If left > right {
+        return 1
+    }
+    return -1
+}
+
+ClassMethod NewSessionTimelineMessageEvent(message As %DynamicObject, sequence As %Integer) As %DynamicObject [ Private ]
+{
+    Set event = {}
+    Set event.sequence = sequence
+    Set event.type = "message"
+    Set event.timestamp = message.timeCreated
+    Set event.messageId = message.messageId
+    Set event.sessionId = message.sessionId
+    Set event.source = message.sourceConfigName
+    Set event.target = message.targetConfigName
+    Set event.status = message.status
+    Set event.isError = message.isError
+    Set event.text = "Message "_message.messageId_" moved from "_$Select(message.sourceConfigName'="":message.sourceConfigName,1:"unknown source")_" to "_$Select(message.targetConfigName'="":message.targetConfigName,1:"unknown target")_". Payload body content was not returned."
+    Set event.confidence = "observed"
+    Set event.evidence = []
+    Do event.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", message.messageId, "TimeCreated", message.timeCreated, "observed"))
+    return event
+}
+
+ClassMethod NewSessionTimelineLogEvent(log As %DynamicObject, sequence As %Integer) As %DynamicObject [ Private ]
+{
+    Set event = {}
+    Set event.sequence = sequence
+    Set event.type = "log"
+    Set event.timestamp = log.timeLogged
+    Set event.logId = log.logId
+    Set event.sessionId = log.sessionId
+    Set event.source = log.source
+    Set event.target = ""
+    Set event.status = log.type
+    Set event.isError = $Select(($ZConvert(log.type, "L")["error"):1,1:0)
+    Set event.text = log.text
+    Set event.confidence = "observed"
+    Set event.evidence = []
+    Do event.evidence.%Push(..NewEvidence("production-log", "event-log", log.logId, "TimeLogged", log.timeLogged, "observed"))
+    return event
 }
 
 ClassMethod NewPayloadMetadata(message As %DynamicObject, settings As %DynamicObject) As %DynamicObject [ Private ]
@@ -5576,6 +5791,47 @@ ClassMethod BuildProductionLogMetrics(result As %DynamicObject) As %DynamicObjec
     }
     If $IsObject(result.warnings) {
         Set metrics.warningCount = result.warnings.%Size()
+    }
+    return metrics
+}
+
+ClassMethod BuildSessionTimelineMetrics(result As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.messageCount = 0
+    Set metrics.logCount = 0
+    Set metrics.eventCount = 0
+    Set metrics.errorCount = 0
+    Set metrics.warningCount = 0
+    Set metrics.evidenceCount = 0
+    Set metrics.confirmedEvidenceCount = 0
+    Set metrics.observedEvidenceCount = 0
+    Set metrics.inferredEvidenceCount = 0
+    Set metrics.unknownEvidenceCount = 0
+    If $IsObject(result.messages) {
+        Set metrics.messageCount = result.messages.%Size()
+        For messageIndex = 0:1:result.messages.%Size()-1 {
+            Set message = result.messages.%Get(messageIndex)
+            Continue:'$IsObject(message)
+            If message.isError {
+                Set metrics.errorCount = metrics.errorCount + 1
+            }
+        }
+        Do ..AddEvidenceCoverageFromArray(result.messages, metrics)
+    }
+    If $IsObject(result.logs) {
+        Set metrics.logCount = result.logs.%Size()
+        Do ..AddEvidenceCoverageFromArray(result.logs, metrics)
+    }
+    If $IsObject(result.events) {
+        Set metrics.eventCount = result.events.%Size()
+        Do ..AddEvidenceCoverageFromArray(result.events, metrics)
+    }
+    If $IsObject(result.warnings) {
+        Set metrics.warningCount = result.warnings.%Size()
+    }
+    If $IsObject(result.evidence) {
+        Do ..AddEvidenceCoverageFromEvidenceArray(result.evidence, metrics)
     }
     return metrics
 }
