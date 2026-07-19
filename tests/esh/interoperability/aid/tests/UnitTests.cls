@@ -531,6 +531,10 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/ai/summary"), "Spec must expose AI summary endpoint")
     Do $$$AssertEquals(spec.paths.%Get("/productions/{productionName}/ai/summary").post.operationId, "GetProductionAISummary", "AI summary operationId mismatch")
     Do $$$AssertTrue(spec.definitions.%IsDefined("ProductionAISummaryResponse"), "Spec must define ProductionAISummaryResponse")
+    Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/rag/context"), "Spec must expose RAG context endpoint")
+    Do $$$AssertEquals(spec.paths.%Get("/productions/{productionName}/rag/context").get.operationId, "GetProductionRAGContext", "RAG context operationId mismatch")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("ProductionRAGContextResponse"), "Spec must define ProductionRAGContextResponse")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("RAGContextMetrics"), "Spec must define RAGContextMetrics")
     Do $$$AssertTrue(spec.paths.%IsDefined("/productions/{productionName}/ai/ask"), "Spec must expose AI ask endpoint")
     Do $$$AssertEquals(spec.paths.%Get("/productions/{productionName}/ai/ask").post.operationId, "AskProductionAI", "AI ask operationId mismatch")
     Do $$$AssertTrue(spec.definitions.%IsDefined("ProductionAIAskRequest"), "Spec must define ProductionAIAskRequest")
@@ -1463,6 +1467,25 @@ Method TestGetProductionAISummaryDisabled()
     Do $$$AssertTrue($IsObject(result), "Disabled AI summary response must be an object")
     Do $$$AssertEquals(%response.Status, 403, "Disabled AI provider should set 403")
     Do $$$AssertEquals(result.error.code, "AI_PROVIDER_DISABLED", "Disabled AI provider error code mismatch")
+}
+
+Method TestGetProductionRAGContext()
+{
+    Do ..InitRequestResponse()
+    Set result = ##class(esh.interoperability.aid.api.impl).GetProductionRAGContext("esh.interoperability.aid.tests.DemoProduction", "routing Patient Router", "Patient Router", 5)
+    Do $$$AssertTrue($IsObject(result), "RAG context response must be an object")
+    Do $$$AssertEquals(result.productionName, "esh.interoperability.aid.tests.DemoProduction", "RAG context production mismatch")
+    Do $$$AssertTrue($IsObject(result.chunks), "RAG context chunks must be an array")
+    Do $$$AssertTrue(result.chunkCount > 0, "RAG context should build chunks")
+    Do $$$AssertTrue($IsObject(result.retrievedChunks), "RAG context retrievedChunks must be an array")
+    Do $$$AssertTrue(result.retrievedChunkCount > 0, "RAG context should retrieve chunks for a question")
+    Do $$$AssertTrue(result.retrievedChunkCount <= 5, "RAG context should honor maxChunks")
+    Do $$$AssertTrue($IsObject(result.metrics), "RAG context should include metrics")
+    If $IsObject(result.metrics) {
+        Do $$$AssertEquals(result.metrics.chunkCount, result.chunkCount, "RAG context metric chunk count mismatch")
+        Do $$$AssertEquals(result.metrics.retrievedChunkCount, result.retrievedChunkCount, "RAG context metric retrieved count mismatch")
+        Do $$$AssertTrue(result.metrics.componentChunkCount > 0, "RAG context should include component chunks")
+    }
 }
 
 Method TestAskProductionAIInvalidQuestion()

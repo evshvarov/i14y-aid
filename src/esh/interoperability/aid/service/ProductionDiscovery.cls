@@ -242,6 +242,44 @@ ClassMethod GetProductionGraph(productionName As %VarString) As %DynamicObject
     return result
 }
 
+ClassMethod GetProductionRAGContext(productionName As %VarString, question As %VarString = "", componentName As %VarString = "", maxChunks As %Integer = 12) As %DynamicObject
+{
+    Set analysis = ..GetProductionAnalysis(productionName)
+    If analysis.%IsDefined("errorCode") {
+        return analysis
+    }
+
+    If maxChunks < 1 {
+        Set maxChunks = 12
+    }
+    If maxChunks > 100 {
+        Set maxChunks = 100
+    }
+    Set question = $ZStrip($Extract(question, 1, 1000), "<>W")
+    Set componentName = $ZStrip($Extract(componentName, 1, 200), "<>W")
+
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.productionName = productionName
+    Set result.question = question
+    Set result.componentName = componentName
+    Set result.maxChunks = maxChunks
+    Set result.chunks = ..BuildProductionRAGChunks(analysis)
+    Set result.chunkCount = result.chunks.%Size()
+    If question '= "" {
+        Set result.retrievedChunks = ..RetrieveRAGChunks(result.chunks, question, componentName, maxChunks)
+    } Else {
+        Set result.retrievedChunks = []
+    }
+    Set result.retrievedChunkCount = result.retrievedChunks.%Size()
+    Set result.metrics = ..BuildRAGContextMetrics(result)
+    Set result.warnings = analysis.warnings
+    Set result.evidence = []
+    Do result.evidence.%Push(..NewEvidence("rag-context", productionName, productionName, "chunks", result.chunkCount, "inferred"))
+    Set result.confidence = "inferred"
+    return result
+}
+
 ClassMethod GetProductionAISummary(productionName As %VarString) As %DynamicObject
 {
     Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
@@ -2729,6 +2767,52 @@ ClassMethod RAGChunkMatchesComponent(chunk As %DynamicObject, componentName As %
         return 1
     }
     return 0
+}
+
+ClassMethod BuildRAGContextMetrics(context As %DynamicObject) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.chunkCount = context.chunkCount
+    Set metrics.retrievedChunkCount = context.retrievedChunkCount
+    Set metrics.componentChunkCount = 0
+    Set metrics.connectionChunkCount = 0
+    Set metrics.ruleChunkCount = 0
+    Set metrics.messageTypeChunkCount = 0
+    Set metrics.externalSystemChunkCount = 0
+    Set metrics.transformationChunkCount = 0
+    Set metrics.businessProcessChunkCount = 0
+    Set metrics.warningChunkCount = 0
+    If $IsObject(context.chunks) {
+        For index = 0:1:context.chunks.%Size()-1 {
+            Set chunk = context.chunks.%Get(index)
+            Continue:'$IsObject(chunk)
+            If chunk.kind = "component" {
+                Set metrics.componentChunkCount = metrics.componentChunkCount + 1
+            }
+            If (chunk.kind = "connection") || (chunk.kind = "connection-explanation") {
+                Set metrics.connectionChunkCount = metrics.connectionChunkCount + 1
+            }
+            If (chunk.kind = "routing-rule") || (chunk.kind = "routing-rule-explanation") {
+                Set metrics.ruleChunkCount = metrics.ruleChunkCount + 1
+            }
+            If chunk.kind = "message-type" {
+                Set metrics.messageTypeChunkCount = metrics.messageTypeChunkCount + 1
+            }
+            If chunk.kind = "external-system" {
+                Set metrics.externalSystemChunkCount = metrics.externalSystemChunkCount + 1
+            }
+            If chunk.kind = "transformation" {
+                Set metrics.transformationChunkCount = metrics.transformationChunkCount + 1
+            }
+            If chunk.kind = "business-process" {
+                Set metrics.businessProcessChunkCount = metrics.businessProcessChunkCount + 1
+            }
+            If chunk.kind = "warning" {
+                Set metrics.warningChunkCount = metrics.warningChunkCount + 1
+            }
+        }
+    }
+    return metrics
 }
 
 ClassMethod RAGChunkScore(chunk As %DynamicObject, normalizedQuestion As %VarString) As %Integer [ Private ]

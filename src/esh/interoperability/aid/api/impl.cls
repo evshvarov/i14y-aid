@@ -128,6 +128,18 @@ ClassMethod GetProductionGraph(productionName As %String) As %DynamicObject
     return ..HandleProductionResult(result)
 }
 
+/// Get deterministic production RAG chunks and retrieval results<br/>
+/// The method arguments hold values for:<br/>
+///     productionName<br/>
+///     question<br/>
+///     componentName<br/>
+///     maxChunks<br/>
+ClassMethod GetProductionRAGContext(productionName As %String, question As %String = "", componentName As %String = "", maxChunks As %Integer = 12) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionRAGContext(productionName, question, componentName, maxChunks)
+    return ..HandleProductionResult(result)
+}
+
 /// Generate AI-assisted production summary
 /// The method arguments hold values for:<br/>
 ///     productionName<br/>

@@ -66,6 +66,7 @@ GET /i14y-aid/api/productions/{productionName}/components/{componentName}
 GET /i14y-aid/api/productions/{productionName}/analysis
 GET /i14y-aid/api/productions/{productionName}/summary
 POST /i14y-aid/api/productions/{productionName}/ai/summary
+GET /i14y-aid/api/productions/{productionName}/rag/context
 POST /i14y-aid/api/productions/{productionName}/ai/ask
 GET /i14y-aid/api/productions/{productionName}/graph
 GET /i14y-aid/api/productions/{productionName}/status
@@ -99,6 +100,7 @@ curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.t
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/analysis"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/summary"
 curl -X POST "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/ai/summary"
+curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/rag/context?question=routing%20Patient%20Router&componentName=Patient%20Router&maxChunks=8"
 curl -X POST "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/ai/ask" -H "Content-Type: application/json" -d '{"question":"Why does this production route messages?","componentName":"Patient Router","maxChunks":8}'
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/graph"
 curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.tests.DemoProduction/logs?limit=10"

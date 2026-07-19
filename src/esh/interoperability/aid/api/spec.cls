@@ -1316,6 +1316,60 @@ XData OpenAPI [ MimeType = application/json ]
         }
       }
     },
+    "/productions/{productionName}/rag/context": {
+      "get": {
+        "summary": "Get deterministic production RAG chunks and retrieval results",
+        "operationId": "GetProductionRAGContext",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "question",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "componentName",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "maxChunks",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 12
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deterministic production RAG context",
+            "schema": {
+              "$ref": "#/definitions/ProductionRAGContextResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid production name",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/productions/{productionName}/ai/ask": {
       "post": {
         "summary": "Ask an AI-assisted question grounded in production analysis chunks",
@@ -4006,6 +4060,110 @@ XData OpenAPI [ MimeType = application/json ]
         "score": {
           "type": "integer",
           "format": "int32"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "RAGContextMetrics": {
+      "type": "object",
+      "properties": {
+        "chunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "retrievedChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "componentChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "connectionChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "ruleChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "messageTypeChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "externalSystemChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "transformationChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "businessProcessChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "warningChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "ProductionRAGContextResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "question": {
+          "type": "string"
+        },
+        "componentName": {
+          "type": "string"
+        },
+        "maxChunks": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "chunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "retrievedChunkCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "chunks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RAGChunk"
+          }
+        },
+        "retrievedChunks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RAGChunk"
+          }
+        },
+        "metrics": {
+          "$ref": "#/definitions/RAGContextMetrics"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
         },
         "evidence": {
           "type": "array",
