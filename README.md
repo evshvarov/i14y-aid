@@ -122,7 +122,7 @@ curl "http://localhost:57337/i14y-aid/api/productions/esh.interoperability.aid.t
 
 AI summaries are disabled by default. To enable them, turn on `aiProviderEnabled` and `aiSummaryEnabled` through `PUT /i14y-aid/api/settings` or the UI settings panel. The OpenAI API key can be supplied through the IRIS process environment as `OPENAI_API_KEY`, or saved from the UI settings panel. The settings API reports only `aiApiKeyConfigured` and `aiApiKeySource`; it never returns the stored key value.
 
-AI ask uses deterministic retrieval over production analysis chunks. When a persisted RAG index exists, AI ask uses that index; otherwise it builds transient chunks for the request. The response includes the retrieved chunks and evidence used to ground the answer.
+AI ask uses deterministic retrieval over production analysis chunks. When a persisted RAG index exists, AI ask uses that index; otherwise it builds transient chunks for the request. The response includes the retrieved chunks, validated answer citations, invalid citation ids, uncited chunk ids, and evidence used to ground the answer.
 
 ## Build And Test
 

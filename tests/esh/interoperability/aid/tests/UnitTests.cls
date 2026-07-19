@@ -554,6 +554,13 @@ Method TestGetSpec()
     Do $$$AssertTrue(spec.definitions.ProductionAIAskResponse.properties.%IsDefined("chunks"), "AI ask response must expose retrieved chunks")
     Do $$$AssertTrue(spec.definitions.ProductionAIAskResponse.properties.%IsDefined("runId"), "AI ask response must expose persisted RAG run id")
     Do $$$AssertTrue(spec.definitions.ProductionAIAskResponse.properties.%IsDefined("chunkSource"), "AI ask response must expose chunk source")
+    Do $$$AssertTrue(spec.definitions.ProductionAIAskResponse.properties.%IsDefined("citations"), "AI ask response must expose citations")
+    Do $$$AssertTrue(spec.definitions.ProductionAIAskResponse.properties.%IsDefined("citationCount"), "AI ask response must expose citation count")
+    Do $$$AssertTrue(spec.definitions.ProductionAIAskResponse.properties.%IsDefined("invalidCitationIds"), "AI ask response must expose invalid citation ids")
+    Do $$$AssertTrue(spec.definitions.ProductionAIAskResponse.properties.%IsDefined("invalidCitationCount"), "AI ask response must expose invalid citation count")
+    Do $$$AssertTrue(spec.definitions.ProductionAIAskResponse.properties.%IsDefined("uncitedChunkIds"), "AI ask response must expose uncited chunk ids")
+    Do $$$AssertTrue(spec.definitions.ProductionAIAskResponse.properties.%IsDefined("answerGrounded"), "AI ask response must expose grounding flag")
+    Do $$$AssertTrue(spec.definitions.%IsDefined("AIAnswerCitation"), "Spec must define AIAnswerCitation")
     Do $$$AssertTrue(spec.definitions.%IsDefined("AnalysisSettings"), "Spec must define AnalysisSettings")
     Do $$$AssertTrue(spec.definitions.AnalysisSettings.properties.%IsDefined("messageResendEnabled"), "Spec settings must expose messageResendEnabled")
     Do $$$AssertTrue(spec.definitions.AnalysisSettings.properties.%IsDefined("payloadMetadataEnabled"), "Spec settings must expose payloadMetadataEnabled")
@@ -1572,6 +1579,47 @@ Method TestSearchProductionRAGChunksInvalidQuestion()
     Do $$$AssertTrue($IsObject(result), "Invalid RAG search response must be an object")
     Do $$$AssertEquals(%response.Status, 400, "Invalid RAG search should set 400")
     Do $$$AssertEquals(result.error.code, "INVALID_AI_QUESTION", "Invalid RAG search error code mismatch")
+}
+
+Method TestValidateAIAnswerCitations()
+{
+    Set chunks = []
+    Set chunk1 = {}
+    Set chunk1.id = "summary"
+    Set chunk1.kind = "summary"
+    Set chunk1.title = "Summary"
+    Set chunk1.component = "esh.interoperability.aid.tests.DemoProduction"
+    Set chunk1.source = "esh.interoperability.aid.tests.DemoProduction"
+    Set chunk1.confidence = "confirmed"
+    Set chunk1.text = "Production summary."
+    Do chunks.%Push(chunk1)
+
+    Set chunk2 = {}
+    Set chunk2.id = "component-Patient Router"
+    Set chunk2.kind = "component"
+    Set chunk2.title = "Patient Router"
+    Set chunk2.component = "Patient Router"
+    Set chunk2.source = "esh.interoperability.aid.tests.DemoProcess"
+    Set chunk2.confidence = "confirmed"
+    Set chunk2.text = "Patient Router routes messages."
+    Do chunks.%Push(chunk2)
+
+    Set audit = ##class(esh.interoperability.aid.service.ProductionDiscovery).ValidateAIAnswerCitations("The production routes messages [component-Patient Router] and has a summary [summary]. It also cites a missing chunk [missing].", chunks)
+    Do $$$AssertTrue($IsObject(audit), "Citation audit must be an object")
+    Do $$$AssertEquals(audit.citationCount, 2, "Citation audit valid citation count mismatch")
+    Do $$$AssertEquals(audit.invalidCitationCount, 1, "Citation audit invalid citation count mismatch")
+    Do $$$AssertEquals(audit.invalidCitationIds.%Get(0), "missing", "Citation audit invalid citation id mismatch")
+    Do $$$AssertEquals(audit.uncitedChunkIds.%Size(), 0, "Citation audit uncited chunk count mismatch")
+    Do $$$AssertEquals(audit.answerGrounded, 0, "Citation audit should not be grounded with invalid citations")
+    Do $$$AssertEquals(audit.citations.%Get(0).chunkId, "component-Patient Router", "Citation audit first citation id mismatch")
+    Do $$$AssertEquals(audit.citations.%Get(0).kind, "component", "Citation audit first citation kind mismatch")
+
+    Set grounded = ##class(esh.interoperability.aid.service.ProductionDiscovery).ValidateAIAnswerCitations("The production routes messages [component-Patient Router].", chunks)
+    Do $$$AssertEquals(grounded.citationCount, 1, "Grounded citation count mismatch")
+    Do $$$AssertEquals(grounded.invalidCitationCount, 0, "Grounded invalid citation count mismatch")
+    Do $$$AssertEquals(grounded.uncitedChunkIds.%Size(), 1, "Grounded uncited chunk count mismatch")
+    Do $$$AssertEquals(grounded.uncitedChunkIds.%Get(0), "summary", "Grounded uncited chunk id mismatch")
+    Do $$$AssertEquals(grounded.answerGrounded, 1, "Grounded answer flag mismatch")
 }
 
 Method TestAskProductionAIInvalidQuestion()

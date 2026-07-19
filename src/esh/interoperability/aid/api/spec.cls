@@ -4632,6 +4632,35 @@ XData OpenAPI [ MimeType = application/json ]
             "$ref": "#/definitions/RAGChunk"
           }
         },
+        "citations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AIAnswerCitation"
+          }
+        },
+        "citationCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "invalidCitationIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "invalidCitationCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "uncitedChunkIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "answerGrounded": {
+          "type": "boolean"
+        },
         "aiProviderEnabled": {
           "type": "boolean"
         },
@@ -4658,6 +4687,29 @@ XData OpenAPI [ MimeType = application/json ]
           "items": {
             "$ref": "#/definitions/Evidence"
           }
+        }
+      }
+    },
+    "AIAnswerCitation": {
+      "type": "object",
+      "properties": {
+        "chunkId": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "component": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
         }
       }
     },

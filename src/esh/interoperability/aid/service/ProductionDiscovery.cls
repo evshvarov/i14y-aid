@@ -557,6 +557,12 @@ ClassMethod GetProductionAISummary(productionName As %VarString) As %DynamicObje
     Set result.provider = settings.aiProvider
     Set result.model = settings.aiModel
     Set result.generated = 0
+    Set result.answerGrounded = 0
+    Set result.citations = []
+    Set result.citationCount = 0
+    Set result.invalidCitationIds = []
+    Set result.invalidCitationCount = 0
+    Set result.uncitedChunkIds = []
     Set result.aiProviderEnabled = settings.aiProviderEnabled
     Set result.aiSummaryEnabled = settings.aiSummaryEnabled
     Set result.aiApiKeyConfigured = settings.aiApiKeyConfigured
@@ -706,7 +712,7 @@ ClassMethod AskProductionAI(productionName As %VarString, request As %DynamicObj
     Do result.evidence.%Push(..NewEvidence("rag-index", productionName, productionName, "chunks", result.chunks.%Size()_" of "_allChunks.%Size(), "inferred"))
 
     Set prompt = ..BuildAIAskPrompt(question, result.chunks)
-    Set systemPrompt = "Answer questions about an InterSystems IRIS interoperability production using only the provided retrieved chunks. If the chunks do not contain enough evidence, say what is missing. Do not invent components, routes, payloads, credentials, or runtime facts."
+    Set systemPrompt = "Answer questions about an InterSystems IRIS interoperability production using only the provided retrieved chunks. Cite factual claims with exact bracketed chunk ids such as [component-Patient Router]. If the chunks do not contain enough evidence, say what is missing. Do not invent components, routes, payloads, credentials, or runtime facts."
     Set aiResponse = ..CallOpenAIChat(settings.aiEndpoint, settings.aiModel, apiKey, prompt, systemPrompt)
     If aiResponse.%IsDefined("errorCode") {
         Do result.%Set("errorCode", aiResponse.errorCode)
@@ -718,6 +724,19 @@ ClassMethod AskProductionAI(productionName As %VarString, request As %DynamicObj
     Set result.generated = 1
     Set result.answer = aiResponse.text
     Set result.rawUsage = aiResponse.usage
+    Set citationAudit = ..ValidateAIAnswerCitations(aiResponse.text, result.chunks)
+    Set result.citations = citationAudit.citations
+    Set result.citationCount = citationAudit.citationCount
+    Set result.invalidCitationIds = citationAudit.invalidCitationIds
+    Set result.invalidCitationCount = citationAudit.invalidCitationCount
+    Set result.uncitedChunkIds = citationAudit.uncitedChunkIds
+    Set result.answerGrounded = citationAudit.answerGrounded
+    If result.citationCount = 0 {
+        Do result.warnings.%Push(..NewWarning("AI_CITATIONS_MISSING", "The AI answer did not cite retrieved chunk ids."))
+    }
+    If result.invalidCitationCount > 0 {
+        Do result.warnings.%Push(..NewWarning("AI_CITATIONS_INVALID", "The AI answer cited chunk ids that were not retrieved for this request."))
+    }
     Do result.evidence.%Push(..NewEvidence("ai-provider", settings.aiProvider, productionName, "model", settings.aiModel, "inferred"))
     return result
 }
@@ -3361,8 +3380,88 @@ ClassMethod BuildAIAskPrompt(question As %VarString, chunks As %DynamicArray) As
         Set prompt = prompt_"["_(index+1)_"] id="_chunk.id_"; kind="_chunk.kind_"; component="_chunk.component_"; source="_chunk.source_"; confidence="_chunk.confidence_$Char(10)
         Set prompt = prompt_chunk.text_$Char(10,10)
     }
-    Set prompt = prompt_"Answer with concise paragraphs. Include chunk ids in parentheses when making factual claims."
+    Set prompt = prompt_"Answer with concise paragraphs. Cite factual claims with exact bracketed chunk ids from the retrieved chunks, for example [summary] or [component-Patient Router]. If evidence is insufficient, say what is missing and cite the closest relevant chunk ids."
     return $Extract(prompt, 1, 12000)
+}
+
+ClassMethod ValidateAIAnswerCitations(answer As %VarString, chunks As %DynamicArray) As %DynamicObject
+{
+    Set result = {}
+    Set result.citations = []
+    Set result.citationCount = 0
+    Set result.invalidCitationIds = []
+    Set result.invalidCitationCount = 0
+    Set result.uncitedChunkIds = []
+    Set result.answerGrounded = 0
+
+    Set citedIds = ..ExtractCitationIds(answer)
+    For index = 0:1:citedIds.%Size()-1 {
+        Set chunkId = citedIds.%Get(index)
+        If ..ChunkIdInArray(chunks, chunkId) {
+            Set citation = ..NewCitation(chunkId, chunks)
+            Do result.citations.%Push(citation)
+        } Else {
+            Do result.invalidCitationIds.%Push(chunkId)
+        }
+    }
+    For index = 0:1:chunks.%Size()-1 {
+        Set chunk = chunks.%Get(index)
+        Continue:'$IsObject(chunk)
+        Continue:..DynamicArrayContains(citedIds, chunk.id)
+        Do result.uncitedChunkIds.%Push(chunk.id)
+    }
+    Set result.citationCount = result.citations.%Size()
+    Set result.invalidCitationCount = result.invalidCitationIds.%Size()
+    Set result.answerGrounded = (result.citationCount > 0) && (result.invalidCitationCount = 0)
+    return result
+}
+
+ClassMethod ExtractCitationIds(answer As %VarString) As %DynamicArray
+{
+    Set ids = []
+    Set position = 1
+    For {
+        Set open = $Find(answer, "[", position)
+        Quit:(open = 0)
+        Set close = $Find(answer, "]", open)
+        Quit:(close = 0)
+        Set id = $ZStrip($Extract(answer, open, close - 2), "<>W")
+        If (id '= "") && '..DynamicArrayContains(ids, id) && (id '[ $Char(10)) && (id '[ $Char(13)) {
+            Do ids.%Push(id)
+        }
+        Set position = close
+    }
+    return ids
+}
+
+ClassMethod NewCitation(chunkId As %VarString, chunks As %DynamicArray) As %DynamicObject [ Private ]
+{
+    Set citation = {}
+    Set citation.chunkId = chunkId
+    For index = 0:1:chunks.%Size()-1 {
+        Set chunk = chunks.%Get(index)
+        Continue:'$IsObject(chunk)
+        Continue:(chunk.id '= chunkId)
+        Set citation.kind = chunk.kind
+        Set citation.title = chunk.title
+        Set citation.component = chunk.component
+        Set citation.source = chunk.source
+        Set citation.confidence = chunk.confidence
+        return citation
+    }
+    return citation
+}
+
+ClassMethod ChunkIdInArray(chunks As %DynamicArray, chunkId As %VarString) As %Boolean [ Private ]
+{
+    For index = 0:1:chunks.%Size()-1 {
+        Set chunk = chunks.%Get(index)
+        Continue:'$IsObject(chunk)
+        If chunk.id = chunkId {
+            return 1
+        }
+    }
+    return 0
 }
 
 ClassMethod CallOpenAIChat(endpoint As %VarString, model As %VarString, apiKey As %VarString, prompt As %VarString, systemPrompt As %VarString = "") As %DynamicObject [ Private ]
