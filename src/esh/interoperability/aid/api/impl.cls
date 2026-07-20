@@ -40,6 +40,34 @@ ClassMethod Codes() As %DynamicObject
     return ##class(esh.interoperability.aid.service.ProductionDiscovery).Codes()
 }
 
+/// Get sanitized interoperability monitor metric date range
+ClassMethod GetMonitorInteropRange(period As %String = "current") As %DynamicObject
+{
+    Set period = $Get(period)
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetMonitorInteropRange(period)
+    return ..HandleMonitorResult(result)
+}
+
+/// Get sanitized interoperability monitor volume metrics
+ClassMethod GetMonitorInteropVolume(period As %String = "current", namespace As %String = "", startDate As %String = "", endDate As %String = "", startMonth As %String = "", endMonth As %String = "") As %DynamicObject
+{
+    Set period = $Get(period)
+    Set namespace = $Get(namespace)
+    Set startDate = $Get(startDate)
+    Set endDate = $Get(endDate)
+    Set startMonth = $Get(startMonth)
+    Set endMonth = $Get(endMonth)
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetMonitorInteropVolume(period, namespace, startDate, endDate, startMonth, endMonth)
+    return ..HandleMonitorResult(result)
+}
+
+/// Get sanitized interoperability OpenMetrics samples from /api/monitor/metrics
+ClassMethod GetMonitorInteropMetrics(limit As %Integer = 200) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetMonitorInteropMetrics(limit)
+    return ..HandleMonitorResult(result)
+}
+
 /// Get module analysis settings
 ClassMethod GetSettings() As %DynamicObject
 {
@@ -741,6 +769,25 @@ ClassMethod HandleAIResult(result As %DynamicObject) As %DynamicObject [ Private
         }
         If result.errorCode = "AI_RESPONSE_PARSE_FAILED" {
             return ..Error(502, "AI_RESPONSE_PARSE_FAILED", result.%Get("statusText"))
+        }
+    }
+    return result
+}
+
+ClassMethod HandleMonitorResult(result As %DynamicObject) As %DynamicObject [ Private ]
+{
+    If result.%IsDefined("errorCode") {
+        If result.errorCode = "INVALID_MONITOR_PERIOD" {
+            return ..Error(400, "INVALID_MONITOR_PERIOD", "period must be current or historical.")
+        }
+        If result.errorCode = "INVALID_MONITOR_DATE_FILTER" {
+            return ..Error(400, "INVALID_MONITOR_DATE_FILTER", result.%Get("statusText"))
+        }
+        If result.errorCode = "INVALID_MONITOR_NAMESPACE" {
+            return ..Error(400, "INVALID_MONITOR_NAMESPACE", "Invalid monitor namespace filter.")
+        }
+        If result.errorCode = "MONITOR_REQUEST_FAILED" {
+            return ..Error(502, "MONITOR_REQUEST_FAILED", result.%Get("statusText"))
         }
     }
     return result

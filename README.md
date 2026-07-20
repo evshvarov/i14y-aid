@@ -67,6 +67,9 @@ GET /i14y-aid/api/_spec
 GET /i14y-aid/api/health
 GET /i14y-aid/api/capabilities
 GET /i14y-aid/api/codes
+GET /i14y-aid/api/monitor/interop/range
+GET /i14y-aid/api/monitor/interop/volume
+GET /i14y-aid/api/monitor/metrics/interop
 GET /i14y-aid/api/settings
 PUT /i14y-aid/api/settings
 GET /i14y-aid/api/messages
@@ -113,6 +116,9 @@ Example:
 curl http://localhost:57337/i14y-aid/api/health
 curl http://localhost:57337/i14y-aid/api/capabilities
 curl http://localhost:57337/i14y-aid/api/codes
+curl "http://localhost:57337/i14y-aid/api/monitor/interop/range"
+curl "http://localhost:57337/i14y-aid/api/monitor/interop/volume?namespace=USER"
+curl "http://localhost:57337/i14y-aid/api/monitor/metrics/interop?limit=50"
 curl http://localhost:57337/i14y-aid/api/settings
 curl -X PUT http://localhost:57337/i14y-aid/api/settings -H "Content-Type: application/json" -d '{"maxTraceDepth":25,"explanationVerbosity":"brief"}'
 curl "http://localhost:57337/i14y-aid/api/messages?limit=10"
@@ -170,6 +176,8 @@ Message status labels:
 ```
 
 Log APIs return raw IRIS log `type` values and readable `typeLabel` values. The `type` query filter accepts either value, such as `type=2` or `type=Error`. Log responses include structured `typeFacets`. Frontends can also call `GET /i14y-aid/api/codes` to load the mappings dynamically.
+
+Monitor wrapper APIs expose a narrow, sanitized JSON view of selected IRIS `/api/monitor` data through the existing `/i14y-aid/api` web application. Use `GET /i14y-aid/api/monitor/interop/range` to find available interoperability usage metric dates, `GET /i14y-aid/api/monitor/interop/volume?namespace=USER` for current usage volume samples, and `GET /i14y-aid/api/monitor/metrics/interop` for `iris_interop*` samples from `/api/monitor/metrics`. These wrappers parse OpenMetrics text into JSON samples and keep CORS/security scoped to the explainer API.
 
 Log type labels:
 

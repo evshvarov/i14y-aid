@@ -69,6 +69,143 @@
         }
       }
     },
+    "/monitor/interop/range": {
+      "get": {
+        "summary": "Get sanitized interoperability monitor metric date range",
+        "operationId": "GetMonitorInteropRange",
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "default": "current",
+            "description": "Monitor data period: current or historical."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sanitized interoperability monitor range",
+            "schema": {
+              "$ref": "#/definitions/MonitorInteropRangeResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid monitor query",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "502": {
+            "description": "Monitor endpoint request failed",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/monitor/interop/volume": {
+      "get": {
+        "summary": "Get sanitized interoperability monitor volume metrics",
+        "operationId": "GetMonitorInteropVolume",
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "default": "current",
+            "description": "Monitor data period: current or historical."
+          },
+          {
+            "name": "namespace",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Namespace filter. Defaults to the current namespace; use * for all namespaces."
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Current period start date in UTC, YYYY-MM-DD."
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Current period end date in UTC, YYYY-MM-DD."
+          },
+          {
+            "name": "startMonth",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Historical period start month, YYYY-MM."
+          },
+          {
+            "name": "endMonth",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Historical period end month, YYYY-MM."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sanitized interoperability monitor volume metrics",
+            "schema": {
+              "$ref": "#/definitions/MonitorInteropVolumeResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid monitor query",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "502": {
+            "description": "Monitor endpoint request failed",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/monitor/metrics/interop": {
+      "get": {
+        "summary": "Get sanitized interoperability OpenMetrics samples from /api/monitor/metrics",
+        "operationId": "GetMonitorInteropMetrics",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 200
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sanitized interoperability OpenMetrics samples",
+            "schema": {
+              "$ref": "#/definitions/MonitorInteropMetricsResponse"
+            }
+          },
+          "502": {
+            "description": "Monitor endpoint request failed",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/settings": {
       "get": {
         "summary": "Get module analysis settings",
@@ -1920,6 +2057,9 @@
         "productionLogs": {
           "type": "boolean"
         },
+        "monitorInterop": {
+          "type": "boolean"
+        },
         "aiProvider": {
           "type": "boolean"
         },
@@ -2066,6 +2206,169 @@
           "format": "int32"
         },
         "logTypeCount": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "MonitorInteropRangeResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "period": {
+          "type": "string"
+        },
+        "startDate": {
+          "type": "string"
+        },
+        "endDate": {
+          "type": "string"
+        },
+        "samples": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MonitorMetricSample"
+          }
+        },
+        "sampleCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "metrics": {
+          "$ref": "#/definitions/MonitorWrapperMetrics"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "MonitorInteropVolumeResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "period": {
+          "type": "string"
+        },
+        "namespaceFilter": {
+          "type": "string"
+        },
+        "samples": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MonitorMetricSample"
+          }
+        },
+        "sampleCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "metrics": {
+          "$ref": "#/definitions/MonitorWrapperMetrics"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "MonitorInteropMetricsResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "samples": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MonitorMetricSample"
+          }
+        },
+        "sampleCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "metrics": {
+          "$ref": "#/definitions/MonitorWrapperMetrics"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "MonitorMetricSample": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "numeric": {
+          "type": "boolean"
+        },
+        "numericValue": {
+          "type": "number"
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "labelCount": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "MonitorWrapperMetrics": {
+      "type": "object",
+      "properties": {
+        "sampleCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "httpStatus": {
           "type": "integer",
           "format": "int32"
         }

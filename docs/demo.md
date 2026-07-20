@@ -32,6 +32,7 @@ printf 'zn "USER"\nzpm "install esh-i14y-csv"\nhalt\n' | docker compose exec -T 
 curl http://localhost:57337/i14y-aid/api/health
 curl http://localhost:57337/i14y-aid/api/capabilities
 curl http://localhost:57337/i14y-aid/api/codes
+curl "http://localhost:57337/i14y-aid/api/monitor/interop/range"
 curl http://localhost:57337/i14y-aid/api/settings
 ```
 
@@ -135,6 +136,16 @@ curl "http://localhost:57337/i14y-aid/api/productions/esh.i14y.csv.F2CProduction
 
 Message filters accept either IRIS status codes or labels, for example `status=9` and `status=Completed`. Responses include `statusLabel` and structured `statusFacets`. The `GET /i14y-aid/api/codes` endpoint returns the status mappings.
 Log filters accept either IRIS log type codes or labels, for example `type=2` and `type=Error`. Responses include `typeLabel` and structured `typeFacets`. The `GET /i14y-aid/api/codes` endpoint returns the log type mappings.
+
+Inspect sanitized IRIS monitor interoperability usage metrics through the explainer API:
+
+```sh
+curl "http://localhost:57337/i14y-aid/api/monitor/interop/range"
+curl "http://localhost:57337/i14y-aid/api/monitor/interop/volume?namespace=USER"
+curl "http://localhost:57337/i14y-aid/api/monitor/metrics/interop?limit=50"
+```
+
+These endpoints wrap selected `/api/monitor` responses and return JSON samples instead of exposing raw instance-level OpenMetrics output to the UI.
 
 Pick a `messageId` from the response, then inspect detail, trace, explanation, and payload metadata:
 

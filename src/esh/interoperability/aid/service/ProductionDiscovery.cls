@@ -14,6 +14,7 @@ ClassMethod Capabilities() As %DynamicObject
     Set capabilities.payloadInspection = capabilities.runtimeTraceAnalysis
     Set capabilities.payloadPreview = capabilities.runtimeTraceAnalysis
     Set capabilities.productionLogs = (..ProductionLogClassName() '= "")
+    Set capabilities.monitorInterop = 1
     Set capabilities.aiProvider = 1
     Set capabilities.aiSummary = 1
     Set capabilities.openapiVersion = "2.0"
@@ -37,6 +38,126 @@ ClassMethod Codes() As %DynamicObject
     Set result.metrics = {}
     Set result.metrics.messageStatusCount = result.messageStatuses.%Size()
     Set result.metrics.logTypeCount = result.logTypes.%Size()
+    return result
+}
+
+ClassMethod GetMonitorInteropRange(period As %VarString = "current") As %DynamicObject
+{
+    Set normalizedPeriod = ..NormalizeMonitorPeriod(period)
+    If normalizedPeriod = "" {
+        return ..NewMonitorError("INVALID_MONITOR_PERIOD", "period must be current or historical.")
+    }
+
+    Set path = "/api/monitor/interop/"_normalizedPeriod_"/range"
+    Set response = ..FetchMonitorOpenMetrics(path)
+    If response.%IsDefined("errorCode") {
+        return response
+    }
+
+    Set result = ..NewMonitorResult(path)
+    Set result.period = normalizedPeriod
+    Set result.samples = ..ParseOpenMetricsSamples(response.body, "", 50)
+    Set result.sampleCount = result.samples.%Size()
+    Set result.startDate = ""
+    Set result.endDate = ""
+    For index = 0:1:result.samples.%Size()-1 {
+        Set sample = result.samples.%Get(index)
+        Continue:'$IsObject(sample)
+        If sample.name = "iris_interop_range_start" {
+            Set result.startDate = sample.value
+        }
+        If sample.name = "iris_interop_range_end" {
+            Set result.endDate = sample.value
+        }
+    }
+    Set result.metrics = ..NewMonitorMetrics(result.samples.%Size(), response.httpStatus)
+    Do result.evidence.%Push(..NewEvidence("iris-monitor", "/api/monitor", path, "sampleCount", result.samples.%Size(), "observed"))
+    return result
+}
+
+ClassMethod GetMonitorInteropVolume(period As %VarString = "current", namespace As %VarString = "", startDate As %VarString = "", endDate As %VarString = "", startMonth As %VarString = "", endMonth As %VarString = "") As %DynamicObject
+{
+    Set normalizedPeriod = ..NormalizeMonitorPeriod(period)
+    If normalizedPeriod = "" {
+        return ..NewMonitorError("INVALID_MONITOR_PERIOD", "period must be current or historical.")
+    }
+
+    Set namespaceFilter = ..NormalizeMonitorNamespace(namespace)
+    If namespaceFilter = "" {
+        return ..NewMonitorError("INVALID_MONITOR_NAMESPACE", "Invalid monitor namespace filter.")
+    }
+
+    Set path = "/api/monitor/interop/"_normalizedPeriod_"/volume"
+    If normalizedPeriod = "current" {
+        Set start = ..NormalizeMonitorDate(startDate)
+        If start.%IsDefined("errorCode") {
+            return start
+        }
+        Set finish = ..NormalizeMonitorDate(endDate)
+        If finish.%IsDefined("errorCode") {
+            return finish
+        }
+        Set path = ..AppendMonitorQuery(path, "namespace", namespaceFilter)
+        If start.value '= "" {
+            Set path = ..AppendMonitorQuery(path, "startDate", start.value)
+        }
+        If finish.value '= "" {
+            Set path = ..AppendMonitorQuery(path, "endDate", finish.value)
+        }
+    } Else {
+        Set start = ..NormalizeMonitorMonth(startMonth)
+        If start.%IsDefined("errorCode") {
+            return start
+        }
+        Set finish = ..NormalizeMonitorMonth(endMonth)
+        If finish.%IsDefined("errorCode") {
+            return finish
+        }
+        Set path = ..AppendMonitorQuery(path, "namespace", namespaceFilter)
+        If start.value '= "" {
+            Set path = ..AppendMonitorQuery(path, "startmonth", start.value)
+        }
+        If finish.value '= "" {
+            Set path = ..AppendMonitorQuery(path, "endmonth", finish.value)
+        }
+    }
+
+    Set response = ..FetchMonitorOpenMetrics(path)
+    If response.%IsDefined("errorCode") {
+        return response
+    }
+
+    Set result = ..NewMonitorResult(path)
+    Set result.period = normalizedPeriod
+    Set result.namespaceFilter = namespaceFilter
+    Set result.samples = ..ParseOpenMetricsSamples(response.body, "", 500)
+    Set result.sampleCount = result.samples.%Size()
+    Set result.metrics = ..NewMonitorMetrics(result.samples.%Size(), response.httpStatus)
+    Do result.evidence.%Push(..NewEvidence("iris-monitor", "/api/monitor", path, "sampleCount", result.samples.%Size(), "observed"))
+    return result
+}
+
+ClassMethod GetMonitorInteropMetrics(limit As %Integer = 200) As %DynamicObject
+{
+    Set limit = ..NormalizeLimit(limit)
+    Set response = ..FetchMonitorOpenMetrics("/api/monitor/metrics")
+    If response.%IsDefined("errorCode") {
+        return response
+    }
+
+    Set result = ..NewMonitorResult("/api/monitor/metrics")
+    Set result.samples = ..ParseOpenMetricsSamples(response.body, "iris_interop", limit)
+    Set lastActivity = ..ParseOpenMetricsSamples(response.body, "iris_last_activity", limit)
+    For index = 0:1:lastActivity.%Size()-1 {
+        Quit:(result.samples.%Size() >= limit)
+        Do result.samples.%Push(lastActivity.%Get(index))
+    }
+    Set result.sampleCount = result.samples.%Size()
+    Set result.metrics = ..NewMonitorMetrics(result.samples.%Size(), response.httpStatus)
+    If result.samples.%Size() = 0 {
+        Do result.warnings.%Push(..NewWarning("INTEROP_METRICS_NOT_ENABLED", "No iris_interop metrics were returned by /api/monitor/metrics. Interoperability metrics may not be enabled for active productions."))
+    }
+    Do result.evidence.%Push(..NewEvidence("iris-monitor", "/api/monitor", "/api/monitor/metrics", "sampleCount", result.samples.%Size(), "observed"))
     return result
 }
 
@@ -4480,6 +4601,231 @@ ClassMethod NormalizeDateRange(startDate As %VarString = "", endDate As %VarStri
         Set range.statusText = "startDate must be earlier than or equal to endDate."
     }
     return range
+}
+
+ClassMethod FetchMonitorOpenMetrics(path As %VarString) As %DynamicObject [ Private ]
+{
+    Set result = {}
+    Set result.body = ""
+    Set request = ##class(%Net.HttpRequest).%New()
+    Set request.Server = "127.0.0.1"
+    Set request.Port = ..MonitorPort()
+    Set request.Https = 0
+    Set request.ContentType = "text/plain"
+    Do request.SetHeader("Accept", "text/plain")
+
+    Set sc = request.Get(path)
+    If $$$ISERR(sc) {
+        return ..NewMonitorError("MONITOR_REQUEST_FAILED", $System.Status.GetErrorText(sc))
+    }
+    Set result.httpStatus = request.HttpResponse.StatusCode
+    If (request.HttpResponse.StatusCode < 200) || (request.HttpResponse.StatusCode > 299) {
+        return ..NewMonitorError("MONITOR_REQUEST_FAILED", "/api/monitor request failed with HTTP "_request.HttpResponse.StatusCode_".")
+    }
+    If $IsObject(request.HttpResponse.Data) {
+        Do request.HttpResponse.Data.Rewind()
+        While 'request.HttpResponse.Data.AtEnd {
+            Set result.body = result.body_request.HttpResponse.Data.Read(32000)
+        }
+    }
+    return result
+}
+
+ClassMethod MonitorPort() As %Integer [ Private ]
+{
+    Set port = 52773
+    Try {
+        If $IsObject(%request) && %request.CgiEnvs("SERVER_PORT") '= "" {
+            Set port = +%request.CgiEnvs("SERVER_PORT")
+        }
+    } Catch ex {
+        Set port = 52773
+    }
+    If port < 1 {
+        Set port = 52773
+    }
+    return port
+}
+
+ClassMethod ParseOpenMetricsSamples(text As %VarString, prefix As %VarString = "", limit As %Integer = 200) As %DynamicArray [ Private ]
+{
+    Set samples = []
+    If limit < 1 {
+        Set limit = 200
+    }
+    For lineIndex = 1:1:$Length(text, $Char(10)) {
+        Quit:(samples.%Size() >= limit)
+        Set line = $ZStrip($Piece(text, $Char(10), lineIndex), "<>W")
+        Continue:(line = "")
+        Continue:($Extract(line, 1) = "#")
+        Set space = $Find(line, " ")
+        Continue:(space = 0)
+        Set nameAndLabels = $Extract(line, 1, space-2)
+        Set value = $ZStrip($Extract(line, space, *), "<>W")
+        Continue:(nameAndLabels = "")
+        Set metricName = nameAndLabels
+        Set labels = {}
+        If nameAndLabels["{" {
+            Set metricName = $Piece(nameAndLabels, "{", 1)
+            Set labelText = $Piece($Piece(nameAndLabels, "{", 2), "}", 1)
+            Do ..AddOpenMetricLabels(labelText, labels)
+        }
+        Continue:(metricName = "")
+        If prefix '= "" {
+            Continue:($Extract(metricName, 1, $Length(prefix)) '= prefix)
+        }
+        Set sample = {}
+        Set sample.name = metricName
+        Set sample.value = value
+        Set sample.labels = labels
+        Set sample.labelCount = labels.%Size()
+        Set sample.numeric = ..IsMonitorNumericValue(value)
+        If sample.numeric {
+            Set sample.numericValue = +value
+        }
+        Do samples.%Push(sample)
+    }
+    return samples
+}
+
+ClassMethod AddOpenMetricLabels(labelText As %VarString, labels As %DynamicObject) [ Private ]
+{
+    For index = 1:1:$Length(labelText, ",") {
+        Set pair = $ZStrip($Piece(labelText, ",", index), "<>W")
+        Quit:(pair = "")
+        Set key = $ZStrip($Piece(pair, "=", 1), "<>W")
+        Set value = $Piece(pair, "=", 2, *)
+        Continue:(key = "")
+        If ($Extract(value, 1) = """") && ($Extract(value, $Length(value)) = """") {
+            Set value = $Extract(value, 2, $Length(value)-1)
+        }
+        Set value = $Replace(value, "\""", """")
+        Do labels.%Set(key, value)
+    }
+    return
+}
+
+ClassMethod NormalizeMonitorPeriod(period As %VarString) As %VarString [ Private ]
+{
+    Set value = $ZConvert($ZStrip(period, "<>W"), "L")
+    If value = "" {
+        return "current"
+    }
+    If (value = "current") || (value = "historical") {
+        return value
+    }
+    return ""
+}
+
+ClassMethod NormalizeMonitorNamespace(namespace As %VarString) As %VarString [ Private ]
+{
+    Set value = $ZStrip(namespace, "<>W")
+    If value = "" {
+        return $Namespace
+    }
+    If value = "*" {
+        return value
+    }
+    If $Length(value) > 64 {
+        return ""
+    }
+    For index = 1:1:$Length(value) {
+        Set char = $Extract(value, index)
+        Continue:((char?1AN) || (char = "%") || (char = "_") || (char = "-"))
+        return ""
+    }
+    return value
+}
+
+ClassMethod NormalizeMonitorDate(value As %VarString) As %DynamicObject [ Private ]
+{
+    Set result = {}
+    Set result.value = ""
+    Set date = ..NormalizeDateFilter(value, 0)
+    If 'date.valid {
+        return ..NewMonitorError("INVALID_MONITOR_DATE_FILTER", "Invalid date filter. Use YYYY-MM-DD or ISO 8601.")
+    }
+    If date.value '= "" {
+        Set result.value = $Piece(date.value, " ", 1)
+    }
+    return result
+}
+
+ClassMethod NormalizeMonitorMonth(value As %VarString) As %DynamicObject [ Private ]
+{
+    Set result = {}
+    Set result.value = ""
+    Set month = $ZStrip(value, "<>W")
+    If month = "" {
+        return result
+    }
+    If '(month?4N1"-"2N) {
+        return ..NewMonitorError("INVALID_MONITOR_DATE_FILTER", "Invalid month filter. Use YYYY-MM.")
+    }
+    Set result.value = month
+    return result
+}
+
+ClassMethod AppendMonitorQuery(path As %VarString, name As %VarString, value As %VarString) As %VarString [ Private ]
+{
+    If value = "*" {
+        return path
+    }
+    If path["?" {
+        return path_"&"_name_"="_value
+    }
+    return path_"?"_name_"="_value
+}
+
+ClassMethod NewMonitorResult(sourcePath As %VarString) As %DynamicObject [ Private ]
+{
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.source = sourcePath
+    Set result.contentType = "application/json"
+    Set result.samples = []
+    Set result.sampleCount = 0
+    Set result.warnings = []
+    Set result.evidence = []
+    return result
+}
+
+ClassMethod NewMonitorMetrics(sampleCount As %Integer, httpStatus As %Integer) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.sampleCount = sampleCount
+    Set metrics.httpStatus = httpStatus
+    return metrics
+}
+
+ClassMethod NewMonitorError(code As %VarString, message As %VarString) As %DynamicObject [ Private ]
+{
+    Set result = {}
+    Do result.%Set("errorCode", code)
+    Do result.%Set("statusText", message)
+    Set result.warnings = []
+    Do result.warnings.%Push(..NewWarning(code, message))
+    return result
+}
+
+ClassMethod IsMonitorNumericValue(value As %VarString) As %Boolean [ Private ]
+{
+    If value = "" {
+        return 0
+    }
+    If value?1"-".N {
+        return 1
+    }
+    If value?.N {
+        return 1
+    }
+    If value?1"-".N1".".N {
+        return 1
+    }
+    If value?.N1".".N {
+        return 1
+    }
+    return 0
 }
 
 ClassMethod NormalizeDateFilter(value As %VarString = "", endOfDay As %Boolean = 0) As %DynamicObject [ Private ]
