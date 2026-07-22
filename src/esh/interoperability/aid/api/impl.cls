@@ -22,7 +22,7 @@ ClassMethod Health() As %DynamicObject
     Set result = {}
     Set result.status = "ok"
     Set result.module = "esh-i14y-aid"
-    Set result.version = "0.1.0"
+    Set result.version = "0.2.20"
     Set result.namespace = $Namespace
     Set result.capabilities = ##class(esh.interoperability.aid.service.ProductionDiscovery).Capabilities()
     return result

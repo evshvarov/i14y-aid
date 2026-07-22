@@ -18,6 +18,10 @@ ClassMethod SetupSecurity() As %Status
     If $$$ISERR(sc) {
         Set tSC = sc
     }
+    Set sc = ..RequirePasswordAuth()
+    If $$$ISERR(sc) {
+        Set tSC = sc
+    }
     Set sc = ..AddARoleToUser()
     If $$$ISERR(sc) {
         Set tSC = sc
@@ -26,11 +30,11 @@ ClassMethod SetupSecurity() As %Status
     If $$$ISERR(sc) {
         Set tSC = sc
     }
-    Set sc = ..AddARoleToUser("UnknownUser")
+    Set sc = ..RemoveARoleFromUser("UnknownUser")
     If $$$ISERR(sc) {
         Set tSC = sc
     }
-    Set sc = ..AddARoleToUser("UnknownUser", "%All")
+    Set sc = ..RemoveARoleFromUser("UnknownUser", "%All")
     If $$$ISERR(sc) {
         Set tSC = sc
     }
@@ -115,6 +119,38 @@ ClassMethod AddARoleToUser(user As %VarString = "CSPSystem", ARole As %VarString
     return status
 }
 
+ClassMethod RemoveARoleFromUser(user As %VarString = "UnknownUser", ARole As %VarString = "i14yaid") As %Status
+{
+    New $NAMESPACE
+    Set $NAMESPACE = "%SYS"
+
+    Set status = ##class(Security.Users).Get(user, .userProps)
+    If $$$ISERR(status) {
+        return status
+    }
+    If '$Data(userProps("Roles")) {
+        return $$$OK
+    }
+    Set roles = userProps("Roles")
+    Set nextRoles = ""
+    For index = 1:1:$Length(roles, ",") {
+        Set currentARole = $Piece(roles, ",", index)
+        Continue:(currentARole = "")
+        Continue:(currentARole = ARole)
+        If nextRoles = "" {
+            Set nextRoles = currentARole
+        } Else {
+            Set nextRoles = nextRoles _ "," _ currentARole
+        }
+    }
+    If nextRoles = roles {
+        return $$$OK
+    }
+    Set userProps("Roles") = nextRoles
+    Set status = ##class(Security.Users).Modify(user, .userProps)
+    return status
+}
+
 ClassMethod AddARole(appname As %VarString = "", appARole As %VarString = "i14yaid") As %Status
 {
     New $NAMESPACE
@@ -133,6 +169,24 @@ ClassMethod AddARole(appname As %VarString = "", appARole As %VarString = "i14ya
     If (":" _ appProps("MatchRoles") _ ":") '[ (":" _ appARole _ ":") {
         Set appProps("MatchRoles") = appProps("MatchRoles") _ ":" _ appARole
     }
+    Set status = ##class(Security.Applications).Modify(appname, .appProps)
+    return status
+}
+
+ClassMethod RequirePasswordAuth(appname As %VarString = "") As %Status
+{
+    New $NAMESPACE
+    Set $NAMESPACE = "%SYS"
+
+    If appname = "" {
+        Set appname = ..#webapp
+    }
+    Set status = ##class(Security.Applications).Get(appname, .appProps)
+    If $$$ISERR(status) {
+        return status
+    }
+    Set appProps("PasswordAuthEnabled") = 1
+    Set appProps("UnauthenticatedEnabled") = 0
     Set status = ##class(Security.Applications).Modify(appname, .appProps)
     return status
 }

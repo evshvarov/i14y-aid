@@ -265,8 +265,10 @@ ClassMethod ListProductions() As %DynamicObject
         return result
     }
 
+    Set runtime = ..GetRuntimeStatus("")
+    Kill typeCache
     Set stmt = ##class(%SQL.Statement).%New()
-    Set sc = stmt.%Prepare("SELECT Name, Description FROM %Dictionary.CompiledClass ORDER BY Name")
+    Set sc = stmt.%Prepare("SELECT TOP 500 Name, Description FROM Ens_Config.Production ORDER BY Name")
     If $$$ISERR(sc) {
         return ..AddStatusError(.result, "Status error: "_$System.Status.GetErrorText(sc))
     }
@@ -279,24 +281,23 @@ ClassMethod ListProductions() As %DynamicObject
     While rset.%Next() {
         Set className = rset.%Get("Name")
         Continue:($Extract(className, 1) = "%")
-        Continue:('..ClassExtends(className, "Ens.Production"))
 
         Set item = {}
         Set item.name = className
         Set item.namespace = $Namespace
         Set item.description = rset.%Get("Description")
-        Set components = ..ListComponents(className).items
-        Set item.componentCount = components.%Size()
-        Set item.serviceCount = ..CountComponentsByType(components, "business-service")
-        Set item.processCount = ..CountComponentsByType(components, "business-process")
-        Set item.operationCount = ..CountComponentsByType(components, "business-operation")
-        Set item.disabledComponentCount = ..CountDisabledComponents(components)
-        Set item.runtime = ..GetRuntimeStatus(className)
+        Set itemMetrics = ..BuildProductionItemMetrics(className, .typeCache)
+        Set item.componentCount = itemMetrics.componentCount
+        Set item.serviceCount = itemMetrics.serviceCount
+        Set item.processCount = itemMetrics.processCount
+        Set item.operationCount = itemMetrics.operationCount
+        Set item.disabledComponentCount = itemMetrics.disabledComponentCount
+        Set item.runtime = ..RuntimeStatusForProduction(className, runtime)
         Set item.isRunning = item.runtime.isRunning
         Set item.runtimeState = item.runtime.stateLabel
         Set item.runtimeMetrics = ..BuildProductionRuntimeMetrics(item)
         Set item.evidence = []
-        Do item.evidence.%Push(..NewEvidence("class-metadata", "%Dictionary.CompiledClass", className, "Super", "Ens.Production", "confirmed"))
+        Do item.evidence.%Push(..NewEvidence("production-config", "Ens_Config.Production", className, "Name", className, "confirmed"))
         Do result.items.%Push(item)
     }
 
@@ -4446,6 +4447,7 @@ ClassMethod CallOpenAIChat(endpoint As %VarString, model As %VarString, apiKey A
     Set request.Server = endpointParts.server
     Set request.Port = endpointParts.port
     Set request.Https = endpointParts.https
+    Set request.Timeout = 30
     If request.Https {
         Set request.SSLConfiguration = "default"
     }
@@ -4503,6 +4505,12 @@ ClassMethod CallOpenAIChat(endpoint As %VarString, model As %VarString, apiKey A
 ClassMethod ParseEndpoint(endpoint As %VarString) As %DynamicObject [ Private ]
 {
     Set result = {}
+    Set endpoint = $ZStrip(endpoint, "<>W")
+    If endpoint = "" {
+        Do result.%Set("errorCode", "AI_ENDPOINT_INVALID")
+        Do result.%Set("statusText", "AI endpoint is empty.")
+        return result
+    }
     Do ##class(%Net.URLParser).Parse(endpoint, .parts)
     If '$Data(parts("host")) {
         Do result.%Set("errorCode", "AI_ENDPOINT_INVALID")
@@ -4510,6 +4518,11 @@ ClassMethod ParseEndpoint(endpoint As %VarString) As %DynamicObject [ Private ]
         return result
     }
     Set scheme = $ZConvert(parts("scheme"), "L")
+    If (scheme '= "https") && (scheme '= "http") {
+        Do result.%Set("errorCode", "AI_ENDPOINT_INVALID")
+        Do result.%Set("statusText", "AI endpoint scheme must be http or https.")
+        return result
+    }
     Set result.scheme = scheme
     Set result.https = $Select(scheme="https":1,1:0)
     Set result.server = parts("host")
@@ -4517,6 +4530,26 @@ ClassMethod ParseEndpoint(endpoint As %VarString) As %DynamicObject [ Private ]
         Set result.port = +parts("port")
     } Else {
         Set result.port = $Select(result.https:443,1:80)
+    }
+    If (result.port < 1) || (result.port > 65535) {
+        Do result.%Set("errorCode", "AI_ENDPOINT_INVALID")
+        Do result.%Set("statusText", "AI endpoint port must be between 1 and 65535.")
+        return result
+    }
+    If (scheme = "https") && (result.port '= 443) {
+        Do result.%Set("errorCode", "AI_ENDPOINT_INVALID")
+        Do result.%Set("statusText", "OpenAI HTTPS endpoint must use port 443.")
+        return result
+    }
+    If (scheme = "http") && (result.port '= 80) {
+        Do result.%Set("errorCode", "AI_ENDPOINT_INVALID")
+        Do result.%Set("statusText", "OpenAI HTTP endpoint must use port 80.")
+        return result
+    }
+    If (result.server = "127.0.0.1") || (result.server = "localhost") {
+        Do result.%Set("errorCode", "AI_ENDPOINT_INVALID")
+        Do result.%Set("statusText", "AI endpoint must not point to localhost.")
+        return result
     }
     Set path = "/"
     If $Data(parts("path")) {
@@ -7003,6 +7036,54 @@ ClassMethod CountComponentsByType(components As %DynamicArray, componentType As 
     return count
 }
 
+ClassMethod BuildProductionItemMetrics(productionName As %VarString, ByRef typeCache) As %DynamicObject [ Private ]
+{
+    Set metrics = {}
+    Set metrics.componentCount = 0
+    Set metrics.serviceCount = 0
+    Set metrics.processCount = 0
+    Set metrics.operationCount = 0
+    Set metrics.disabledComponentCount = 0
+
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sc = stmt.%Prepare("SELECT ClassName, Enabled FROM Ens_Config.Item WHERE Production = ?")
+    If $$$ISERR(sc) {
+        return metrics
+    }
+    Set rset = stmt.%Execute(productionName)
+    If rset.%SQLCODE < 0 {
+        return metrics
+    }
+
+    While rset.%Next() {
+        Set metrics.componentCount = metrics.componentCount + 1
+        If rset.%Get("Enabled") = 0 {
+            Set metrics.disabledComponentCount = metrics.disabledComponentCount + 1
+        }
+        Set componentType = ..CachedComponentType(rset.%Get("ClassName"), .typeCache)
+        If componentType = "business-service" {
+            Set metrics.serviceCount = metrics.serviceCount + 1
+        } ElseIf componentType = "business-process" {
+            Set metrics.processCount = metrics.processCount + 1
+        } ElseIf componentType = "business-operation" {
+            Set metrics.operationCount = metrics.operationCount + 1
+        }
+    }
+    return metrics
+}
+
+ClassMethod CachedComponentType(className As %VarString, ByRef typeCache) As %VarString [ Private ]
+{
+    If className = "" {
+        return "unknown"
+    }
+    If $Data(typeCache(className)) {
+        return typeCache(className)
+    }
+    Set typeCache(className) = ..ComponentType(className)
+    return typeCache(className)
+}
+
 ClassMethod CountConnectionsByKind(connections As %DynamicArray, kind As %VarString) As %Integer [ Private ]
 {
     Set count = 0
@@ -7324,6 +7405,31 @@ ClassMethod GetRuntimeStatus(productionName As %VarString = "") As %DynamicObjec
     }
     If $$$ISERR(sc) {
         Do status.%Set("statusText", $System.Status.GetErrorText(sc))
+    }
+    return status
+}
+
+ClassMethod RuntimeStatusForProduction(productionName As %VarString, runtime As %DynamicObject) As %DynamicObject [ Private ]
+{
+    If '$IsObject(runtime) {
+        return ..GetRuntimeStatus(productionName)
+    }
+    Set status = {}
+    Set status.requestedProduction = productionName
+    Set status.currentProduction = runtime.currentProduction
+    Set status.state = runtime.state
+    Set status.activeStateLabel = runtime.activeStateLabel
+    Set status.isCurrent = $Select((productionName '= "") && (runtime.currentProduction = productionName):1, 1:0)
+    Set status.isRunning = $Select((runtime.state = 1) && ((productionName = "") || (runtime.currentProduction = productionName)):1, 1:0)
+    If productionName = "" {
+        Set status.stateLabel = runtime.activeStateLabel
+    } ElseIf status.isRunning {
+        Set status.stateLabel = runtime.activeStateLabel
+    } Else {
+        Set status.stateLabel = "stopped"
+    }
+    If runtime.%IsDefined("statusText") {
+        Set status.statusText = runtime.statusText
     }
     return status
 }
