@@ -206,6 +206,42 @@
         }
       }
     },
+    "/monitor/metrics/interop/enable": {
+      "post": {
+        "summary": "Enable IRIS interoperability metrics collection for the current namespace",
+        "operationId": "EnableMonitorInteropMetrics",
+        "parameters": [
+          {
+            "name": "settings",
+            "in": "body",
+            "required": false,
+            "schema": {
+              "$ref": "#/definitions/MonitorInteropEnableRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Interoperability monitor metrics enablement result",
+            "schema": {
+              "$ref": "#/definitions/MonitorInteropEnableResponse"
+            }
+          },
+          "404": {
+            "description": "Interoperability metrics enablement is unavailable",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Interoperability metrics enablement failed",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/settings": {
       "get": {
         "summary": "Get module analysis settings",
@@ -346,6 +382,20 @@
             "required": false,
             "type": "string",
             "description": "Message status filter. Accepts IRIS status code or label, for example 9 or Completed."
+          },
+          {
+            "name": "messageId",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Message id search. Matches entered digits against Ens.MessageHeader ID."
+          },
+          {
+            "name": "sourceOrTarget",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Source or target component search. Matches entered text against SourceConfigName or TargetConfigName."
           }
         ],
         "responses": {
@@ -588,6 +638,20 @@
             "required": false,
             "type": "string",
             "description": "Message status filter. Accepts IRIS status code or label, for example 9 or Completed."
+          },
+          {
+            "name": "messageId",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Message id search. Matches entered digits against Ens.MessageHeader ID."
+          },
+          {
+            "name": "sourceOrTarget",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Source or target component search. Matches entered text against SourceConfigName or TargetConfigName."
           }
         ],
         "responses": {
@@ -1395,6 +1459,60 @@
           },
           "404": {
             "description": "Production or component not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/productions/{productionName}/components/{componentName}/settings": {
+      "put": {
+        "summary": "Update production component settings",
+        "operationId": "UpdateComponentSettings",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "componentName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "settings",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ComponentSettingsUpdateRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated production component settings",
+            "schema": {
+              "$ref": "#/definitions/ComponentSettingsUpdateResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid settings update request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production or component not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Component settings update failed",
             "schema": {
               "$ref": "#/definitions/ErrorResponse"
             }
@@ -2374,6 +2492,67 @@
         }
       }
     },
+    "MonitorInteropEnableRequest": {
+      "type": "object",
+      "properties": {
+        "enableSAM": {
+          "type": "boolean",
+          "description": "Enable basic iris_interop metrics for the current namespace. Defaults to true."
+        },
+        "enableActivityStats": {
+          "type": "boolean",
+          "description": "Also enable activity stats for a production. Requires Ens.Activity.Operation.LocalOp in the production for activity volume metrics."
+        },
+        "productionName": {
+          "type": "string",
+          "description": "Production class used for activity stats. Defaults to the active production when available."
+        }
+      }
+    },
+    "MonitorInteropEnableResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "samEnabled": {
+          "type": "boolean"
+        },
+        "samPrevious": {
+          "type": "boolean"
+        },
+        "activityStatsRequested": {
+          "type": "boolean"
+        },
+        "activityStatsEnabled": {
+          "type": "boolean"
+        },
+        "activityStatsPrevious": {
+          "type": "boolean"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "metrics": {
+          "$ref": "#/definitions/SettingsMetrics"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
     "AnalysisSettings": {
       "type": "object",
       "properties": {
@@ -2385,6 +2564,14 @@
         },
         "payloadMetadataEnabled": {
           "type": "boolean"
+        },
+        "requestSessionAnalysisEnabled": {
+          "type": "boolean",
+          "description": "When true, message detail views may request and show session timeline analysis. Default is false."
+        },
+        "requestTraceAnalysisEnabled": {
+          "type": "boolean",
+          "description": "When true, message detail views may request and show trace analysis. Default is false."
         },
         "messageResendEnabled": {
           "type": "boolean"
@@ -3040,6 +3227,10 @@
         },
         "messageBodyClassName": {
           "type": "string"
+        },
+        "resolvedMessageBodyClassName": {
+          "type": "string",
+          "description": "Canonical compiled class name used for dictionary metadata lookup."
         },
         "messageBodyId": {
           "type": "string"
@@ -3704,6 +3895,10 @@
         "messageBodyClassName": {
           "type": "string"
         },
+        "resolvedMessageBodyClassName": {
+          "type": "string",
+          "description": "Canonical compiled class name used for dictionary metadata lookup."
+        },
         "messageBodyId": {
           "type": "string"
         },
@@ -3757,6 +3952,10 @@
         },
         "messageBodyClassName": {
           "type": "string"
+        },
+        "resolvedMessageBodyClassName": {
+          "type": "string",
+          "description": "Canonical compiled class name used for dictionary metadata lookup."
         },
         "messageBodyId": {
           "type": "string"
@@ -6335,6 +6534,10 @@
         "stateLabel": {
           "type": "string"
         },
+        "activeStateLabel": {
+          "type": "string",
+          "description": "Namespace-level active production state label. stateLabel is scoped to requestedProduction."
+        },
         "isCurrent": {
           "type": "boolean"
         },
@@ -6413,6 +6616,72 @@
         },
         "hasError": {
           "type": "boolean"
+        }
+      }
+    },
+    "ComponentSettingsUpdateRequest": {
+      "type": "object",
+      "properties": {
+        "settings": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ComponentSettingUpdate": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "oldValue": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "ComponentSettingsUpdateResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "componentName": {
+          "type": "string"
+        },
+        "component": {
+          "$ref": "#/definitions/Component"
+        },
+        "settings": {
+          "type": "object"
+        },
+        "updatedSettings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ComponentSettingUpdate"
+          }
+        },
+        "metrics": {
+          "type": "object"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
         }
       }
     },

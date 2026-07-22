@@ -3,9 +3,13 @@ Class esh.interoperability.aid.config.Settings Extends %Persistent
 
 Property RuntimeMessageAnalysisEnabled As %Boolean [ InitialExpression = 1 ];
 
-Property PayloadInspectionEnabled As %Boolean [ InitialExpression = 0 ];
+Property PayloadInspectionEnabled As %Boolean [ InitialExpression = 1 ];
 
 Property PayloadMetadataEnabled As %Boolean [ InitialExpression = 1 ];
+
+Property RequestSessionAnalysisEnabled As %Boolean [ InitialExpression = 0 ];
+
+Property RequestTraceAnalysisEnabled As %Boolean [ InitialExpression = 0 ];
 
 Property MessageResendEnabled As %Boolean [ InitialExpression = 0 ];
 
@@ -53,8 +57,10 @@ ClassMethod Defaults() As %DynamicObject
 {
     Set settings = {}
     Set settings.runtimeMessageAnalysisEnabled = 1
-    Set settings.payloadInspectionEnabled = 0
+    Set settings.payloadInspectionEnabled = 1
     Set settings.payloadMetadataEnabled = 1
+    Set settings.requestSessionAnalysisEnabled = 0
+    Set settings.requestTraceAnalysisEnabled = 0
     Set settings.messageResendEnabled = 0
     Set settings.maxMessagesReturned = 100
     Set settings.maxTraceDepth = 50
@@ -84,7 +90,7 @@ ClassMethod Current() As %DynamicObject
 {
     Set settings = ..Defaults()
     Set stmt = ##class(%SQL.Statement).%New()
-    Set sql = "SELECT TOP 1 RuntimeMessageAnalysisEnabled, PayloadInspectionEnabled, PayloadMetadataEnabled, MessageResendEnabled, MaxMessagesReturned, MaxTraceDepth, DefaultMessageLookbackDays, FieldRedactionPatterns, ClassExclusions, ProductionExclusions, SourceCodeInferenceEnabled, ExplanationVerbosity, AIProviderEnabled, AISummaryEnabled, AIProvider, AIModel, AIEndpoint, OpenAIApiKey, RAGRuntimeDataEnabled, RAGRuntimeLookbackHours, RAGRuntimeMaxMessages, RAGRuntimeMaxLogs, RAGPayloadIndexingEnabled, RAGPayloadMaxFields FROM esh_interoperability_aid_config.Settings ORDER BY ID"
+    Set sql = "SELECT TOP 1 RuntimeMessageAnalysisEnabled, PayloadInspectionEnabled, PayloadMetadataEnabled, RequestSessionAnalysisEnabled, RequestTraceAnalysisEnabled, MessageResendEnabled, MaxMessagesReturned, MaxTraceDepth, DefaultMessageLookbackDays, FieldRedactionPatterns, ClassExclusions, ProductionExclusions, SourceCodeInferenceEnabled, ExplanationVerbosity, AIProviderEnabled, AISummaryEnabled, AIProvider, AIModel, AIEndpoint, OpenAIApiKey, RAGRuntimeDataEnabled, RAGRuntimeLookbackHours, RAGRuntimeMaxMessages, RAGRuntimeMaxLogs, RAGPayloadIndexingEnabled, RAGPayloadMaxFields FROM esh_interoperability_aid_config.Settings ORDER BY ID"
     Set sc = stmt.%Prepare(sql)
     If $$$ISERR(sc) {
         return settings
@@ -97,6 +103,8 @@ ClassMethod Current() As %DynamicObject
         Set settings.runtimeMessageAnalysisEnabled = rset.%Get("RuntimeMessageAnalysisEnabled")
         Set settings.payloadInspectionEnabled = rset.%Get("PayloadInspectionEnabled")
         Set settings.payloadMetadataEnabled = rset.%Get("PayloadMetadataEnabled")
+        Set settings.requestSessionAnalysisEnabled = rset.%Get("RequestSessionAnalysisEnabled")
+        Set settings.requestTraceAnalysisEnabled = rset.%Get("RequestTraceAnalysisEnabled")
         Set settings.messageResendEnabled = rset.%Get("MessageResendEnabled")
         Set settings.maxMessagesReturned = rset.%Get("MaxMessagesReturned")
         Set settings.maxTraceDepth = rset.%Get("MaxTraceDepth")
@@ -166,6 +174,20 @@ ClassMethod UpdateFromPayload(payload As %DynamicObject) As %DynamicObject
             Set result.changed = 1
         }
         Set settings.PayloadMetadataEnabled = value
+    }
+    If payload.%IsDefined("requestSessionAnalysisEnabled") {
+        Set value = ..NormalizeBooleanValue(payload.%Get("requestSessionAnalysisEnabled"), before.requestSessionAnalysisEnabled)
+        If value '= before.requestSessionAnalysisEnabled {
+            Set result.changed = 1
+        }
+        Set settings.RequestSessionAnalysisEnabled = value
+    }
+    If payload.%IsDefined("requestTraceAnalysisEnabled") {
+        Set value = ..NormalizeBooleanValue(payload.%Get("requestTraceAnalysisEnabled"), before.requestTraceAnalysisEnabled)
+        If value '= before.requestTraceAnalysisEnabled {
+            Set result.changed = 1
+        }
+        Set settings.RequestTraceAnalysisEnabled = value
     }
     If payload.%IsDefined("messageResendEnabled") {
         Set value = ..NormalizeBooleanValue(payload.%Get("messageResendEnabled"), before.messageResendEnabled)
@@ -356,6 +378,12 @@ ClassMethod ApplyDefaultBounds(settings As %DynamicObject) [ Private ]
     }
     If settings.payloadMetadataEnabled = "" {
         Set settings.payloadMetadataEnabled = 1
+    }
+    If settings.requestSessionAnalysisEnabled = "" {
+        Set settings.requestSessionAnalysisEnabled = 0
+    }
+    If settings.requestTraceAnalysisEnabled = "" {
+        Set settings.requestTraceAnalysisEnabled = 0
     }
     If settings.explanationVerbosity = "" {
         Set settings.explanationVerbosity = "normal"

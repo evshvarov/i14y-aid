@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #16202e; background: #eef1f5; -webkit-font-smoothing: antialiased; }
+  a { color: #2b5cd6; text-decoration: none; }
+  a:hover { color: #12327a; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #cdd4de; border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: #b3bcc9; background-clip: content-box; }
+  @keyframes i14yblink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+  @keyframes i14ypulse { 0% { box-shadow: 0 0 0 0 rgba(26,127,82,.5); } 70% { box-shadow: 0 0 0 6px rgba(26,127,82,0); } 100% { box-shadow: 0 0 0 0 rgba(26,127,82,0); } }
+  @keyframes i14yslide { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+</style>
+</helmet>
+
+<div style="display:flex; flex-direction:column; height:100vh; overflow:hidden;">
+
+  <!-- TOP BAR -->
+  <header style="flex:0 0 auto; height:54px; background:#0e2350; color:#eaf0fb; display:flex; align-items:center; gap:20px; padding:0 18px; box-shadow:0 1px 0 rgba(0,0,0,.12);">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div style="width:26px; height:26px; border-radius:6px; background:#2b5cd6; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; color:#fff; font-family:'IBM Plex Mono',monospace;">i14</div>
+      <div style="display:flex; flex-direction:column; line-height:1.1;">
+        <span style="font-weight:600; font-size:14px; letter-spacing:.2px;">Interoperability Aid</span>
+        <span style="font-size:10.5px; color:#8ea3ce; font-family:'IBM Plex Mono',monospace;">IRIS Production Explainer</span>
+      </div>
+    </div>
+    <div style="flex:1;"></div>
+    <div style="display:flex; align-items:center; gap:7px; font-size:12px; color:#c3d1ea; font-family:'IBM Plex Mono',monospace;">
+      <span style="color:#8ea3ce;">ns</span>
+      <span style="background:rgba(255,255,255,.09); padding:3px 9px; border-radius:5px; color:#eaf0fb;">USER</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:7px; font-size:12px; color:#c3d1ea; font-family:'IBM Plex Mono',monospace;">
+      <span style="color:#8ea3ce;">/i14y-aid/api</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px; background:rgba(46,196,120,.14); border:1px solid rgba(46,196,120,.35); padding:4px 10px; border-radius:20px;">
+      <span style="width:8px; height:8px; border-radius:50%; background:#2ec478; animation:i14ypulse 2.2s infinite;"></span>
+      <span style="font-size:11.5px; color:#a7ecc7; font-weight:500;">API healthy</span>
+    </div>
+    <button onClick="{{ toggleCopilot }}" style="display:flex; align-items:center; gap:7px; background:#2b5cd6; border:none; color:#fff; padding:7px 12px; border-radius:7px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit;" style-hover="background:#3a6ae0;">
+      <span style="font-size:14px;">✦</span> Copilot
+    </button>
+  </header>
+
+  <div style="flex:1; display:flex; min-height:0;">
+
+    <!-- SIDEBAR -->
+    <aside style="flex:0 0 258px; background:#fff; border-right:1px solid #dde2ea; display:flex; flex-direction:column; min-height:0;">
+      <div style="padding:14px 14px 8px;">
+        <div style="font-size:10.5px; font-weight:600; letter-spacing:.7px; text-transform:uppercase; color:#8792a3; margin-bottom:8px; padding-left:2px;">Productions</div>
+        <sc-for list="{{ productions }}" as="p" hint-placeholder-count="3">
+          <button onClick="{{ p.onSelect }}" style="width:100%; text-align:left; border:1px solid {{ p.border }}; background:{{ p.bg }}; border-radius:9px; padding:10px 11px; margin-bottom:7px; cursor:pointer; display:flex; flex-direction:column; gap:5px; font-family:inherit;" style-hover="border-color:#b9c6de;">
+            <div style="display:flex; align-items:center; gap:7px;">
+              <span style="width:7px; height:7px; border-radius:50%; background:{{ p.dot }}; flex:0 0 auto;"></span>
+              <span style="font-size:12.5px; font-weight:600; color:{{ p.title }}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ p.short }}</span>
+            </div>
+            <span style="font-size:10px; font-family:'IBM Plex Mono',monospace; color:#8792a3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ p.name }}</span>
+            <span style="font-size:10px; font-weight:600; color:{{ p.dot }};">{{ p.status }}</span>
+          </button>
+        </sc-for>
+      </div>
+      <div style="height:1px; background:#eceff4; margin:6px 14px;"></div>
+      <nav style="padding:6px 10px; flex:1; overflow:auto;">
+        <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="6">
+          <button onClick="{{ n.onClick }}" style="width:100%; text-align:left; border:none; background:{{ n.bg }}; color:{{ n.color }}; border-radius:8px; padding:9px 11px; margin-bottom:2px; cursor:pointer; display:flex; align-items:center; gap:10px; font-size:13px; font-weight:{{ n.weight }}; font-family:inherit;" style-hover="background:#f1f4f9;">
+            <span style="font-size:14px; width:18px; text-align:center;">{{ n.icon }}</span>
+            <span style="flex:1;">{{ n.label }}</span>
+            <sc-if value="{{ n.badge }}" hint-placeholder-val="{{ true }}"><span style="font-size:10.5px; font-family:'IBM Plex Mono',monospace; background:{{ n.badgeBg }}; color:{{ n.badgeColor }}; padding:1px 7px; border-radius:10px; font-weight:600;">{{ n.badge }}</span></sc-if>
+          </button>
+        </sc-for>
+      </nav>
+      <div style="padding:12px 16px; border-top:1px solid #eceff4; display:flex; align-items:center; gap:9px;">
+        <div style="width:30px; height:30px; border-radius:50%; background:#e3e9f5; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; color:#12327a;">DV</div>
+        <div style="display:flex; flex-direction:column; line-height:1.2;">
+          <span style="font-size:12px; font-weight:600;">dev.user</span>
+          <span style="font-size:10.5px; color:#8792a3;">read + control</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main style="flex:1; min-width:0; overflow:auto; background:#eef1f5;">
+      <div style="padding:20px 24px; max-width:1180px;">
+
+        <!-- context header -->
+        <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:18px; flex-wrap:wrap;">
+          <div>
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+              <h1 style="margin:0; font-size:22px; font-weight:700; letter-spacing:-.3px;">{{ prod.short }}</h1>
+              <span style="display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:{{ prod.dot }}; background:{{ prod.pillBg }}; padding:3px 9px; border-radius:14px;"><span style="width:7px; height:7px; border-radius:50%; background:{{ prod.dot }};"></span>{{ prod.status }}</span>
+            </div>
+            <div style="font-size:12px; font-family:'IBM Plex Mono',monospace; color:#8792a3;">{{ prod.name }}</div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button onClick="{{ prod.onToggleRun }}" style="border:1px solid #d3dae4; background:#fff; color:#c0392b; padding:8px 14px; border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit;" style-hover="background:#fbeae7; border-color:#f0c3ba;">{{ prod.runLabel }}</button>
+            <button onClick="{{ prod.onRebuild }}" style="border:1px solid #d3dae4; background:#fff; color:#33405a; padding:8px 14px; border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit;" style-hover="background:#f1f4f9;">Rebuild RAG index</button>
+          </div>
+        </div>
+
+        <!-- ===== MONITOR ===== -->
+        <sc-if value="{{ isMonitor }}" hint-placeholder-val="{{ true }}">
+        <div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(158px,1fr)); gap:12px; margin-bottom:16px;">
+            <sc-for list="{{ metrics }}" as="m" hint-placeholder-count="6">
+              <div style="background:#fff; border:1px solid #dde2ea; border-radius:11px; padding:14px 15px;">
+                <div style="font-size:11px; color:#8792a3; font-weight:500; margin-bottom:8px;">{{ m.label }}</div>
+                <div style="display:flex; align-items:baseline; gap:5px;">
+                  <span style="font-size:25px; font-weight:700; letter-spacing:-.5px; color:{{ m.valColor }};">{{ m.value }}</span>
+                  <span style="font-size:12px; color:#8792a3; font-weight:500;">{{ m.unit }}</span>
+                </div>
+                <div style="font-size:11px; margin-top:6px; color:{{ m.deltaColor }}; font-weight:500;">{{ m.delta }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px; margin-bottom:16px;">
+            <!-- volume chart -->
+            <div style="background:#fff; border:1px solid #dde2ea; border-radius:12px; padding:16px 18px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <div>
+                  <div style="font-size:13px; font-weight:600;">Message volume</div>
+                  <div style="font-size:11px; color:#8792a3; font-family:'IBM Plex Mono',monospace;">monitor/interop/volume · last 24h</div>
+                </div>
+                <span style="font-size:11px; color:#8792a3;">per hour</span>
+              </div>
+              <div style="display:flex; align-items:flex-end; gap:4px; height:130px;">
+                <sc-for list="{{ vol }}" as="b" hint-placeholder-count="24">
+                  <div title="{{ b.label }}" style="flex:1; height:{{ b.h }}%; background:{{ b.color }}; border-radius:3px 3px 0 0; min-height:3px;" style-hover="filter:brightness(.9);"></div>
+                </sc-for>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:10px; color:#a2abb8; font-family:'IBM Plex Mono',monospace;">
+                <span>12:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>now</span>
+              </div>
+            </div>
+            <!-- interop samples -->
+            <div style="background:#fff; border:1px solid #dde2ea; border-radius:12px; padding:16px 18px;">
+              <div style="font-size:13px; font-weight:600; margin-bottom:2px;">Interop metrics</div>
+              <div style="font-size:11px; color:#8792a3; font-family:'IBM Plex Mono',monospace; margin-bottom:12px;">monitor/metrics/interop</div>
+              <sc-for list="{{ interop }}" as="s" hint-placeholder-count="4">
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid #f1f4f9;">
+                  <span style="font-size:11.5px; font-family:'IBM Plex Mono',monospace; color:#5a6577;">{{ s.name }}</span>
+                  <span style="font-size:15px; font-weight:700; color:{{ s.color }};">{{ s.value }}<span style="font-size:10px; color:#a2abb8; font-weight:500; margin-left:3px;">{{ s.unit }}</span></span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <!-- recent messages + logs -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px;">
+            <div style="background:#fff; border:1px solid #dde2ea; border-radius:12px; overflow:hidden;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; padding:13px 16px; border-bottom:1px solid #eceff4;">
+                <div style="font-size:13px; font-weight:600;">Recent messages</div>
+                <button onClick="{{ goMessages }}" style="border:none; background:none; color:#2b5cd6; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit;">View all →</button>
+              </div>
+              <div style="max-height:290px; overflow:auto;">
+                <sc-for list="{{ recentMsgs }}" as="m" hint-placeholder-count="6">
+                  <div onClick="{{ m.onOpen }}" style="display:flex; align-items:center; gap:10px; padding:9px 16px; border-bottom:1px solid #f4f6f9; cursor:pointer;" style-hover="background:#f7f9fc;">
+                    <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#8792a3; width:44px;">#{{ m.id }}</span>
+                    <div style="flex:1; min-width:0;">
+                      <div style="font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ m.source }} <span style="color:#b3bcc9;">→</span> {{ m.target }}</div>
+                      <div style="font-size:10.5px; color:#8792a3; font-family:'IBM Plex Mono',monospace;">{{ m.body }}</div>
+                    </div>
+                    <span style="font-size:10.5px; font-weight:600; color:{{ m.color }}; background:{{ m.bg }}; padding:2px 8px; border-radius:11px; white-space:nowrap;">{{ m.statusLabel }}</span>
+                    <span style="font-size:10.5px; color:#a2abb8; font-family:'IBM Plex Mono',monospace; width:52px; text-align:right;">{{ m.time }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="background:#fff; border:1px solid #dde2ea; border-radius:12px; overflow:hidden;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; padding:13px 16px; border-bottom:1px solid #eceff4;">
+                <div style="font-size:13px; font-weight:600;">Event log</div>
+                <button onClick="{{ goLogs }}" style="border:none; background:none; color:#2b5cd6; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit;">View all →</button>
+              </div>
+              <div style="max-height:290px; overflow:auto; padding:4px 0;">
+                <sc-for list="{{ recentLogs }}" as="l" hint-placeholder-count="6">
+                  <div style="display:flex; gap:9px; padding:8px 16px; border-bottom:1px solid #f7f9fb;">
+                    <span style="width:7px; height:7px; border-radius:2px; background:{{ l.color }}; margin-top:4px; flex:0 0 auto;"></span>
+                    <div style="min-width:0;">
+                      <div style="display:flex; gap:7px; align-items:center; margin-bottom:1px;">
+                        <span style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:{{ l.color }};">{{ l.typeLabel }}</span>
+                        <span style="font-size:10px; color:#a2abb8; font-family:'IBM Plex Mono',monospace;">{{ l.time }}</span>
+                      </div>
+                      <div style="font-size:11.5px; color:#4b5568; line-height:1.35;">{{ l.text }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ===== OVERVIEW ===== -->
+        <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px;">
+          <div style="display:flex; flex-direction:column; gap:16px;">
+            <div style="background:#fff; border:1px solid #dde2ea; border-radius:12px; padding:18px 20px;">
+              <div style="font-size:11px; font-weight:600; letter-spacing:.6px; text-transform:uppercase; color:#8792a3; margin-bottom:8px;">What this production does</div>
+              <p style="margin:0; font-size:14px; line-height:1.6; color:#2c3648;">{{ overview.summary }}</p>
+              <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
+                <sc-for list="{{ overview.tags }}" as="t" hint-placeholder-count="4">
+                  <span style="font-size:11px; font-family:'IBM Plex Mono',monospace; background:#f1f4f9; color:#4b5568; padding:4px 10px; border-radius:6px; border:1px solid #e6eaf1;">{{ t }}</span>
+                </sc-for>
+              </div>
+            </div>
+            <div style="background:linear-gradient(180deg,#f4f7fd,#eef3fc); border:1px solid #d6e0f2; border-radius:12px; padding:18px 20px;">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                <span style="font-size:15px;">✦</span>
+                <span style="font-size:12px; font-weight:700; color:#12327a;">AI production summary</span>
+                <span style="font-size:10px; font-family:'IBM Plex Mono',monospace; color:#7186b0; background:#e2ebfa; padding:2px 7px; border-radius:5px;">deterministic + OpenAI</span>
+              </div>
+              <p style="margin:0; font-size:13.5px; line-height:1.6; color:#2c3648;">{{ overview.aiSummary }}</p>
+              <div style="font-size:10.5px; color:#7186b0; margin-top:10px; font-family:'IBM Plex Mono',monospace;">grounded in 14 analysis chunks · confidence high</div>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:16px;">
+            <div style="background:#fff; border:1px solid #dde2ea; border-radius:12px; padding:16px 18px;">
+              <div style="font-size:12px; font-weight:600; margin-bottom:12px;">Composition</div>
+              <sc-for list="{{ overview.counts }}" as="c" hint-placeholder-count="3">
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f4f6f9;">
+                  <span style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:#4b5568;"><span style="width:9px; height:9px; border-radius:2px; background:{{ c.color }};"></span>{{ c.label }}</span>
+                  <span style="font-size:16px; font-weight:700;">{{ c.n }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="background:#fff; border:1px solid #dde2ea; border-radius:12px; padding:16px 18px;">
+              <div style="font-size:12px; font-weight:600; margin-bottom:12px;">Facts</div>
+              <sc-for list="{{ overview.facts }}" as="f" hint-placeholder-count="4">
+                <div style="display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid #f4f6f9;">
+                  <span style="font-size:12px; color:#8792a3;">{{ f.k }}</span>
+                  <span style="font-size:12px; font-weight:600; font-family:'IBM Plex Mono',monospace; text-align:right;">{{ f.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ===== GRAPH ===== -->
+        <sc-if value="{{ isGraph }}" hint-placeholder-val="{{ true }}">
+        <div style="background:#fff; border:1px solid #dde2ea; border-radius:12px; padding:20px;">
+          <div style="font-size:13px; font-weight:600; margin-bottom:2px;">Component flow</div>
+          <div style="font-size:11px; color:#8792a3; font-family:'IBM Plex Mono',monospace; margin-bottom:18px;">productions/{name}/graph · service → process → operation</div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; align-items:start;">
+            <sc-for list="{{ lanes }}" as="lane" hint-placeholder-count="3">
+              <div>
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                  <span style="width:10px; height:10px; border-radius:3px; background:{{ lane.color }};"></span>
+                  <span style="font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:#5a6577;">{{ lane.title }}</span>
+                </div>
+                <sc-for list="{{ lane.items }}" as="c" hint-placeholder-count="2">
+                  <div style="border:1px solid {{ lane.border }}; background:{{ lane.tint }}; border-radius:10px; padding:12px 13px; margin-bottom:11px;">
+                    <div style="font-size:13px; font-weight:600; margin-bottom:3px;">{{ c.name }}</div>
+                    <div style="font-size:10.5px; font-family:'IBM Plex Mono',monospace; color:#8792a3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ c.cls }}</div>
+                    <div style="display:flex; gap:6px; margin-top:9px; flex-wrap:wrap;">
+                      <span style="font-size:10px; background:#fff; border:1px solid #dde2ea; color:#4b5568; padding:2px 7px; border-radius:5px; font-family:'IBM Plex Mono',monospace;">{{ c.protocol }}</span>
+                      <sc-if value="{{ c.hasTargets }}" hint-placeholder-val="{{ true }}"><span style="font-size:10px; background:#eef3fc; border:1px solid #d6e0f2; color:#3a5aa0; padding:2px 7px; border-radius:5px;">→ {{ c.targetsText }}</span></sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <div style="margin-top:16px; padding-top:14px; border-top:1px solid #eceff4; font-size:11px; color:#8792a3;">Targets shown are extracted from each component's <span style="font-family:'IBM Plex Mono',monospace;">TargetConfigNames</span>. Click a message to trace an actual path through these components.</div>
+        </div>
+        </sc-if>
+
+        <!-- ===== MESSAGES ===== -->
+        <sc-if value="{{ isMessages }}" hint-placeholder-val="{{ true }}">
+        <div style="background:#fff; border:1px solid #dde2ea; border-radius:12px; overflow:hidden;">
+          <div style="display:flex; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid #eceff4; flex-wrap:wrap;">
+            <sc-for list="{{ msgFilters }}" as="f" hint-placeholder-count="5">
+              <button onClick="{{ f.onClick }}" style="border:1px solid {{ f.border }}; background:{{ f.bg }}; color:{{ f.color }}; padding:5px 12px; border-radius:16px; font-size:11.5px; font-weight:600; cursor:pointer; font-family:inherit;" style-hover="border-color:#b9c6de;">{{ f.label }} <span style="opacity:.6;">{{ f.count }}</span></button>
+            </sc-for>
+          </div>
+          <div style="display:grid; grid-template-columns:56px 1fr 1fr 90px 108px 62px; padding:9px 16px; border-bottom:1px solid #eceff4; font-size:10px; font-weight:600; letter-spacing:.4px; text-transform:uppercase; color:#8792a3;">
+            <span>ID</span><span>Source</span><span>Target</span><span>Session</span><span>Status</span><span style="text-align:right;">Time</span>
+          </div>
+          <sc-for list="{{ allMsgs }}" as="m" hint-placeholder-count="10">
+            <div onClick="{{ m.onOpen }}" style="display:grid; grid-template-columns:56px 1fr 1fr 90px 108px 62px; align-items:center; padding:10px 16px; border-bottom:1px solid #f4f6f9; cursor:pointer; font-size:12px;" style-hover="background:#f7f9fc;">
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#2b5cd6; font-weight:600;">#{{ m.id }}</span>
+              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px;">{{ m.source }}</span>
+              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px; color:#4b5568;">{{ m.target }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#8792a3;">{{ m.session }}</span>
+              <span><span style="font-size:10.5px; font-weight:600; color:{{ m.color }}; background:{{ m.bg }}; padding:2px 9px; border-radius:11px;">{{ m.statusLabel }}</span></span>
+              <span style="text-align:right; font-family:'IBM Plex Mono',monospace; font-size:11px; color:#a2abb8;">{{ m.time }}</span>
+            </div>
+          </sc-for>
+        </div>
+        </sc-if>
+
+        <!-- ===== LOGS ===== -->
+        <sc-if value="{{ isLogs }}" hint-placeholder-val="{{ true }}">
+        <div style="background:#fff; border:1px solid #dde2ea; border-radius:12px; overflow:hidden;">
+          <div style="display:flex; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid #eceff4; flex-wrap:wrap;">
+            <sc-for list="{{ logFilters }}" as="f" hint-placeholder-count="5">
+              <button onClick="{{ f.onClick }}" style="border:1px solid {{ f.border }}; background:{{ f.bg }}; color:{{ f.color }}; padding:5px 12px; border-radius:16px; font-size:11.5px; font-weight:600; cursor:pointer; font-family:inherit;" style-hover="border-color:#b9c6de;">{{ f.label }} <span style="opacity:.6;">{{ f.count }}</span></button>
+            </sc-for>
+          </div>
+          <sc-for list="{{ allLogs }}" as="l" hint-placeholder-count="8">
+            <div style="display:flex; gap:12px; padding:12px 16px; border-bottom:1px solid #f4f6f9;">
+              <span style="width:9px; height:9px; border-radius:2px; background:{{ l.color }}; margin-top:4px; flex:0 0 auto;"></span>
+              <div style="flex:1; min-width:0;">
+                <div style="display:flex; gap:10px; align-items:center; margin-bottom:3px;">
+                  <span style="font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:{{ l.color }};">{{ l.typeLabel }}</span>
+                  <span style="font-size:11.5px; font-weight:600; color:#33405a;">{{ l.source }}</span>
+                  <span style="font-size:10.5px; color:#a2abb8; font-family:'IBM Plex Mono',monospace;">{{ l.time }}</span>
+                </div>
+                <div style="font-size:12.5px; color:#4b5568; line-height:1.45;">{{ l.text }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        </sc-if>
+
+        <!-- ===== SETTINGS ===== -->
+        <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px; max-width:860px;">
+          <div style="background:#fff; border:1px solid #dde2ea; border-radius:12px; padding:18px 20px;">
+            <div style="font-size:13px; font-weight:600; margin-bottom:4px;">Analysis &amp; AI</div>
+            <div style="font-size:11px; color:#8792a3; margin-bottom:14px; font-family:'IBM Plex Mono',monospace;">PUT /settings</div>
+            <sc-for list="{{ toggles }}" as="t" hint-placeholder-count="5">
+              <div onClick="{{ t.onToggle }}" style="display:flex; align-items:center; gap:12px; padding:11px 0; border-bottom:1px solid #f4f6f9; cursor:pointer;">
+                <div style="flex:1;">
+                  <div style="font-size:12.5px; font-weight:600;">{{ t.label }}</div>
+                  <div style="font-size:11px; color:#8792a3; margin-top:2px;">{{ t.desc }}</div>
+                </div>
+                <div style="width:38px; height:22px; border-radius:12px; background:{{ t.track }}; position:relative; flex:0 0 auto; transition:background .15s;">
+                  <span style="position:absolute; top:3px; left:{{ t.knob }}; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.25); transition:left .15s;"></span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:16px;">
+            <div style="background:#fff; border:1px solid #dde2ea; border-radius:12px; padding:18px 20px;">
+              <div style="font-size:13px; font-weight:600; margin-bottom:14px;">Runtime limits</div>
+              <sc-for list="{{ limits }}" as="lm" hint-placeholder-count="3">
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid #f4f6f9;">
+                  <span style="font-size:12px; color:#4b5568;">{{ lm.k }}</span>
+                  <span style="font-size:12.5px; font-weight:600; font-family:'IBM Plex Mono',monospace; background:#f1f4f9; padding:3px 10px; border-radius:6px;">{{ lm.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="background:#fff; border:1px solid #dde2ea; border-radius:12px; padding:18px 20px;">
+              <div style="font-size:13px; font-weight:600; margin-bottom:12px;">OpenAI key</div>
+              <div style="display:flex; align-items:center; gap:9px;">
+                <span style="width:9px; height:9px; border-radius:50%; background:#1a7f52;"></span>
+                <span style="font-size:12.5px; font-weight:600;">Configured</span>
+                <span style="font-size:11px; color:#8792a3; font-family:'IBM Plex Mono',monospace; margin-left:auto;">source: environment</span>
+              </div>
+              <div style="font-size:11px; color:#8792a3; margin-top:10px; line-height:1.5;">The key value is never returned by the API — only whether it is configured and its source.</div>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+    </main>
+
+    <!-- COPILOT -->
+    <sc-if value="{{ copilotOpen }}" hint-placeholder-val="{{ true }}">
+    <aside style="flex:0 0 372px; background:#fff; border-left:1px solid #dde2ea; display:flex; flex-direction:column; min-height:0;">
+      <div style="flex:0 0 auto; padding:14px 16px; border-bottom:1px solid #eceff4; display:flex; align-items:center; gap:10px;">
+        <div style="width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg,#2b5cd6,#12327a); display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px;">✦</div>
+        <div style="flex:1; line-height:1.2;">
+          <div style="font-size:13px; font-weight:700;">Production Copilot</div>
+          <div style="font-size:10.5px; color:#8792a3; font-family:'IBM Plex Mono',monospace;">RAG over {{ prod.short }}</div>
+        </div>
+        <button onClick="{{ toggleCopilot }}" style="border:none; background:none; color:#8792a3; font-size:18px; cursor:pointer; line-height:1; padding:2px 6px;" style-hover="color:#33405a;">×</button>
+      </div>
+
+      <div style="flex:1; overflow:auto; padding:16px;">
+        <sc-for list="{{ thread }}" as="t" hint-placeholder-count="2">
+          <div style="margin-bottom:16px; display:flex; flex-direction:column; align-items:{{ t.align }};">
+            <div style="max-width:92%; background:{{ t.bubbleBg }}; color:{{ t.bubbleColor }}; border:{{ t.bubbleBorder }}; border-radius:{{ t.radius }}; padding:11px 13px; font-size:13px; line-height:1.55;">{{ t.text }}</div>
+            <sc-if value="{{ t.schemaBased }}" hint-placeholder-val="{{ true }}">
+              <div style="font-size:10px; color:#7186b0; background:#eef3fc; border:1px solid #d6e0f2; padding:2px 8px; border-radius:5px; margin-top:7px; font-family:'IBM Plex Mono',monospace;">schema-based evidence</div>
+            </sc-if>
+            <sc-if value="{{ t.hasCitations }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; max-width:92%;">
+                <sc-for list="{{ t.citations }}" as="c" hint-placeholder-count="2">
+                  <span style="font-size:10px; font-family:'IBM Plex Mono',monospace; background:#f4f6f9; border:1px solid #e0e5ec; color:#4b5568; padding:3px 8px; border-radius:6px;">{{ c.tag }} {{ c.label }}</span>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+        <sc-if value="{{ aiTyping }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex; gap:4px; padding:6px 2px;">
+            <span style="width:7px; height:7px; border-radius:50%; background:#9fb0d0; animation:i14yblink 1s infinite;"></span>
+            <span style="width:7px; height:7px; border-radius:50%; background:#9fb0d0; animation:i14yblink 1s infinite .2s;"></span>
+            <span style="width:7px; height:7px; border-radius:50%; background:#9fb0d0; animation:i14yblink 1s infinite .4s;"></span>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="flex:0 0 auto; padding:12px 14px; border-top:1px solid #eceff4;">
+        <div style="display:flex; gap:7px; flex-wrap:wrap; margin-bottom:10px;">
+          <sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="3">
+            <button onClick="{{ s.onClick }}" style="border:1px solid #dde2ea; background:#f7f9fc; color:#33405a; padding:5px 10px; border-radius:14px; font-size:11px; cursor:pointer; font-family:inherit; text-align:left;" style-hover="border-color:#2b5cd6; color:#12327a;">{{ s.label }}</button>
+          </sc-for>
+        </div>
+        <div style="display:flex; align-items:flex-end; gap:8px; border:1px solid #d3dae4; border-radius:10px; padding:8px 8px 8px 12px; background:#fff;">
+          <input ref="{{ inputRef }}" onKeyDown="{{ onInputKey }}" placeholder="Ask about this production…" style="flex:1; border:none; outline:none; font-family:inherit; font-size:13px; background:transparent; color:#16202e;" />
+          <button onClick="{{ sendInput }}" style="border:none; background:#2b5cd6; color:#fff; width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:15px; flex:0 0 auto;" style-hover="background:#3a6ae0;">↑</button>
+        </div>
+        <div style="font-size:9.5px; color:#a2abb8; margin-top:7px; text-align:center; font-family:'IBM Plex Mono',monospace;">answers cite retrieved chunks · never live payload values</div>
+      </div>
+    </aside>
+    </sc-if>
+
+  </div>
+
+  <!-- MESSAGE DETAIL SLIDE-OVER -->
+  <sc-if value="{{ hasDetail }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed; inset:0; z-index:40; display:flex; justify-content:flex-end;">
+    <div onClick="{{ closeDetail }}" style="position:absolute; inset:0; background:rgba(14,35,80,.28);"></div>
+    <section style="position:relative; width:560px; max-width:92vw; background:#f6f8fb; height:100%; overflow:auto; box-shadow:-6px 0 24px rgba(14,35,80,.15); animation:i14yslide .22s ease;">
+      <div style="position:sticky; top:0; background:#0e2350; color:#eaf0fb; padding:15px 18px; display:flex; align-items:center; gap:12px; z-index:2;">
+        <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:600;">Message #{{ detail.id }}</span>
+        <span style="font-size:10.5px; font-weight:600; color:{{ detail.color }}; background:{{ detail.bg }}; padding:2px 9px; border-radius:11px;">{{ detail.statusLabel }}</span>
+        <span style="font-size:10.5px; color:#8ea3ce; font-family:'IBM Plex Mono',monospace;">status {{ detail.statusCode }}</span>
+        <div style="flex:1;"></div>
+        <button onClick="{{ closeDetail }}" style="border:none; background:rgba(255,255,255,.1); color:#eaf0fb; width:28px; height:28px; border-radius:7px; cursor:pointer; font-size:16px;" style-hover="background:rgba(255,255,255,.2);">×</button>
+      </div>
+
+      <div style="padding:18px;">
+        <!-- header fields -->
+        <div style="background:#fff; border:1px solid #dde2ea; border-radius:11px; padding:15px 16px; margin-bottom:14px;">
+          <div style="font-size:11px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; color:#8792a3; margin-bottom:11px;">Header</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:11px 16px;">
+            <sc-for list="{{ detail.header }}" as="h" hint-placeholder-count="6">
+              <div>
+                <div style="font-size:10.5px; color:#8792a3; margin-bottom:2px;">{{ h.k }}</div>
+                <div style="font-size:12.5px; font-weight:600; font-family:'IBM Plex Mono',monospace; word-break:break-all;">{{ h.v }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- session timeline -->
+        <div style="background:#fff; border:1px solid #dde2ea; border-radius:11px; padding:15px 16px; margin-bottom:14px;">
+          <div style="font-size:11px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; color:#8792a3; margin-bottom:14px;">Session timeline · {{ detail.session }}</div>
+          <div style="position:relative; padding-left:18px;">
+            <div style="position:absolute; left:4px; top:4px; bottom:4px; width:2px; background:#e3e9f1;"></div>
+            <sc-for list="{{ detail.timeline }}" as="e" hint-placeholder-count="4">
+              <div style="position:relative; padding-bottom:14px;">
+                <span style="position:absolute; left:-18px; top:2px; width:10px; height:10px; border-radius:50%; background:{{ e.dot }}; border:2px solid #fff; box-shadow:0 0 0 1px {{ e.dot }};"></span>
+                <div style="display:flex; justify-content:space-between; gap:10px;">
+                  <span style="font-size:12.5px; font-weight:600;">{{ e.comp }}</span>
+                  <span style="font-size:10.5px; color:#a2abb8; font-family:'IBM Plex Mono',monospace;">{{ e.t }}</span>
+                </div>
+                <div style="font-size:11.5px; color:#5a6577; margin-top:1px;">{{ e.label }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- trace -->
+        <div style="background:#fff; border:1px solid #dde2ea; border-radius:11px; padding:15px 16px; margin-bottom:14px;">
+          <div style="font-size:11px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; color:#8792a3; margin-bottom:12px;">Trace</div>
+          <sc-for list="{{ detail.trace }}" as="tr" hint-placeholder-count="3">
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #f4f6f9; font-size:12px;">
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#a2abb8; width:22px;">{{ tr.seq }}</span>
+              <span style="flex:1;">{{ tr.from }} <span style="color:#b3bcc9;">→</span> {{ tr.to }}</span>
+              <span style="font-size:10.5px; color:#8792a3;">{{ tr.action }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:{{ tr.color }};">{{ tr.ms }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <!-- payload metadata -->
+        <div style="background:#fff; border:1px solid #dde2ea; border-radius:11px; padding:15px 16px; margin-bottom:14px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+            <div style="font-size:11px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; color:#8792a3;">Payload metadata</div>
+            <span style="font-size:10px; font-family:'IBM Plex Mono',monospace; color:#7186b0; background:#eef3fc; padding:2px 7px; border-radius:5px;">{{ detail.body }}</span>
+          </div>
+          <sc-for list="{{ detail.payload }}" as="p" hint-placeholder-count="4">
+            <div style="display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid #f4f6f9;">
+              <span style="font-size:12px; font-family:'IBM Plex Mono',monospace; color:#33405a;">{{ p.name }}</span>
+              <span style="font-size:11px; color:#8792a3; font-family:'IBM Plex Mono',monospace;">{{ p.type }}</span>
+              <span style="font-size:10px; font-weight:600; color:{{ p.kindColor }}; background:{{ p.kindBg }}; padding:2px 8px; border-radius:10px;">{{ p.kind }}</span>
+            </div>
+          </sc-for>
+          <div style="font-size:11px; color:#8792a3; margin-top:11px; line-height:1.5; background:#f7f9fc; border-radius:8px; padding:9px 11px;">Redacted preview (scalars only): <span style="font-family:'IBM Plex Mono',monospace; color:#4b5568;">{{ detail.preview }}</span></div>
+        </div>
+
+        <!-- explanation -->
+        <div style="background:linear-gradient(180deg,#f4f7fd,#eef3fc); border:1px solid #d6e0f2; border-radius:11px; padding:15px 16px; margin-bottom:14px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:9px;">
+            <span style="font-size:14px;">✦</span>
+            <span style="font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:#12327a;">Deterministic explanation</span>
+            <span style="font-size:10px; font-family:'IBM Plex Mono',monospace; color:#fff; background:{{ detail.confColor }}; padding:2px 8px; border-radius:10px; margin-left:auto;">confidence {{ detail.confidence }}</span>
+          </div>
+          <p style="margin:0 0 10px; font-size:13px; line-height:1.55; color:#2c3648;">{{ detail.explanation }}</p>
+          <div style="font-size:10.5px; font-weight:600; color:#7186b0; margin-bottom:6px;">Evidence</div>
+          <sc-for list="{{ detail.evidence }}" as="ev" hint-placeholder-count="2">
+            <div style="display:flex; gap:8px; font-size:11.5px; color:#4b5568; padding:4px 0;">
+              <span style="color:#2b5cd6;">›</span><span>{{ ev }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:flex; gap:9px;">
+          <button onClick="{{ askAboutMsg }}" style="flex:1; border:1px solid #2b5cd6; background:#fff; color:#12327a; padding:10px; border-radius:9px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit;" style-hover="background:#eef3fc;">✦ Ask copilot about this</button>
+          <sc-if value="{{ showResend }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ resendMsg }}" style="flex:0 0 auto; border:1px solid #d3dae4; background:#fff; color:#33405a; padding:10px 16px; border-radius:9px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit;" style-hover="background:#f1f4f9;">{{ resendLabel }}</button>
+          </sc-if>
+        </div>
+      </div>
+    </section>
+  </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:&quot;100%&quot;},&quot;initialSection&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;overview&quot;,&quot;monitor&quot;,&quot;graph&quot;,&quot;messages&quot;,&quot;logs&quot;,&quot;settings&quot;],&quot;default&quot;:&quot;monitor&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Behavior&quot;},&quot;copilotDefaultOpen&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Behavior&quot;},&quot;showResendControls&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Behavior&quot;}}">
+class Component extends DCLogic {
+  state = {
+    section: this.props.initialSection || 'monitor',
+    copilotOpen: this.props.copilotDefaultOpen ?? true,
+    prodId: 'demo',
+    msgFilter: 'all',
+    logFilter: 'all',
+    detailId: null,
+    resendState: 'idle',
+    thread: [
+      { role: 'ai', text: "I'm grounded in this production's components, routing rules, message schemas, recent headers, and logs. Ask me what it does, how a message flows, or why something failed." }
+    ],
+    aiTyping: false,
+    settings: {
+      aiProviderEnabled: true, aiSummaryEnabled: true, payloadInspection: true,
+      redactedPreview: true, ragRuntime: true, ragPayload: false
+    }
+  };
+
+  inputRef = React.createRef();
+
+  // ---- static sample data ----
+  PRODUCTIONS = [
+    { id: 'demo', short: 'Demo Production', name: 'esh.interoperability.aid.tests.DemoProduction', status: 'Running', running: true },
+    { id: 'hl7', short: 'HL7 MSH Routing', name: 'HS.Demo.HL7.MSHRouting.Production', status: 'Running', running: true },
+    { id: 'file', short: 'File Feed', name: 'Demo.FileFeed.Production', status: 'Stopped', running: false }
+  ];
+
+  MESSAGES = [
+    { id: 10472, time: '12:04:18', source: 'File Intake Service', target: 'Patient Router', session: 10472, body: 'HS.Message.PatientIn', code: 9 },
+    { id: 10471, time: '12:04:11', source: 'HTTP Order Service', target: 'Order BPL Process', session: 10471, body: 'Demo.OrderRequest', code: 2 },
+    { id: 10470, time: '12:03:52', source: 'Patient Router', target: 'EMR Operation', session: 10468, body: 'HS.Message.PatientIn', code: 9 },
+    { id: 10469, time: '12:03:40', source: 'HTTP Order Service', target: 'Order BPL Process', session: 10469, body: 'Demo.OrderRequest', code: 8 },
+    { id: 10468, time: '12:03:31', source: 'File Intake Service', target: 'Patient Router', session: 10468, body: 'HS.Message.PatientIn', code: 9 },
+    { id: 10467, time: '12:03:02', source: 'Order BPL Process', target: 'Alert Email Operation', session: 10465, body: 'Demo.AlertMessage', code: 5 },
+    { id: 10466, time: '12:02:55', source: 'Patient Router', target: 'Archive File Operation', session: 10464, body: 'HS.Message.PatientIn', code: 9 },
+    { id: 10465, time: '12:02:40', source: 'HTTP Order Service', target: 'Order BPL Process', session: 10465, body: 'Demo.OrderRequest', code: 3 },
+    { id: 10464, time: '12:02:12', source: 'File Intake Service', target: 'Patient Router', session: 10464, body: 'HS.Message.PatientIn', code: 4 },
+    { id: 10463, time: '12:01:58', source: 'Patient Router', target: 'EMR Operation', session: 10461, body: 'HS.Message.PatientIn', code: 9 }
+  ];
+
+  LOGS = [
+    { time: '12:04:19', code: 4, source: 'Ens.Director', text: 'Production DemoProduction: message 10472 completed in 96ms' },
+    { time: '12:03:41', code: 2, source: 'Order BPL Process', text: '<Ens>ErrGeneral: EMR endpoint returned HTTP 503 for order 10469; message set to Error' },
+    { time: '12:03:33', code: 3, source: 'Patient Router', text: 'No routing rule matched document type ADT_A08; routed to default target Archive File Operation' },
+    { time: '12:03:02', code: 3, source: 'Alert Email Operation', text: 'Message 10467 suspended: SMTP host mail.local unreachable, will retry (attempt 1/5)' },
+    { time: '12:02:41', code: 4, source: 'HTTP Order Service', text: 'Inbound order accepted from 10.4.2.19, session 10465 opened' },
+    { time: '12:01:30', code: 5, source: 'Patient Router', text: 'Evaluating rule set PatientRouting.Rule (3 rules) for session 10464' },
+    { time: '12:00:05', code: 6, source: 'Ens.Alert', text: 'Queue depth for Alert Email Operation exceeded threshold 20 (current 22)' },
+    { time: '11:58:12', code: 4, source: 'Ens.Director', text: 'Production DemoProduction started; 7 components enabled' }
+  ];
+
+  LANES = [
+    { title: 'Business Services', color: '#2b5cd6', border: '#cdd9f2', tint: '#f6f9fe', items: [
+      { name: 'File Intake Service', cls: 'EnsLib.File.PassthroughService', protocol: 'File', targets: ['Patient Router'] },
+      { name: 'HTTP Order Service', cls: 'EnsLib.HTTP.GenericService', protocol: 'HTTP', targets: ['Order BPL Process'] }
+    ]},
+    { title: 'Business Processes', color: '#7c4dd6', border: '#ddd0f2', tint: '#faf8fe', items: [
+      { name: 'Patient Router', cls: 'EnsLib.MsgRouter.RoutingEngine', protocol: 'RoutingRule', targets: ['EMR Operation', 'Archive File Operation'] },
+      { name: 'Order BPL Process', cls: 'Demo.OrderProcess (BPL)', protocol: 'BPL', targets: ['EMR Operation', 'Alert Email Operation'] }
+    ]},
+    { title: 'Business Operations', color: '#1a7f52', border: '#c6e6d5', tint: '#f5fbf8', items: [
+      { name: 'EMR Operation', cls: 'EnsLib.SOAP.OutboundAdapter', protocol: 'SOAP', targets: [] },
+      { name: 'Archive File Operation', cls: 'EnsLib.File.OutboundAdapter', protocol: 'File', targets: [] },
+      { name: 'Alert Email Operation', cls: 'EnsLib.EMail.OutboundAdapter', protocol: 'SMTP', targets: [] }
+    ]}
+  ];
+
+  DETAILS = {
+    10469: {
+      explanation: "This message failed because the EMR Operation's SOAP endpoint returned HTTP 503. The Order BPL Process received the order, transformed it, and attempted delivery; the outbound adapter reported the service unavailable and IRIS set the header to Error (8) without retry, per the operation's configured retry count of 0.",
+      confidence: 'high',
+      evidence: [
+        'Log 12:03:41 <Ens>ErrGeneral references order 10469 and HTTP 503.',
+        'EMR Operation adapter is EnsLib.SOAP.OutboundAdapter with FailureTimeout not set to retry.',
+        'Trace shows delivery attempt to EMR Operation with no completion event.'
+      ],
+      timeline: [
+        { comp: 'HTTP Order Service', label: 'Inbound order received', t: '12:03:40', kind: 'ok' },
+        { comp: 'Order BPL Process', label: 'Transform + route order', t: '12:03:40', kind: 'ok' },
+        { comp: 'EMR Operation', label: 'SOAP call → HTTP 503', t: '12:03:41', kind: 'err' }
+      ],
+      trace: [
+        { seq: 1, from: 'HTTP Order Service', to: 'Order BPL Process', action: 'SendRequestAsync', ms: '2ms', ok: true },
+        { seq: 2, from: 'Order BPL Process', to: 'EMR Operation', action: 'SendRequestSync', ms: '1180ms', ok: false }
+      ],
+      payload: [
+        { name: 'OrderId', type: '%String', kind: 'scalar' },
+        { name: 'PatientMRN', type: '%String', kind: 'scalar' },
+        { name: 'Priority', type: '%Integer', kind: 'scalar' },
+        { name: 'Items', type: 'Demo.OrderItem', kind: 'collection' }
+      ],
+      preview: 'OrderId=ORD-88431 · Priority=2 · PatientMRN=***REDACTED***'
+    },
+    10472: {
+      explanation: 'This message completed normally. A file was picked up by the File Intake Service, the Patient Router evaluated PatientRouting.Rule and forwarded it to the EMR Operation, which acknowledged delivery. Total elapsed time 96ms across 3 components.',
+      confidence: 'high',
+      evidence: [
+        'Log 12:04:19 confirms message 10472 completed in 96ms.',
+        'Patient Router rule set PatientRouting.Rule matched document type ADT_A01.',
+        'Trace shows a completion event on EMR Operation.'
+      ],
+      timeline: [
+        { comp: 'File Intake Service', label: 'File picked up from /in', t: '12:04:18', kind: 'ok' },
+        { comp: 'Patient Router', label: 'Rule matched → EMR Operation', t: '12:04:18', kind: 'ok' },
+        { comp: 'EMR Operation', label: 'Delivered, ack received', t: '12:04:18', kind: 'ok' }
+      ],
+      trace: [
+        { seq: 1, from: 'File Intake Service', to: 'Patient Router', action: 'SendRequestAsync', ms: '3ms', ok: true },
+        { seq: 2, from: 'Patient Router', to: 'EMR Operation', action: 'SendRequestSync', ms: '91ms', ok: true }
+      ],
+      payload: [
+        { name: 'MRN', type: '%String', kind: 'scalar' },
+        { name: 'DocType', type: '%String', kind: 'scalar' },
+        { name: 'AdmitDate', type: '%TimeStamp', kind: 'scalar' },
+        { name: 'Encounter', type: 'HS.Message.Encounter', kind: 'object' }
+      ],
+      preview: 'DocType=ADT_A01 · AdmitDate=2026-07-20 · MRN=***REDACTED***'
+    }
+  };
+
+  // ---- helpers ----
+  statusMeta(code) {
+    const m = {
+      1: ['Created', '#2b5cd6', '#e8eefb'], 2: ['Queued', '#2b5cd6', '#e8eefb'],
+      3: ['Delivered', '#2b5cd6', '#e8eefb'], 4: ['Discarded', '#6b7686', '#eef1f5'],
+      5: ['Suspended', '#b7791f', '#fdf3e2'], 6: ['Deferred', '#b7791f', '#fdf3e2'],
+      7: ['Aborted', '#c0392b', '#fbeae7'], 8: ['Error', '#c0392b', '#fbeae7'],
+      9: ['Completed', '#1a7f52', '#e5f4ec']
+    };
+    return m[code] || ['Unknown', '#6b7686', '#eef1f5'];
+  }
+  logMeta(code) {
+    const m = {
+      1: ['Assert', '#c0392b'], 2: ['Error', '#c0392b'], 3: ['Warning', '#b7791f'],
+      4: ['Info', '#2b5cd6'], 5: ['Trace', '#6b7686'], 6: ['Alert', '#7c4dd6']
+    };
+    return m[code] || ['Log', '#6b7686'];
+  }
+
+  get prod() { return this.PRODUCTIONS.find(p => p.id === this.state.prodId) || this.PRODUCTIONS[0]; }
+
+  set(section) { this.setState({ section, detailId: null }); }
+
+  ask(q) {
+    if (!q || !q.trim()) return;
+    const question = q.trim();
+    this.setState(s => ({ thread: [...s.thread, { role: 'user', text: question }], aiTyping: true }));
+    if (!this.state.copilotOpen) this.setState({ copilotOpen: true });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => {
+      const ans = this.answer(question);
+      this.setState(s => ({ thread: [...s.thread, { role: 'ai', ...ans }], aiTyping: false }));
+    }, 850);
+  }
+
+  answer(q) {
+    const l = q.toLowerCase();
+    if (l.includes('fail') || l.includes('error') || l.includes('503') || l.includes('10469')) {
+      return {
+        text: 'Message #10469 failed because the EMR Operation SOAP endpoint returned HTTP 503 (service unavailable). The operation has no retry configured, so IRIS set the header to Error. Two other orders in that session completed. Restarting the EMR endpoint or enabling FailureTimeout retry would let these reprocess.',
+        citations: [ { kind: 'log', label: 'log:12:03:41' }, { kind: 'component', label: 'EMR Operation' }, { kind: 'message', label: 'msg:10469' } ]
+      };
+    }
+    if (l.includes('route') || l.includes('router') || l.includes('rule')) {
+      return {
+        text: 'The Patient Router (EnsLib.MsgRouter.RoutingEngine) drives routing using the PatientRouting.Rule rule set — 3 rules keyed on document type. Matched documents go to the EMR Operation; unmatched ones fall through to the Archive File Operation as the default target.',
+        citations: [ { kind: 'component', label: 'Patient Router' }, { kind: 'rule', label: 'PatientRouting.Rule' } ]
+      };
+    }
+    if (l.includes('payload') || l.includes('field') || l.includes('schema') || l.includes('message')) {
+      return {
+        text: 'DemoMessage / HS.Message.PatientIn carries scalar fields MRN, DocType and AdmitDate plus an Encounter object. Demo.OrderRequest carries OrderId, PatientMRN, Priority and an Items collection. These come from compiled class metadata — I only see field names and types, never live payload values.',
+        citations: [ { kind: 'message-schema', label: 'HS.Message.PatientIn' }, { kind: 'message-schema', label: 'Demo.OrderRequest' } ],
+        schemaBased: true
+      };
+    }
+    if (l.includes('do') || l.includes('purpose') || l.includes('what') || l.includes('how')) {
+      return {
+        text: 'This production ingests patient documents (file) and orders (HTTP), routes them through a rules engine and a BPL process, then delivers to an EMR over SOAP, archives to file, and raises email alerts. It has 2 services, 2 processes and 3 operations.',
+        citations: [ { kind: 'production', label: 'analysis' }, { kind: 'component', label: 'Patient Router' }, { kind: 'component', label: 'Order BPL Process' } ]
+      };
+    }
+    return {
+      text: 'Based on the production analysis: 7 components are wired File/HTTP → routing/BPL → SOAP/File/SMTP. Ask me about a specific component, a message id, routing behavior, or the message schemas and I will cite the evidence I used.',
+      citations: [ { kind: 'production', label: 'analysis' } ]
+    };
+  }
+
+  renderVals() {
+    const st = this.state, prod = this.prod;
+    const sm = this.statusMeta.bind(this), lm = this.logMeta.bind(this);
+
+    const productions = this.PRODUCTIONS.map(p => {
+      const active = p.id === st.prodId;
+      const dot = p.running ? '#1a7f52' : '#a2abb8';
+      return {
+        short: p.short, name: p.name, status: p.status, dot,
+        onSelect: () => this.setState({ prodId: p.id, detailId: null }),
+        bg: active ? '#eef3fc' : '#fff', border: active ? '#c3d3f0' : '#e6eaf1',
+        title: active ? '#12327a' : '#33405a'
+      };
+    });
+
+    const navDef = [
+      ['overview', 'Overview', '◱', null], ['monitor', 'Monitor', '▤', null],
+      ['graph', 'Component graph', '⊞', null], ['messages', 'Messages', '✉', '10'],
+      ['logs', 'Event log', '≣', '2'], ['settings', 'Settings', '⚙', null]
+    ];
+    const navItems = navDef.map(([key, label, icon, badge]) => {
+      const active = st.section === key;
+      return {
+        label, icon, badge, onClick: () => this.set(key),
+        bg: active ? '#eef3fc' : 'transparent', color: active ? '#12327a' : '#4b5568',
+        weight: active ? 600 : 500,
+        badgeBg: key === 'logs' ? '#fbeae7' : '#e8eefb', badgeColor: key === 'logs' ? '#c0392b' : '#2b5cd6'
+      };
+    });
+
+    const prodPill = prod.running
+      ? { dot: '#1a7f52', pillBg: '#e5f4ec' } : { dot: '#a2abb8', pillBg: '#eef1f5' };
+
+    const metrics = [
+      { label: 'Messages (24h)', value: '1,284', unit: '', delta: '▲ 6.2% vs prev', deltaColor: '#1a7f52', valColor: '#16202e' },
+      { label: 'Throughput', value: '42', unit: '/min', delta: 'steady', deltaColor: '#8792a3', valColor: '#16202e' },
+      { label: 'Avg processing', value: '118', unit: 'ms', delta: '▼ 9ms', deltaColor: '#1a7f52', valColor: '#16202e' },
+      { label: 'Queued', value: '3', unit: '', delta: '1 suspended', deltaColor: '#b7791f', valColor: '#16202e' },
+      { label: 'Errors (24h)', value: '7', unit: '', delta: '▲ 2 last hour', deltaColor: '#c0392b', valColor: '#c0392b' },
+      { label: 'Active sessions', value: '5', unit: '', delta: 'live', deltaColor: '#1a7f52', valColor: '#16202e' }
+    ];
+
+    const heights = [34,28,40,52,46,60,72,66,80,74,58,63,70,88,92,78,84,96,90,68,55,47,61,82];
+    const vol = heights.map((h, i) => ({ h, label: (i) + ':00 · ' + Math.round(h * 1.4) + ' msgs', color: i === heights.length - 1 ? '#2b5cd6' : '#c3d3f0' }));
+
+    const interop = [
+      { name: 'iris_interop_queue_count', value: '3', unit: '', color: '#16202e' },
+      { name: 'iris_interop_message_rate', value: '42', unit: '/min', color: '#16202e' },
+      { name: 'iris_interop_active_sessions', value: '5', unit: '', color: '#16202e' },
+      { name: 'iris_interop_error_count', value: '1', unit: '', color: '#c0392b' }
+    ];
+
+    const mapMsg = m => {
+      const [statusLabel, color, bg] = sm(m.code);
+      return { ...m, statusLabel, color, bg, onOpen: () => this.setState({ detailId: m.id, resendState: 'idle' }) };
+    };
+    const allMsgsRaw = this.MESSAGES.map(mapMsg);
+    const recentMsgs = allMsgsRaw.slice(0, 7);
+    const allMsgs = st.msgFilter === 'all' ? allMsgsRaw : allMsgsRaw.filter(m => m.statusLabel === st.msgFilter);
+
+    const msgFilterDefs = [['all', 'All'], ['Completed', 'Completed'], ['Error', 'Error'], ['Queued', 'Queued'], ['Suspended', 'Suspended'], ['Discarded', 'Discarded']];
+    const msgFilters = msgFilterDefs.map(([value, label]) => {
+      const active = st.msgFilter === value;
+      const count = value === 'all' ? allMsgsRaw.length : allMsgsRaw.filter(m => m.statusLabel === value).length;
+      return { label, count, onClick: () => this.setState({ msgFilter: value }),
+        bg: active ? '#12327a' : '#fff', color: active ? '#fff' : '#4b5568', border: active ? '#12327a' : '#dde2ea' };
+    });
+
+    const mapLog = (l, i) => {
+      const [typeLabel, color] = lm(l.code);
+      return { ...l, typeLabel, color, id: i };
+    };
+    const allLogsRaw = this.LOGS.map(mapLog);
+    const recentLogs = allLogsRaw.slice(0, 6);
+    const allLogs = st.logFilter === 'all' ? allLogsRaw : allLogsRaw.filter(l => l.typeLabel === st.logFilter);
+    const logFilterDefs = [['all', 'All'], ['Error', 'Error'], ['Warning', 'Warning'], ['Info', 'Info'], ['Trace', 'Trace'], ['Alert', 'Alert']];
+    const logFilters = logFilterDefs.map(([value, label]) => {
+      const active = st.logFilter === value;
+      const count = value === 'all' ? allLogsRaw.length : allLogsRaw.filter(l => l.typeLabel === value).length;
+      return { label, count, onClick: () => this.setState({ logFilter: value }),
+        bg: active ? '#12327a' : '#fff', color: active ? '#fff' : '#4b5568', border: active ? '#12327a' : '#dde2ea' };
+    });
+
+    const lanes = this.LANES.map(lane => ({
+      ...lane,
+      items: lane.items.map(c => ({
+        name: c.name, cls: c.cls, protocol: c.protocol,
+        hasTargets: c.targets.length > 0, targetsText: c.targets.join(', ')
+      }))
+    }));
+
+    const overview = {
+      summary: 'DemoProduction ingests patient documents from a file drop and orders over HTTP, classifies and routes them through a rules-based router and a BPL order process, then delivers results to a downstream EMR over SOAP, archives copies to disk, and raises email alerts on exceptions.',
+      aiSummary: 'A healthcare interoperability pipeline: two inbound services feed a routing engine and a business process, which fan out to three outbound operations (EMR, file archive, email). Routing is rule-driven; the order path uses a BPL. Most traffic completes in ~100ms; the main failure mode is the EMR SOAP endpoint returning 5xx.',
+      tags: ['HL7 / ADT', 'RoutingRule', 'BPL', 'SOAP', 'SMTP', 'File'],
+      counts: [
+        { label: 'Business services', n: 2, color: '#2b5cd6' },
+        { label: 'Business processes', n: 2, color: '#7c4dd6' },
+        { label: 'Business operations', n: 3, color: '#1a7f52' }
+      ],
+      facts: [
+        { k: 'Namespace', v: 'USER' }, { k: 'Status', v: prod.status },
+        { k: 'Components', v: '7' }, { k: 'Adapters', v: 'File · HTTP · SOAP · SMTP' },
+        { k: 'Message classes', v: '3' }, { k: 'RAG chunks', v: '14' }
+      ]
+    };
+
+    // copilot thread
+    const thread = st.thread.map(t => {
+      const isUser = t.role === 'user';
+      const cits = (t.citations || []).map(c => ({ tag: c.kind === 'message-schema' ? '◇' : '▪', label: c.label }));
+      return {
+        text: t.text, align: isUser ? 'flex-end' : 'flex-start',
+        bubbleBg: isUser ? '#12327a' : '#f4f6f9', bubbleColor: isUser ? '#fff' : '#2c3648',
+        bubbleBorder: isUser ? 'none' : '1px solid #e6eaf1',
+        radius: isUser ? '12px 12px 4px 12px' : '4px 12px 12px 12px',
+        schemaBased: !!t.schemaBased, hasCitations: cits.length > 0, citations: cits
+      };
+    });
+    const suggDefs = ['What does this production do?', 'Why did message #10469 fail?', 'What fields does the order schema carry?'];
+    const suggestions = suggDefs.map(q => ({ label: q, onClick: () => this.ask(q) }));
+
+    // detail
+    const raw = st.detailId ? this.MESSAGES.find(m => m.id === st.detailId) : null;
+    let detail = null, hasDetail = false;
+    if (raw) {
+      hasDetail = true;
+      const [statusLabel, color, bg] = sm(raw.code);
+      const d = this.DETAILS[raw.id] || {
+        explanation: 'This message ' + statusLabel.toLowerCase() + '. It moved from ' + raw.source + ' to ' + raw.target + ' within session ' + raw.session + '. No exceptions were recorded on its trace.',
+        confidence: 'medium',
+        evidence: ['Header status is ' + statusLabel + ' (' + raw.code + ').', 'Trace contains a single hop ' + raw.source + ' → ' + raw.target + '.'],
+        timeline: [
+          { comp: raw.source, label: 'Message created', t: raw.time, kind: 'ok' },
+          { comp: raw.target, label: statusLabel, t: raw.time, kind: raw.code === 8 || raw.code === 7 ? 'err' : 'ok' }
+        ],
+        trace: [{ seq: 1, from: raw.source, to: raw.target, action: 'SendRequestAsync', ms: '—', ok: raw.code === 9 }],
+        payload: [ { name: 'DocType', type: '%String', kind: 'scalar' }, { name: 'Ref', type: '%String', kind: 'scalar' } ],
+        preview: 'DocType=ADT_A01 · Ref=***REDACTED***'
+      };
+      const confColor = d.confidence === 'high' ? '#1a7f52' : d.confidence === 'medium' ? '#b7791f' : '#6b7686';
+      const kindStyle = k => k === 'scalar' ? ['#1a7f52', '#e5f4ec'] : k === 'object' ? ['#2b5cd6', '#e8eefb'] : ['#7c4dd6', '#f0e9fb'];
+      detail = {
+        id: raw.id, statusLabel, statusCode: raw.code, color, bg, session: raw.session, body: raw.body,
+        header: [
+          { k: 'Message ID', v: '#' + raw.id }, { k: 'Session', v: String(raw.session) },
+          { k: 'Source', v: raw.source }, { k: 'Target', v: raw.target },
+          { k: 'Body class', v: raw.body }, { k: 'Time created', v: raw.time },
+          { k: 'Priority', v: 'Sync' }, { k: 'Status', v: statusLabel + ' (' + raw.code + ')' }
+        ],
+        timeline: d.timeline.map(e => ({ ...e, dot: e.kind === 'err' ? '#c0392b' : '#1a7f52' })),
+        trace: d.trace.map(t => ({ ...t, color: t.ok ? '#1a7f52' : '#c0392b' })),
+        payload: d.payload.map(p => { const [kc, kb] = kindStyle(p.kind); return { ...p, kindColor: kc, kindBg: kb }; }),
+        preview: d.preview, explanation: d.explanation, confidence: d.confidence, confColor,
+        evidence: d.evidence
+      };
+    }
+
+    const settings = st.settings;
+    const toggleDefs = [
+      ['aiProviderEnabled', 'AI provider enabled', 'Allow OpenAI-assisted summaries and answers'],
+      ['aiSummaryEnabled', 'AI production summary', 'Generate the natural-language summary on Overview'],
+      ['payloadInspection', 'Payload inspection', 'Expose payload field metadata (names + types)'],
+      ['redactedPreview', 'Redacted scalar preview', 'Show scalar payload values with redaction patterns'],
+      ['ragRuntime', 'Runtime RAG data', 'Index recent message headers and production logs'],
+      ['ragPayload', 'Payload RAG indexing', 'Index redacted scalar payload fields for retrieval']
+    ];
+    const toggles = toggleDefs.map(([key, label, desc]) => {
+      const on = settings[key];
+      return { label, desc, track: on ? '#2b5cd6' : '#cdd4de', knob: on ? '19px' : '3px',
+        onToggle: () => this.setState(s => ({ settings: { ...s.settings, [key]: !s.settings[key] } })) };
+    });
+    const limits = [
+      { k: 'maxTraceDepth', v: '25' }, { k: 'lookbackHours', v: '24' },
+      { k: 'maxMessages', v: '100' }, { k: 'maxPayloadFields', v: '50' },
+      { k: 'explanationVerbosity', v: 'standard' }
+    ];
+
+    const resendLabels = { idle: 'Resend message', sending: 'Resending…', done: 'Queued ✓' };
+
+    return {
+      // chrome
+      toggleCopilot: () => this.setState(s => ({ copilotOpen: !s.copilotOpen })),
+      copilotOpen: st.copilotOpen,
+      productions, navItems,
+      prod: { ...prod, ...prodPill, runLabel: prod.running ? 'Stop production' : 'Start production',
+        onToggleRun: () => {}, onRebuild: () => this.ask('Rebuild the RAG index and summarize what changed.') },
+      // sections
+      isOverview: st.section === 'overview', isMonitor: st.section === 'monitor',
+      isGraph: st.section === 'graph', isMessages: st.section === 'messages',
+      isLogs: st.section === 'logs', isSettings: st.section === 'settings',
+      goMessages: () => this.set('messages'), goLogs: () => this.set('logs'),
+      // monitor
+      metrics, vol, interop, recentMsgs, recentLogs,
+      // messages / logs
+      allMsgs, msgFilters, allLogs, logFilters,
+      // graph / overview
+      lanes, overview,
+      // copilot
+      thread, aiTyping: st.aiTyping, suggestions,
+      inputRef: this.inputRef,
+      sendInput: () => { const v = this.inputRef.current ? this.inputRef.current.value : ''; if (this.inputRef.current) this.inputRef.current.value = ''; this.ask(v); },
+      onInputKey: (e) => { if (e.key === 'Enter') { e.preventDefault(); const v = e.target.value; e.target.value = ''; this.ask(v); } },
+      // detail
+      hasDetail, detail, closeDetail: () => this.setState({ detailId: null }),
+      showResend: this.props.showResendControls ?? true,
+      resendLabel: resendLabels[st.resendState],
+      resendMsg: () => { this.setState({ resendState: 'sending' }); setTimeout(() => this.setState({ resendState: 'done' }), 900); },
+      askAboutMsg: () => { const id = st.detailId; this.setState({ detailId: null }); this.ask('Explain message #' + id + ' and why it ended in that state.'); }
+    };
+  }
+}
+</script>
+</body>
+</html>

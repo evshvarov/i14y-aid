@@ -161,6 +161,80 @@ ClassMethod GetMonitorInteropMetrics(limit As %Integer = 200) As %DynamicObject
     return result
 }
 
+ClassMethod EnableMonitorInteropMetrics(payload As %DynamicObject = "") As %DynamicObject
+{
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.enabled = 0
+    Set result.samEnabled = 0
+    Set result.samPrevious = ""
+    Set result.activityStatsRequested = 0
+    Set result.activityStatsEnabled = 0
+    Set result.activityStatsPrevious = ""
+    Set result.productionName = ""
+    Set result.warnings = []
+    Set result.evidence = []
+
+    If '..ClassExists("Ens.Util.Statistics") {
+        return ..NewMonitorError("MONITOR_ENABLE_UNAVAILABLE", "Ens.Util.Statistics is not available in this namespace.")
+    }
+
+    Set enableSAM = 1
+    Set enableActivityStats = 0
+    Set productionName = ""
+    If $IsObject(payload) {
+        If payload.%IsDefined("enableSAM") {
+            Set enableSAM = ..NormalizeBoolean(payload.%Get("enableSAM"), 1)
+        }
+        If payload.%IsDefined("enableActivityStats") {
+            Set enableActivityStats = ..NormalizeBoolean(payload.%Get("enableActivityStats"), 0)
+        }
+        If payload.%IsDefined("productionName") {
+            Set productionName = $ZStrip($Extract(payload.%Get("productionName"), 1, 300), "<>W")
+        }
+    }
+    If productionName = "" {
+        Set productionName = ..CurrentProductionName()
+    }
+    Set result.productionName = productionName
+    Set result.activityStatsRequested = enableActivityStats
+
+    If enableSAM {
+        Set previous = ""
+        Set sc = ##class(Ens.Util.Statistics).EnableSAMForNamespace(.previous, 1)
+        If $$$ISERR(sc) {
+            return ..NewMonitorError("MONITOR_ENABLE_FAILED", $System.Status.GetErrorText(sc))
+        }
+        Set result.samEnabled = 1
+        Set result.samPrevious = previous
+        Do result.evidence.%Push(..NewEvidence("monitor-config", "Ens.Util.Statistics", $Namespace, "EnableSAMForNamespace", "previous="_previous, "confirmed"))
+    }
+
+    If enableActivityStats {
+        If productionName = "" {
+            Do result.warnings.%Push(..NewWarning("ACTIVE_PRODUCTION_NOT_FOUND", "Activity stats were requested, but no active production was found. Pass productionName explicitly or start a production."))
+        } Else {
+            Set previous = ""
+            Set sc = ##class(Ens.Util.Statistics).EnableStatsForProduction(productionName, .previous, 1)
+            If $$$ISERR(sc) {
+                return ..NewMonitorError("MONITOR_ENABLE_FAILED", $System.Status.GetErrorText(sc))
+            }
+            Set result.activityStatsEnabled = 1
+            Set result.activityStatsPrevious = previous
+            Do result.evidence.%Push(..NewEvidence("monitor-config", "Ens.Util.Statistics", productionName, "EnableStatsForProduction", "previous="_previous, "confirmed"))
+            Do result.warnings.%Push(..NewWarning("ACTIVITY_LOCAL_OPERATION_REQUIRED", "Activity volume metrics require Ens.Activity.Operation.LocalOp to be present in the production. This API does not modify the production definition."))
+        }
+    }
+
+    If result.samEnabled || result.activityStatsEnabled {
+        Set result.enabled = 1
+    }
+    Set result.metrics = {}
+    Set result.metrics.warningCount = result.warnings.%Size()
+    Set result.metrics.evidenceCount = result.evidence.%Size()
+    return result
+}
+
 ClassMethod GetSettings() As %DynamicObject
 {
     Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
@@ -1142,6 +1216,100 @@ ClassMethod GetComponentDetail(productionName As %VarString, componentName As %V
     return result
 }
 
+ClassMethod UpdateComponentSettings(productionName As %VarString, componentName As %VarString, payload As %DynamicObject) As %DynamicObject
+{
+    Set result = {}
+    Set result.namespace = $Namespace
+    Set result.productionName = productionName
+    Set result.componentName = componentName
+    Set result.updatedSettings = []
+    Set result.warnings = []
+    Set result.evidence = []
+
+    If '..IsValidClassName(productionName) {
+        Do result.%Set("errorCode", "INVALID_PRODUCTION_NAME")
+        return result
+    }
+    If '..ClassExtends(productionName, "Ens.Production") {
+        Do result.%Set("errorCode", "PRODUCTION_NOT_FOUND")
+        return result
+    }
+    If componentName = "" {
+        Do result.%Set("errorCode", "INVALID_COMPONENT_NAME")
+        return result
+    }
+    If '$IsObject(payload) {
+        Do result.%Set("errorCode", "INVALID_COMPONENT_SETTINGS_PAYLOAD")
+        return result
+    }
+
+    Set settings = payload
+    If payload.%IsDefined("settings") {
+        Set settings = payload.settings
+    }
+    If '$IsObject(settings) {
+        Do result.%Set("errorCode", "INVALID_COMPONENT_SETTINGS_PAYLOAD")
+        return result
+    }
+
+    Set production = ##class(Ens.Config.Production).%OpenId(productionName,,.sc)
+    If $$$ISERR(sc) || '$IsObject(production) {
+        Do result.%Set("errorCode", "COMPONENT_SETTINGS_OPEN_FAILED")
+        Do result.%Set("statusText", $System.Status.GetErrorText(sc))
+        return result
+    }
+
+    Set item = ..FindProductionConfigItem(production, componentName)
+    If '$IsObject(item) {
+        Do result.%Set("errorCode", "COMPONENT_NOT_FOUND")
+        return result
+    }
+
+    Set iterator = settings.%GetIterator()
+    While iterator.%GetNext(.settingName, .settingValue) {
+        Set settingName = $ZStrip(settingName, "<>W")
+        Continue:(settingName = "")
+        If $IsObject(settingValue) {
+            Do result.warnings.%Push(..NewWarning("INVALID_COMPONENT_SETTING_VALUE", "Setting "_settingName_" was not updated because only scalar values are supported."))
+            Continue
+        }
+        Set setting = item.FindSettingByName(settingName)
+        If '$IsObject(setting) {
+            Do result.warnings.%Push(..NewWarning("COMPONENT_SETTING_NOT_FOUND", "Setting "_settingName_" was not found on component "_componentName_"."))
+            Continue
+        }
+        Set oldValue = setting.Value
+        Set newValue = settingValue_""
+        Set setting.Value = newValue
+        Do result.updatedSettings.%Push({"name":(settingName),"oldValue":(oldValue),"value":(newValue)})
+        Do result.evidence.%Push(..NewEvidence("production-setting", productionName, componentName, settingName, newValue, "confirmed"))
+    }
+
+    If result.updatedSettings.%Size() = 0 {
+        Do result.%Set("errorCode", "NO_COMPONENT_SETTINGS_UPDATED")
+        Do result.%Set("statusText", "No editable existing component settings were provided.")
+        return result
+    }
+
+    Set sc = production.SaveToClass(item)
+    If $$$ISERR(sc) {
+        Do result.%Set("errorCode", "COMPONENT_SETTINGS_SAVE_FAILED")
+        Do result.%Set("statusText", $System.Status.GetErrorText(sc))
+        return result
+    }
+
+    Set detail = ..GetComponentDetail(productionName, componentName)
+    If detail.%IsDefined("errorCode") {
+        return detail
+    }
+    Set result.component = detail.component
+    Set result.settings = detail.component.settings
+    Set result.metrics = {}
+    Set result.metrics.updatedSettingCount = result.updatedSettings.%Size()
+    Set result.metrics.warningCount = result.warnings.%Size()
+    return result
+}
+
 ClassMethod StartProduction(productionName As %VarString) As %DynamicObject
 {
     Set result = ..NewActionResult(productionName, "start")
@@ -1228,7 +1396,7 @@ ClassMethod StopProduction(productionName As %VarString, timeout As %Integer = 1
     return result
 }
 
-ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0, startDate As %VarString = "", endDate As %VarString = "", status As %VarString = "") As %DynamicObject
+ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0, startDate As %VarString = "", endDate As %VarString = "", status As %VarString = "", messageId As %VarString = "", sourceOrTarget As %VarString = "") As %DynamicObject
 {
     Set result = ..NewListResult()
     Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
@@ -1258,6 +1426,8 @@ ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 
     Do result.%Set("sessionId", sessionId)
     Do result.%Set("errorsOnly", errorsOnly)
     Do result.%Set("status", status)
+    Do result.%Set("messageId", messageId)
+    Do result.%Set("sourceOrTarget", sourceOrTarget)
     Do result.%Set("startDate", dateRange.startDate)
     Do result.%Set("endDate", dateRange.endDate)
     Do result.%Set("hasMore", 0)
@@ -1304,7 +1474,7 @@ ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 
     Set collected = 0
     For {
         Quit:'rset.%Next()
-        Continue:'..ShouldIncludeMessageHeader(rset, componentNames, sourceConfigName, targetConfigName, messageBodyClassName, sessionId, errorsOnly, status, dateRange.startHorolog, dateRange.endHorolog)
+        Continue:'..ShouldIncludeMessageHeader(rset, componentNames, sourceConfigName, targetConfigName, messageBodyClassName, sessionId, errorsOnly, status, dateRange.startHorolog, dateRange.endHorolog, messageId, sourceOrTarget)
         If skipped < offset {
             Set skipped = skipped + 1
             Continue
@@ -1626,6 +1796,7 @@ ClassMethod GetMessagePayloadMetadata(messageId As %Integer) As %DynamicObject
     Set result.metadata = metadata
     Set result.message = message
     Set result.messageBodyClassName = metadata.messageBodyClassName
+    Set result.resolvedMessageBodyClassName = metadata.resolvedMessageBodyClassName
     Set result.messageBodyId = metadata.messageBodyId
     Set result.bodyReferenceAvailable = metadata.bodyReferenceAvailable
     Set result.payloadReturned = metadata.payloadReturned
@@ -1666,6 +1837,7 @@ ClassMethod GetMessagePayloadPreview(messageId As %Integer) As %DynamicObject
     Set result.message = metadataResult.message
     Set result.metadata = metadataResult.metadata
     Set result.messageBodyClassName = metadataResult.messageBodyClassName
+    Set result.resolvedMessageBodyClassName = metadataResult.resolvedMessageBodyClassName
     Set result.messageBodyId = metadataResult.messageBodyId
     Set result.bodyReferenceAvailable = metadataResult.bodyReferenceAvailable
     Set result.payloadReturned = 0
@@ -1691,7 +1863,8 @@ ClassMethod GetMessagePayloadPreview(messageId As %Integer) As %DynamicObject
         Do ..AddPayloadMetrics(result)
         return result
     }
-    If '..ClassExists(result.messageBodyClassName) {
+    Set lookupClassName = $Select(result.resolvedMessageBodyClassName'="":result.resolvedMessageBodyClassName,1:result.messageBodyClassName)
+    If '..ClassExists(lookupClassName) {
         Set result.restrictionReason = "PAYLOAD_BODY_CLASS_NOT_FOUND"
         Do result.warnings.%Push(..NewWarning("PAYLOAD_BODY_CLASS_NOT_FOUND", "Message body class "_result.messageBodyClassName_" was not found."))
         Do ..AddPayloadMetrics(result)
@@ -1700,7 +1873,7 @@ ClassMethod GetMessagePayloadPreview(messageId As %Integer) As %DynamicObject
 
     Set body = ""
     Try {
-        Set body = $classmethod(result.messageBodyClassName, "%OpenId", result.messageBodyId)
+        Set body = $classmethod(lookupClassName, "%OpenId", result.messageBodyId)
     } Catch ex {
         Set body = ""
     }
@@ -1711,7 +1884,7 @@ ClassMethod GetMessagePayloadPreview(messageId As %Integer) As %DynamicObject
         return result
     }
 
-    Do ..AddPayloadPreviewFields(body, result.messageBodyClassName, settings.fieldRedactionPatterns, result.fields, result.evidence)
+    Do ..AddPayloadPreviewFields(body, lookupClassName, settings.fieldRedactionPatterns, result.fields, result.evidence)
     Set result.payloadReturned = 1
     Set result.bodyContentReturned = 1
     Set result.restricted = 0
@@ -1721,7 +1894,7 @@ ClassMethod GetMessagePayloadPreview(messageId As %Integer) As %DynamicObject
     Set result.metadata.restrictionReason = ""
     Set result.metadata.fields = result.fields
     Set result.metadata.warnings = []
-    Do result.evidence.%Push(..NewEvidence("payload-preview", result.messageBodyClassName, result.messageBodyId, "fields", result.fields.%Size(), "observed"))
+    Do result.evidence.%Push(..NewEvidence("payload-preview", lookupClassName, result.messageBodyId, "fields", result.fields.%Size(), "observed"))
     Do ..AddPayloadMetrics(result)
     return result
 }
@@ -2102,6 +2275,22 @@ ClassMethod BuildComponent(productionName As %VarString, tag As %VarString, bloc
         Do component.evidence.%Push(..NewEvidence("adapter-configuration", component.className, component.name, "ADAPTER", component.adapterClass, "confirmed"))
     }
     return component
+}
+
+ClassMethod FindProductionConfigItem(production As Ens.Config.Production, componentName As %VarString) As Ens.Config.Item [ Private ]
+{
+    If '$IsObject(production) {
+        return ""
+    }
+    For index = 1:1:production.Items.Count() {
+        Set item = production.Items.GetAt(index)
+        If $IsObject(item) {
+            If item.Name = componentName {
+                return item
+            }
+        }
+    }
+    return ""
 }
 
 ClassMethod AddConnections(productionName As %VarString, components As %DynamicArray, connections As %DynamicArray, warnings As %DynamicArray) [ Private ]
@@ -4321,6 +4510,7 @@ ClassMethod ParseEndpoint(endpoint As %VarString) As %DynamicObject [ Private ]
         return result
     }
     Set scheme = $ZConvert(parts("scheme"), "L")
+    Set result.scheme = scheme
     Set result.https = $Select(scheme="https":1,1:0)
     Set result.server = parts("host")
     If $Data(parts("port")) {
@@ -4481,10 +4671,11 @@ ClassMethod NewExternalSystem(productionName As %VarString, componentName As %Va
     return external
 }
 
-ClassMethod ShouldIncludeMessageHeader(rset As %SQL.IResultSet, componentNames As %DynamicArray, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0, status As %VarString = "", startHorolog As %VarString = "", endHorolog As %VarString = "") As %Boolean [ Private ]
+ClassMethod ShouldIncludeMessageHeader(rset As %SQL.IResultSet, componentNames As %DynamicArray, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0, status As %VarString = "", startHorolog As %VarString = "", endHorolog As %VarString = "", messageId As %VarString = "", sourceOrTarget As %VarString = "") As %Boolean [ Private ]
 {
     Set source = rset.%Get("SourceConfigName")
     Set target = rset.%Get("TargetConfigName")
+    Set bodyClass = rset.%Get("MessageBodyClassName")
     If '..ShouldIncludeDateTime(rset.%Get("TimeCreated"), startHorolog, endHorolog) {
         return 0
     }
@@ -4507,7 +4698,13 @@ ClassMethod ShouldIncludeMessageHeader(rset As %SQL.IResultSet, componentNames A
     If (targetConfigName '= "") && (target '= targetConfigName) {
         return 0
     }
-    If (messageBodyClassName '= "") && (rset.%Get("MessageBodyClassName") '= messageBodyClassName) {
+    If (sourceOrTarget '= "") && ($ZConvert(source, "U") '[ $ZConvert(sourceOrTarget, "U")) && ($ZConvert(target, "U") '[ $ZConvert(sourceOrTarget, "U")) {
+        return 0
+    }
+    If (messageId '= "") && (rset.%Get("MessageId") '[ messageId) {
+        return 0
+    }
+    If (messageBodyClassName '= "") && ($ZConvert(bodyClass, "U") '[ $ZConvert(messageBodyClassName, "U")) {
         return 0
     }
     If (sessionId '= "") && (rset.%Get("SessionId") '= sessionId) {
@@ -4633,16 +4830,35 @@ ClassMethod FetchMonitorOpenMetrics(path As %VarString) As %DynamicObject [ Priv
 
 ClassMethod MonitorPort() As %Integer [ Private ]
 {
-    Set port = 52773
-    Try {
-        If $IsObject(%request) && %request.CgiEnvs("SERVER_PORT") '= "" {
-            Set port = +%request.CgiEnvs("SERVER_PORT")
-        }
-    } Catch ex {
-        Set port = 52773
-    }
+    Set port = ..CPFWebServerPort()
     If port < 1 {
         Set port = 52773
+    }
+    return port
+}
+
+ClassMethod CPFWebServerPort() As %Integer [ Private ]
+{
+    Set port = 0
+    Set cpf = $System.Util.InstallDirectory()_"iris.cpf"
+    If '##class(%File).Exists(cpf) {
+        Set cpf = $System.Util.ManagerDirectory()_"iris.cpf"
+    }
+    If '##class(%File).Exists(cpf) {
+        return port
+    }
+    Try {
+        Set stream = ##class(%Stream.FileCharacter).%New()
+        Set stream.Filename = cpf
+        While 'stream.AtEnd {
+            Set line = stream.ReadLine()
+            If $Piece(line, "=", 1) = "WebServerPort" {
+                Set port = +$Piece(line, "=", 2)
+                Quit
+            }
+        }
+    } Catch ex {
+        Set port = 0
     }
     return port
 }
@@ -5079,7 +5295,7 @@ ClassMethod BuildTraceStepStaticText(step As %DynamicObject, connection As %Dyna
     } Else {
         Set text = text_". The message header is not marked as an error"
     }
-    Set text = text_". Payload body content was not returned."
+    Set text = text_..PayloadNotIncludedText()
     return text
 }
 
@@ -5142,7 +5358,7 @@ ClassMethod NewMessageSessionSummaryFromTrace(trace As %DynamicObject, productio
     Set summary.payloadPolicy.payloadInspectionEnabled = settings.payloadInspectionEnabled
     Set summary.payloadPolicy.payloadInspectionSupported = 0
     Set summary.payloadPolicy.bodyContentReturned = 0
-    Set summary.payloadPolicy.summary = "Payload body content was not returned."
+    Set summary.payloadPolicy.summary = $Extract(..PayloadNotIncludedText(), 3, *)
     Set summary.staticContext = ..NewTraceStaticContext(trace)
     Set summary.metrics = trace.metrics
     Set summary.text = ..BuildMessageSessionSummaryText(summary)
@@ -5219,7 +5435,7 @@ ClassMethod BuildMessageSessionSummaryText(summary As %DynamicObject) As %VarStr
             Set text = text_" and transformation"_..Plural(summary.staticContext.transformNames.%Size())_" "_..JoinArray(summary.staticContext.transformNames)
         }
     }
-    Set text = text_". Payload body content was not returned."
+    Set text = text_..PayloadNotIncludedText()
     return text
 }
 
@@ -5451,7 +5667,7 @@ ClassMethod NewSessionTimelineMessageEvent(message As %DynamicObject, sequence A
     Set event.status = message.status
     Set event.statusLabel = message.statusLabel
     Set event.isError = message.isError
-    Set event.text = "Message "_message.messageId_" moved from "_$Select(message.sourceConfigName'="":message.sourceConfigName,1:"unknown source")_" to "_$Select(message.targetConfigName'="":message.targetConfigName,1:"unknown target")_". Payload body content was not returned."
+    Set event.text = "Message "_message.messageId_" moved from "_$Select(message.sourceConfigName'="":message.sourceConfigName,1:"unknown source")_" to "_$Select(message.targetConfigName'="":message.targetConfigName,1:"unknown target")_..PayloadNotIncludedText()
     Set event.confidence = "observed"
     Set event.evidence = []
     Do event.evidence.%Push(..NewEvidence("message-header", "Ens.MessageHeader", message.messageId, "TimeCreated", message.timeCreated, "observed"))
@@ -5483,6 +5699,7 @@ ClassMethod NewPayloadMetadata(message As %DynamicObject, settings As %DynamicOb
     Set metadata = {}
     Set metadata.messageId = message.messageId
     Set metadata.messageBodyClassName = message.messageBodyClassName
+    Set metadata.resolvedMessageBodyClassName = ""
     Set metadata.messageBodyId = message.messageBodyId
     Set metadata.payloadReturned = 0
     Set metadata.payloadInspectionEnabled = settings.payloadInspectionEnabled
@@ -5491,7 +5708,8 @@ ClassMethod NewPayloadMetadata(message As %DynamicObject, settings As %DynamicOb
     Set metadata.bodyReferenceAvailable = (message.messageBodyClassName '= "") && (message.messageBodyId '= "")
     Set metadata.bodyClassExists = 0
     If message.messageBodyClassName '= "" {
-        Set metadata.bodyClassExists = ..ClassExists(message.messageBodyClassName)
+        Set metadata.resolvedMessageBodyClassName = ..ResolveClassName(message.messageBodyClassName)
+        Set metadata.bodyClassExists = (metadata.resolvedMessageBodyClassName '= "")
     }
     Set metadata.payloadInspectionSupported = metadata.bodyReferenceAvailable && metadata.bodyClassExists
     Set metadata.restricted = 1
@@ -5520,7 +5738,10 @@ ClassMethod NewPayloadMetadata(message As %DynamicObject, settings As %DynamicOb
         Do metadata.warnings.%Push(..NewWarning("PAYLOAD_BODY_CLASS_NOT_FOUND", "Message body class "_metadata.messageBodyClassName_" was not found."))
         return metadata
     }
-    Do ..AddPayloadMetadataFields(metadata.messageBodyClassName, metadata.fields, metadata.evidence)
+    Do ..AddPayloadMetadataFields(metadata.resolvedMessageBodyClassName, metadata.fields, metadata.evidence)
+    If metadata.fields.%Size() = 0 {
+        Do metadata.warnings.%Push(..NewWarning("PAYLOAD_METADATA_FIELDS_NOT_FOUND", "Message body class "_metadata.resolvedMessageBodyClassName_" was found, but no compiled payload properties were returned."))
+    }
     Set metadata.payloadReturned = 1
     Set metadata.restricted = 0
     Set metadata.restrictionReason = ""
@@ -5728,7 +5949,7 @@ ClassMethod BuildTraceStepText(header As %DynamicObject, sequence As %Integer) A
     If header.statusLabel '= "" {
         Set text = text_" and has status "_header.status_" ("_header.statusLabel_")"
     }
-    Set text = text_". Payload body content was not returned."
+    Set text = text_..PayloadNotIncludedText()
     return text
 }
 
@@ -5813,7 +6034,7 @@ ClassMethod BuildProductionTraceExplanationText(trace As %DynamicObject, product
     If processClasses.%Size() > 0 {
         Set text = text_". BPL process"_..Plural(processClasses.%Size())_" involved: "_..JoinArray(processClasses)
     }
-    Set text = text_". Payload body content was not returned."
+    Set text = text_..PayloadNotIncludedText()
     return text
 }
 
@@ -5872,7 +6093,7 @@ ClassMethod BuildTraceExplanationText(selected As %DynamicObject, steps As %Dyna
             Set text = text_". The reconstructed header path has "_steps.%Size()_" step"_..Plural(steps.%Size())_" from "_$Select(first.source'="":first.source,1:"unknown source")_" to "_$Select(last.target'="":last.target,1:"unknown target")
         }
     }
-    Set text = text_". This explanation is based on Ens.MessageHeader metadata only; payload body content was not read or returned."
+    Set text = text_". This explanation is based on Ens.MessageHeader metadata only; payload values are available from the payload endpoints when inspection is enabled."
     return text
 }
 
@@ -5888,8 +6109,13 @@ ClassMethod BuildTraceSummary(selected As %DynamicObject) As %VarString [ Privat
     If selected.sessionId '= "" {
         Set text = text_" in session "_selected.sessionId
     }
-    Set text = text_". Payload body content was not returned."
+    Set text = text_..PayloadNotIncludedText()
     return text
+}
+
+ClassMethod PayloadNotIncludedText() As %VarString [ Private ]
+{
+    return ". Payload values are not included in this response; use the payload metadata or preview endpoints when inspection is enabled."
 }
 
 ClassMethod NewArtifact(productionName As %VarString, componentName As %VarString, kind As %VarString, name As %VarString, field As %VarString) As %DynamicObject [ Private ]
@@ -7086,13 +7312,32 @@ ClassMethod GetRuntimeStatus(productionName As %VarString = "") As %DynamicObjec
     Set status.requestedProduction = productionName
     Set status.currentProduction = currentProduction
     Set status.state = +state
-    Set status.stateLabel = ..RuntimeStateLabel(+state)
     Set status.isCurrent = $Select((productionName '= "") && (currentProduction = productionName):1, 1:0)
     Set status.isRunning = $Select((+state = 1) && ((productionName = "") || (currentProduction = productionName)):1, 1:0)
+    Set status.activeStateLabel = ..RuntimeStateLabel(+state)
+    If productionName = "" {
+        Set status.stateLabel = status.activeStateLabel
+    } ElseIf status.isRunning {
+        Set status.stateLabel = status.activeStateLabel
+    } Else {
+        Set status.stateLabel = "stopped"
+    }
     If $$$ISERR(sc) {
         Do status.%Set("statusText", $System.Status.GetErrorText(sc))
     }
     return status
+}
+
+ClassMethod CurrentProductionName() As %VarString [ Private ]
+{
+    Set status = ..GetRuntimeStatus("")
+    If '$IsObject(status) {
+        return ""
+    }
+    If status.isRunning {
+        return status.currentProduction
+    }
+    return ""
 }
 
 ClassMethod RuntimeStateLabel(state As %Integer) As %VarString [ Private ]
@@ -7134,6 +7379,17 @@ ClassMethod EnableRuntimeControlRole() [ Private ]
 
 ClassMethod ClassExists(className As %VarString) As %Boolean [ Private ]
 {
+    If ..ResolveClassName(className) '= "" {
+        return 1
+    }
+    return 0
+}
+
+ClassMethod ResolveClassName(className As %VarString) As %VarString [ Private ]
+{
+    If className = "" {
+        return ""
+    }
     Set exists = 0
     Try {
         Set exists = $classmethod(className, "%ExistsId", className)
@@ -7141,19 +7397,22 @@ ClassMethod ClassExists(className As %VarString) As %Boolean [ Private ]
         Set exists = 0
     }
     If exists {
-        return 1
+        return className
     }
 
     Set stmt = ##class(%SQL.Statement).%New()
-    Set sc = stmt.%Prepare("SELECT Name FROM %Dictionary.CompiledClass WHERE Name = ?")
+    Set sc = stmt.%Prepare("SELECT TOP 1 Name FROM %Dictionary.CompiledClass WHERE Name = ? OR UPPER(Name) = UPPER(?) ORDER BY Name")
     If $$$ISERR(sc) {
-        return 0
+        return ""
     }
-    Set rset = stmt.%Execute(className)
+    Set rset = stmt.%Execute(className, className)
     If rset.%SQLCODE < 0 {
-        return 0
+        return ""
     }
-    return rset.%Next()
+    If rset.%Next() {
+        return rset.%Get("Name")
+    }
+    return ""
 }
 
 ClassMethod ClassExtends(className As %VarString, baseClass As %VarString) As %Boolean [ Private ]

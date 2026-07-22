@@ -68,6 +68,16 @@ ClassMethod GetMonitorInteropMetrics(limit As %Integer = 200) As %DynamicObject
     return ..HandleMonitorResult(result)
 }
 
+/// Enable IRIS interoperability metrics collection for the current namespace
+ClassMethod EnableMonitorInteropMetrics(settings As %DynamicObject) As %DynamicObject
+{
+    If '$IsObject(settings) {
+        Set settings = ..ReadJsonBody()
+    }
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).EnableMonitorInteropMetrics(settings)
+    return ..HandleMonitorResult(result)
+}
+
 /// Get module analysis settings
 ClassMethod GetSettings() As %DynamicObject
 {
@@ -129,6 +139,16 @@ ClassMethod ListComponents(productionName As %String) As %DynamicObject
 ClassMethod GetComponentDetail(productionName As %String, componentName As %String) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetComponentDetail(productionName, componentName)
+    return ..HandleProductionResult(result)
+}
+
+/// Update production component settings
+ClassMethod UpdateComponentSettings(productionName As %String, componentName As %String, settings As %DynamicObject) As %DynamicObject
+{
+    If '$IsObject(settings) {
+        Set settings = ..ReadJsonBody()
+    }
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).UpdateComponentSettings(productionName, componentName, settings)
     return ..HandleProductionResult(result)
 }
 
@@ -298,8 +318,10 @@ ClassMethod StopProduction(productionName As %String, timeout As %Integer = 10, 
 ///     startDate<br/>
 ///     endDate<br/>
 ///     status<br/>
+///     messageId<br/>
+///     sourceOrTarget<br/>
 /// WARNING: This method's signature has changed.
-ClassMethod ListMessages(productionName As %String, limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %String, targetConfigName As %String, messageBodyClassName As %String, sessionId As %String, errorsOnly As %Boolean = 0, startDate As %String, endDate As %String, status As %String = "") As %DynamicObject
+ClassMethod ListMessages(productionName As %String, limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %String, targetConfigName As %String, messageBodyClassName As %String, sessionId As %String, errorsOnly As %Boolean = 0, startDate As %String, endDate As %String, status As %String = "", messageId As %String = "", sourceOrTarget As %String = "") As %DynamicObject
 {
     If '$Data(productionName) {
         Set productionName = ""
@@ -334,7 +356,13 @@ ClassMethod ListMessages(productionName As %String, limit As %Integer = 50, offs
     If '$Data(status) {
         Set status = ""
     }
-    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListMessages(productionName, limit, offset, sourceConfigName, targetConfigName, messageBodyClassName, sessionId, errorsOnly, startDate, endDate, status)
+    If '$Data(messageId) {
+        Set messageId = ""
+    }
+    If '$Data(sourceOrTarget) {
+        Set sourceOrTarget = ""
+    }
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListMessages(productionName, limit, offset, sourceConfigName, targetConfigName, messageBodyClassName, sessionId, errorsOnly, startDate, endDate, status, messageId, sourceOrTarget)
     return ..HandleRuntimeResult(result)
 }
 
@@ -351,8 +379,10 @@ ClassMethod ListMessages(productionName As %String, limit As %Integer = 50, offs
 ///     startDate<br/>
 ///     endDate<br/>
 ///     status<br/>
+///     messageId<br/>
+///     sourceOrTarget<br/>
 /// WARNING: This method's signature has changed.
-ClassMethod ListProductionMessages(productionName As %String, limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %String, targetConfigName As %String, messageBodyClassName As %String, sessionId As %String, errorsOnly As %Boolean = 0, startDate As %String, endDate As %String, status As %String = "") As %DynamicObject
+ClassMethod ListProductionMessages(productionName As %String, limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %String, targetConfigName As %String, messageBodyClassName As %String, sessionId As %String, errorsOnly As %Boolean = 0, startDate As %String, endDate As %String, status As %String = "", messageId As %String = "", sourceOrTarget As %String = "") As %DynamicObject
 {
     If '$Data(limit) {
         Set limit = 50
@@ -384,7 +414,13 @@ ClassMethod ListProductionMessages(productionName As %String, limit As %Integer 
     If '$Data(status) {
         Set status = ""
     }
-    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListMessages(productionName, limit, offset, sourceConfigName, targetConfigName, messageBodyClassName, sessionId, errorsOnly, startDate, endDate, status)
+    If '$Data(messageId) {
+        Set messageId = ""
+    }
+    If '$Data(sourceOrTarget) {
+        Set sourceOrTarget = ""
+    }
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).ListMessages(productionName, limit, offset, sourceConfigName, targetConfigName, messageBodyClassName, sessionId, errorsOnly, startDate, endDate, status, messageId, sourceOrTarget)
     return ..HandleRuntimeResult(result)
 }
 
@@ -674,6 +710,18 @@ ClassMethod HandleProductionResult(result As %DynamicObject) As %DynamicObject [
         If result.errorCode = "COMPONENT_NOT_FOUND" {
             return ..Error(404, "COMPONENT_NOT_FOUND", "The requested production component was not found.")
         }
+        If result.errorCode = "INVALID_COMPONENT_SETTINGS_PAYLOAD" {
+            return ..Error(400, "INVALID_COMPONENT_SETTINGS_PAYLOAD", "Component settings update requires a JSON object body.")
+        }
+        If result.errorCode = "NO_COMPONENT_SETTINGS_UPDATED" {
+            return ..Error(400, "NO_COMPONENT_SETTINGS_UPDATED", result.%Get("statusText"))
+        }
+        If result.errorCode = "COMPONENT_SETTINGS_OPEN_FAILED" {
+            return ..Error(500, "COMPONENT_SETTINGS_OPEN_FAILED", result.%Get("statusText"))
+        }
+        If result.errorCode = "COMPONENT_SETTINGS_SAVE_FAILED" {
+            return ..Error(500, "COMPONENT_SETTINGS_SAVE_FAILED", result.%Get("statusText"))
+        }
         If result.errorCode = "INVALID_AI_QUESTION" {
             return ..Error(400, "INVALID_AI_QUESTION", "RAG search requires a non-empty question.")
         }
@@ -788,6 +836,12 @@ ClassMethod HandleMonitorResult(result As %DynamicObject) As %DynamicObject [ Pr
         }
         If result.errorCode = "MONITOR_REQUEST_FAILED" {
             return ..Error(502, "MONITOR_REQUEST_FAILED", result.%Get("statusText"))
+        }
+        If result.errorCode = "MONITOR_ENABLE_UNAVAILABLE" {
+            return ..Error(404, "MONITOR_ENABLE_UNAVAILABLE", result.%Get("statusText"))
+        }
+        If result.errorCode = "MONITOR_ENABLE_FAILED" {
+            return ..Error(500, "MONITOR_ENABLE_FAILED", result.%Get("statusText"))
         }
     }
     return result

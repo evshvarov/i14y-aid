@@ -147,6 +147,16 @@ curl "http://localhost:57337/i14y-aid/api/monitor/metrics/interop?limit=50"
 
 These endpoints wrap selected `/api/monitor` responses and return JSON samples instead of exposing raw instance-level OpenMetrics output to the UI.
 
+If the interop metrics response reports `INTEROP_METRICS_NOT_ENABLED`, enable basic namespace metrics:
+
+```sh
+curl -X POST "http://localhost:57337/i14y-aid/api/monitor/metrics/interop/enable" \
+  -H "Content-Type: application/json" \
+  -d '{"enableSAM":true,"enableActivityStats":false}'
+```
+
+Activity stats are optional and require `Ens.Activity.Operation.LocalOp` in the production. The explainer API will not add that production item automatically.
+
 Pick a `messageId` from the response, then inspect detail, trace, explanation, and payload metadata:
 
 ```sh
