@@ -1223,6 +1223,7 @@ ClassMethod UpdateComponentSettings(productionName As %VarString, componentName 
     Set result.namespace = $Namespace
     Set result.productionName = productionName
     Set result.componentName = componentName
+    Set result.updatedAttributes = []
     Set result.updatedSettings = []
     Set result.warnings = []
     Set result.evidence = []
@@ -1244,7 +1245,7 @@ ClassMethod UpdateComponentSettings(productionName As %VarString, componentName 
         return result
     }
 
-    Set settings = payload
+    Set settings = {}
     If payload.%IsDefined("settings") {
         Set settings = payload.settings
     }
@@ -1264,6 +1265,40 @@ ClassMethod UpdateComponentSettings(productionName As %VarString, componentName 
     If '$IsObject(item) {
         Do result.%Set("errorCode", "COMPONENT_NOT_FOUND")
         return result
+    }
+
+    If payload.%IsDefined("enabled") {
+        Set oldValue = item.Enabled
+        Set newValue = ..NormalizeBoolean(payload.%Get("enabled"), oldValue)
+        Set item.Enabled = newValue
+        Do result.updatedAttributes.%Push({"name":"enabled","oldValue":(oldValue),"value":(newValue)})
+        Do result.evidence.%Push(..NewEvidence("production-component-attribute", productionName, componentName, "Enabled", newValue, "confirmed"))
+    }
+    If payload.%IsDefined("poolSize") {
+        Set oldValue = item.PoolSize
+        Set newValue = ..NormalizeInteger(payload.%Get("poolSize"), oldValue)
+        If newValue < 0 {
+            Set newValue = oldValue
+            Do result.warnings.%Push(..NewWarning("INVALID_COMPONENT_POOL_SIZE", "PoolSize must be zero or a positive integer."))
+        } Else {
+            Set item.PoolSize = newValue
+            Do result.updatedAttributes.%Push({"name":"poolSize","oldValue":(oldValue),"value":(newValue)})
+            Do result.evidence.%Push(..NewEvidence("production-component-attribute", productionName, componentName, "PoolSize", newValue, "confirmed"))
+        }
+    }
+    If payload.%IsDefined("category") {
+        Set oldValue = item.Category
+        Set newValue = $Extract(payload.%Get("category")_"", 1, 200)
+        Set item.Category = newValue
+        Do result.updatedAttributes.%Push({"name":"category","oldValue":(oldValue),"value":(newValue)})
+        Do result.evidence.%Push(..NewEvidence("production-component-attribute", productionName, componentName, "Category", newValue, "confirmed"))
+    }
+    If payload.%IsDefined("comment") {
+        Set oldValue = item.Comment
+        Set newValue = $Extract(payload.%Get("comment")_"", 1, 500)
+        Set item.Comment = newValue
+        Do result.updatedAttributes.%Push({"name":"comment","oldValue":(oldValue),"value":(newValue)})
+        Do result.evidence.%Push(..NewEvidence("production-component-attribute", productionName, componentName, "Comment", newValue, "confirmed"))
     }
 
     Set iterator = settings.%GetIterator()
@@ -1286,9 +1321,9 @@ ClassMethod UpdateComponentSettings(productionName As %VarString, componentName 
         Do result.evidence.%Push(..NewEvidence("production-setting", productionName, componentName, settingName, newValue, "confirmed"))
     }
 
-    If result.updatedSettings.%Size() = 0 {
+    If (result.updatedAttributes.%Size() = 0) && (result.updatedSettings.%Size() = 0) {
         Do result.%Set("errorCode", "NO_COMPONENT_SETTINGS_UPDATED")
-        Do result.%Set("statusText", "No editable existing component settings were provided.")
+        Do result.%Set("statusText", "No editable component attributes or existing settings were provided.")
         return result
     }
 
@@ -1306,6 +1341,7 @@ ClassMethod UpdateComponentSettings(productionName As %VarString, componentName 
     Set result.component = detail.component
     Set result.settings = detail.component.settings
     Set result.metrics = {}
+    Set result.metrics.updatedAttributeCount = result.updatedAttributes.%Size()
     Set result.metrics.updatedSettingCount = result.updatedSettings.%Size()
     Set result.metrics.warningCount = result.warnings.%Size()
     return result

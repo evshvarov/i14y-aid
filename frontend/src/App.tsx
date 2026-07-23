@@ -39,6 +39,7 @@ import {
   updateSettings,
 } from "./api";
 import type { ApiConnection, ApiConnectionTestResult } from "./api";
+import type { ComponentSettingsUpdate } from "./api";
 import type {
   AIAnswerCitation,
   AnalysisSettings,
@@ -659,12 +660,12 @@ export default function App() {
     }
   }
 
-  async function handleComponentSettingsSave(componentName: string, nextSettings: Record<string, string>) {
+  async function handleComponentSettingsSave(componentName: string, update: ComponentSettingsUpdate) {
     if (!productionName) return;
     const endServerRead = beginServerRead(`${componentName} settings`);
     setError("");
     try {
-      await updateComponentSettings(productionName, componentName, nextSettings);
+      await updateComponentSettings(productionName, componentName, update);
       await loadProductionData(productionName);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to update component settings.");
@@ -1162,7 +1163,7 @@ function OverviewView(props: { production: ProductionDetail | null; summary: str
 
 function GraphView(props: {
   lanes: Record<"service" | "process" | "operation", Component[]>;
-  onSaveSettings: (componentName: string, settings: Record<string, string>) => Promise<void>;
+  onSaveSettings: (componentName: string, update: ComponentSettingsUpdate) => Promise<void>;
 }) {
   const configs = [
     ["service", "Business Services", "blue"],
@@ -1183,12 +1184,6 @@ function GraphView(props: {
                   <span>{component.protocol || component.adapterClass || component.type || "component"}</span>
                   {Boolean(component.targets?.length) && <span>→ {component.targets?.join(", ")}</span>}
                 </div>
-                <div className="component-param-strip">
-                  <span>{component.enabled === false ? "disabled" : "enabled"}</span>
-                  <span>pool {component.poolSize ?? "--"}</span>
-                  {component.category && <span>{component.category}</span>}
-                </div>
-                {component.comment && <p className="component-comment">{component.comment}</p>}
                 <ComponentSettingsEditor component={component} onSave={props.onSaveSettings} />
               </article>
             ))}
@@ -1202,21 +1197,27 @@ function GraphView(props: {
 
 function ComponentSettingsEditor(props: {
   component: Component;
-  onSave: (componentName: string, settings: Record<string, string>) => Promise<void>;
+  onSave: (componentName: string, update: ComponentSettingsUpdate) => Promise<void>;
 }) {
-  const settingsKey = JSON.stringify(props.component.settings ?? {});
-  const [draft, setDraft] = useState<Record<string, string>>(() => normalizeComponentSettings(props.component.settings));
+  const componentKey = JSON.stringify({
+    enabled: props.component.enabled,
+    poolSize: props.component.poolSize,
+    category: props.component.category,
+    comment: props.component.comment,
+    settings: props.component.settings ?? {},
+  });
+  const [draft, setDraft] = useState<ComponentSettingsUpdate>(() => normalizeComponentDraft(props.component));
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
 
   useEffect(() => {
-    setDraft(normalizeComponentSettings(props.component.settings));
+    setDraft(normalizeComponentDraft(props.component));
     setStatus("");
-  }, [props.component.name, settingsKey]);
+  }, [props.component.name, componentKey]);
 
-  const entries = Object.entries(draft);
-  const original = normalizeComponentSettings(props.component.settings);
-  const dirty = entries.some(([key, value]) => value !== (original[key] ?? ""));
+  const settingsEntries = Object.entries(draft.settings ?? {});
+  const original = normalizeComponentDraft(props.component);
+  const dirty = componentDraftChanged(draft, original);
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1233,22 +1234,54 @@ function ComponentSettingsEditor(props: {
     }
   }
 
-  if (entries.length === 0) {
-    return <div className="component-settings-empty">No editable settings discovered.</div>;
-  }
-
   return (
     <form className="component-settings" onSubmit={handleSave}>
       <div className="component-settings-title">
         <span>Parameters</span>
         {status && <small>{status}</small>}
       </div>
-      {entries.map(([key, value]) => (
+      <label className="component-switch-row">
+        <span>Enabled</span>
+        <input
+          checked={Boolean(draft.enabled)}
+          type="checkbox"
+          onChange={(event) => setDraft((current) => ({ ...current, enabled: event.target.checked }))}
+        />
+      </label>
+      <label className="component-setting-row">
+        <span>PoolSize</span>
+        <input
+          inputMode="numeric"
+          min="0"
+          type="number"
+          value={String(draft.poolSize ?? 0)}
+          onChange={(event) => setDraft((current) => ({ ...current, poolSize: Number(event.target.value) }))}
+        />
+      </label>
+      <label className="component-setting-row">
+        <span>Category</span>
+        <input
+          value={draft.category ?? ""}
+          onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))}
+        />
+      </label>
+      <label className="component-setting-row">
+        <span>Comment</span>
+        <input
+          value={draft.comment ?? ""}
+          onChange={(event) => setDraft((current) => ({ ...current, comment: event.target.value }))}
+        />
+      </label>
+      {settingsEntries.length === 0 && <div className="component-settings-empty">No component-specific settings discovered.</div>}
+      {settingsEntries.map(([key, value]) => (
         <label className="component-setting-row" key={key}>
           <span>{key}</span>
           <input
             value={value}
-            onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))}
+            onChange={(event) => setDraft((current) => ({
+              ...current,
+              settings: { ...(current.settings ?? {}), [key]: event.target.value },
+            }))}
           />
         </label>
       ))}
@@ -1259,10 +1292,34 @@ function ComponentSettingsEditor(props: {
   );
 }
 
+function normalizeComponentDraft(component: Component): ComponentSettingsUpdate {
+  return {
+    enabled: component.enabled !== false,
+    poolSize: component.poolSize ?? 0,
+    category: component.category ?? "",
+    comment: component.comment ?? "",
+    settings: normalizeComponentSettings(component.settings),
+  };
+}
+
 function normalizeComponentSettings(settings?: Record<string, string>) {
   return Object.fromEntries(
     Object.entries(settings ?? {}).map(([key, value]) => [key, String(value ?? "")]),
   );
+}
+
+function componentDraftChanged(current: ComponentSettingsUpdate, original: ComponentSettingsUpdate) {
+  if (Boolean(current.enabled) !== Boolean(original.enabled)) return true;
+  if (Number(current.poolSize ?? 0) !== Number(original.poolSize ?? 0)) return true;
+  if ((current.category ?? "") !== (original.category ?? "")) return true;
+  if ((current.comment ?? "") !== (original.comment ?? "")) return true;
+  const currentSettings = current.settings ?? {};
+  const originalSettings = original.settings ?? {};
+  const keys = new Set([...Object.keys(currentSettings), ...Object.keys(originalSettings)]);
+  for (const key of keys) {
+    if ((currentSettings[key] ?? "") !== (originalSettings[key] ?? "")) return true;
+  }
+  return false;
 }
 
 function MessagesView(props: {

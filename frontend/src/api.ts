@@ -239,15 +239,24 @@ export async function getComponents(name: string) {
   return data.items ?? [];
 }
 
-export function updateComponentSettings(name: string, componentName: string, settings: Record<string, string>) {
+export type ComponentSettingsUpdate = {
+  enabled?: boolean;
+  poolSize?: number;
+  category?: string;
+  comment?: string;
+  settings?: Record<string, string>;
+};
+
+export function updateComponentSettings(name: string, componentName: string, update: ComponentSettingsUpdate) {
   return request<{
     component?: Component;
     settings?: Record<string, string>;
+    updatedAttributes?: Array<{ name?: string; oldValue?: string; value?: string | number | boolean }>;
     updatedSettings?: Array<{ name?: string; oldValue?: string; value?: string }>;
     warnings?: unknown[];
   }>(`/productions/${encodeURIComponent(name)}/components/${encodeURIComponent(componentName)}/settings`, {
     method: "PUT",
-    body: JSON.stringify({ settings }),
+    body: JSON.stringify(update),
   });
 }
 

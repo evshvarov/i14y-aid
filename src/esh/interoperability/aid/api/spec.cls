@@ -6631,11 +6631,38 @@ XData OpenAPI [ MimeType = application/json ]
     "ComponentSettingsUpdateRequest": {
       "type": "object",
       "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "poolSize": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "category": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string"
+        },
         "settings": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
           }
+        }
+      }
+    },
+    "ComponentAttributeUpdate": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "oldValue": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
         }
       }
     },
@@ -6670,6 +6697,12 @@ XData OpenAPI [ MimeType = application/json ]
         },
         "settings": {
           "type": "object"
+        },
+        "updatedAttributes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ComponentAttributeUpdate"
+          }
         },
         "updatedSettings": {
           "type": "array",
