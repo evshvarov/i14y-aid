@@ -6716,6 +6716,13 @@
           "additionalProperties": {
             "type": "string"
           }
+        },
+        "settingTargets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Optional map of setting name to target, for example Adapter or Host."
         }
       }
     },
@@ -6723,6 +6730,9 @@
       "type": "object",
       "properties": {
         "name": {
+          "type": "string"
+        },
+        "target": {
           "type": "string"
         },
         "oldValue": {
@@ -6772,6 +6782,12 @@
           }
         },
         "updatedSettings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ComponentSettingUpdate"
+          }
+        },
+        "runtimeUpdatedSettings": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/ComponentSettingUpdate"

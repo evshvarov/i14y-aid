@@ -6725,6 +6725,13 @@ XData OpenAPI [ MimeType = application/json ]
           "additionalProperties": {
             "type": "string"
           }
+        },
+        "settingTargets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Optional map of setting name to target, for example Adapter or Host."
         }
       }
     },
@@ -6732,6 +6739,9 @@ XData OpenAPI [ MimeType = application/json ]
       "type": "object",
       "properties": {
         "name": {
+          "type": "string"
+        },
+        "target": {
           "type": "string"
         },
         "oldValue": {
@@ -6781,6 +6791,12 @@ XData OpenAPI [ MimeType = application/json ]
           }
         },
         "updatedSettings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ComponentSettingUpdate"
+          }
+        },
+        "runtimeUpdatedSettings": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/ComponentSettingUpdate"

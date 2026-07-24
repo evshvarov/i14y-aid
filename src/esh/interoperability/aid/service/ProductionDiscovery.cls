@@ -1225,6 +1225,7 @@ ClassMethod UpdateComponentSettings(productionName As %VarString, componentName 
     Set result.componentName = componentName
     Set result.updatedAttributes = []
     Set result.updatedSettings = []
+    Set result.runtimeUpdatedSettings = []
     Set result.warnings = []
     Set result.evidence = []
 
@@ -1253,6 +1254,13 @@ ClassMethod UpdateComponentSettings(productionName As %VarString, componentName 
         Do result.%Set("errorCode", "INVALID_COMPONENT_SETTINGS_PAYLOAD")
         return result
     }
+    Set settingTargets = ""
+    If payload.%IsDefined("settingTargets") {
+        Set settingTargets = payload.settingTargets
+    }
+    If '$IsObject(settingTargets) {
+        Set settingTargets = {}
+    }
 
     Set production = ##class(Ens.Config.Production).%OpenId(productionName,,.sc)
     If $$$ISERR(sc) || '$IsObject(production) {
@@ -1265,6 +1273,12 @@ ClassMethod UpdateComponentSettings(productionName As %VarString, componentName 
     If '$IsObject(item) {
         Do result.%Set("errorCode", "COMPONENT_NOT_FOUND")
         return result
+    }
+    Set runtime = ..GetRuntimeStatus(productionName)
+    Set updateRuntime = $Select((runtime.isRunning = 1) && (runtime.currentProduction = productionName):1, 1:0)
+    If updateRuntime {
+        New $ROLES
+        Do ..EnableRuntimeControlRole()
     }
 
     If payload.%IsDefined("enabled") {
@@ -1309,16 +1323,30 @@ ClassMethod UpdateComponentSettings(productionName As %VarString, componentName 
             Do result.warnings.%Push(..NewWarning("INVALID_COMPONENT_SETTING_VALUE", "Setting "_settingName_" was not updated because only scalar values are supported."))
             Continue
         }
-        Set setting = item.FindSettingByName(settingName)
+        Set requestedTarget = ""
+        If settingTargets.%IsDefined(settingName) {
+            Set requestedTarget = $ZStrip(settingTargets.%Get(settingName)_"", "<>W")
+        }
+        Set setting = item.FindSettingByName(settingName, requestedTarget)
         If '$IsObject(setting) {
             Do result.warnings.%Push(..NewWarning("COMPONENT_SETTING_NOT_FOUND", "Setting "_settingName_" was not found on component "_componentName_"."))
             Continue
         }
+        Set settingTarget = setting.Target
         Set oldValue = setting.Value
         Set newValue = settingValue_""
         Set setting.Value = newValue
-        Do result.updatedSettings.%Push({"name":(settingName),"oldValue":(oldValue),"value":(newValue)})
+        Do result.updatedSettings.%Push({"name":(settingName),"target":(settingTarget),"oldValue":(oldValue),"value":(newValue)})
         Do result.evidence.%Push(..NewEvidence("production-setting", productionName, componentName, settingName, newValue, "confirmed"))
+        If updateRuntime {
+            Set runtimeSC = ..SetRuntimeComponentSetting(componentName, settingTarget, settingName, newValue)
+            If $$$ISERR(runtimeSC) {
+                Do result.warnings.%Push(..NewWarning("COMPONENT_RUNTIME_SETTING_UPDATE_FAILED", "Runtime setting "_settingName_" could not be updated on component "_componentName_": "_$System.Status.GetErrorText(runtimeSC)))
+            } Else {
+                Do result.runtimeUpdatedSettings.%Push({"name":(settingName),"target":(settingTarget),"value":(newValue)})
+                Do result.evidence.%Push(..NewEvidence("runtime-setting", productionName, componentName, settingName, newValue, "confirmed"))
+            }
+        }
     }
 
     If (result.updatedAttributes.%Size() = 0) && (result.updatedSettings.%Size() = 0) {
@@ -1343,6 +1371,7 @@ ClassMethod UpdateComponentSettings(productionName As %VarString, componentName 
     Set result.metrics = {}
     Set result.metrics.updatedAttributeCount = result.updatedAttributes.%Size()
     Set result.metrics.updatedSettingCount = result.updatedSettings.%Size()
+    Set result.metrics.runtimeUpdatedSettingCount = result.runtimeUpdatedSettings.%Size()
     Set result.metrics.warningCount = result.warnings.%Size()
     return result
 }
@@ -7559,6 +7588,18 @@ ClassMethod NewActionResult(productionName As %VarString, action As %VarString) 
     Set result.action = action
     Set result.changed = 0
     return result
+}
+
+ClassMethod SetRuntimeComponentSetting(componentName As %VarString, settingTarget As %VarString, settingName As %VarString, settingValue As %VarString) As %Status [ Private ]
+{
+    Set target = $ZConvert($ZStrip($Get(settingTarget), "<>W"), "U")
+    If target = "ADAPTER" {
+        return ##class(Ens.Director).SetAdapterSettingValue(componentName, settingName, settingValue)
+    }
+    If target = "HOST" {
+        return ##class(Ens.Director).SetHostSettingValue(componentName, settingName, settingValue)
+    }
+    return ##class(Ens.Director).SetItemSettingValue(componentName, settingTarget, settingName, settingValue)
 }
 
 ClassMethod EnableRuntimeControlRole() [ Private ]
