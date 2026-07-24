@@ -17,9 +17,6 @@ XData OpenAPI [ MimeType = application/json ]
     "description": "Discover and explain InterSystems IRIS interoperability productions in the current namespace."
   },
   "basePath": "/i14y-aid/api",
-  "consumes": [
-    "application/json"
-  ],
   "produces": [
     "application/json"
   ],
