@@ -4,9 +4,15 @@
     <Module>
       <Name>esh-i14y-aid</Name>
       <Description>Explains InterSystems IRIS interoperability productions using deterministic metadata analysis</Description>
-      <Version>0.2.22</Version>
+      <Version>0.2.23</Version>
       <Packaging>module</Packaging>
       <SourcesRoot>src</SourcesRoot>
+      <Dependencies>
+        <ModuleReference>
+          <Name>sslclient</Name>
+          <Version>*</Version>
+        </ModuleReference>
+      </Dependencies>
       <Resource Name="esh.interoperability.aid.PKG"/>
       <UnitTest Name="/tests" Package="esh.interoperability.aid.tests" Phase="test"/>
       <CSPApplication

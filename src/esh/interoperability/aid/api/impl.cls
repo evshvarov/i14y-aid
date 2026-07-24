@@ -22,7 +22,7 @@ ClassMethod Health() As %DynamicObject
     Set result = {}
     Set result.status = "ok"
     Set result.module = "esh-i14y-aid"
-    Set result.version = "0.2.22"
+    Set result.version = "0.2.23"
     Set result.namespace = $Namespace
     Set result.capabilities = ##class(esh.interoperability.aid.service.ProductionDiscovery).Capabilities()
     return result
@@ -69,10 +69,23 @@ ClassMethod GetMonitorInteropMetrics(limit As %Integer = 200) As %DynamicObject
 }
 
 /// Enable IRIS interoperability metrics collection for the current namespace
-ClassMethod EnableMonitorInteropMetrics(settings As %DynamicObject) As %DynamicObject
+ClassMethod EnableMonitorInteropMetrics(enableSAM As %String = "", enableActivityStats As %String = "", productionName As %String = "") As %DynamicObject
 {
+    Set enableSAM = $Get(enableSAM)
+    Set enableActivityStats = $Get(enableActivityStats)
+    Set productionName = $Get(productionName)
+    Set settings = ..ReadJsonBody()
     If '$IsObject(settings) {
-        Set settings = ..ReadJsonBody()
+        Set settings = {}
+        If enableSAM '= "" {
+            Set settings.enableSAM = enableSAM
+        }
+        If enableActivityStats '= "" {
+            Set settings.enableActivityStats = enableActivityStats
+        }
+        If productionName '= "" {
+            Set settings.productionName = productionName
+        }
     }
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).EnableMonitorInteropMetrics(settings)
     return ..HandleMonitorResult(result)
@@ -90,9 +103,7 @@ ClassMethod GetSettings() As %DynamicObject
 /// WARNING: This method's signature has changed.
 ClassMethod UpdateSettings(settings As %DynamicObject) As %DynamicObject
 {
-    If '$IsObject(settings) {
-        Set settings = ..ReadJsonBody()
-    }
+    Set settings = ..NormalizeJsonBody(settings)
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).UpdateSettings(settings)
     return ..HandleSettingsResult(result)
 }
@@ -145,9 +156,7 @@ ClassMethod GetComponentDetail(productionName As %String, componentName As %Stri
 /// Update production component settings
 ClassMethod UpdateComponentSettings(productionName As %String, componentName As %String, settings As %DynamicObject) As %DynamicObject
 {
-    If '$IsObject(settings) {
-        Set settings = ..ReadJsonBody()
-    }
+    Set settings = ..NormalizeJsonBody(settings)
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).UpdateComponentSettings(productionName, componentName, settings)
     return ..HandleProductionResult(result)
 }
@@ -266,9 +275,7 @@ ClassMethod GetProductionAISummary(productionName As %String) As %DynamicObject
 ///     request<br/>
 ClassMethod AskProductionAI(productionName As %String, request As %DynamicObject) As %DynamicObject
 {
-    If '$IsObject(request) {
-        Set request = ..ReadJsonBody()
-    }
+    Set request = ..NormalizeJsonBody(request)
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).AskProductionAI(productionName, request)
     return ..HandleAIResult(result)
 }
@@ -874,13 +881,32 @@ ClassMethod HandleProductionActionResult(result As %DynamicObject) As %DynamicOb
 
 ClassMethod ReadJsonBody() As %DynamicObject [ Private ]
 {
+    If $IsObject(%request) && $IsObject(%request.Content) {
+        return ..ReadJsonStream(%request.Content)
+    }
+    return ""
+}
+
+ClassMethod NormalizeJsonBody(payload) As %DynamicObject [ Private ]
+{
+    If $IsObject(payload) {
+        If payload.%ClassName(1) [ "DynamicObject" {
+            return payload
+        }
+        return ..ReadJsonStream(payload)
+    }
+    return ..ReadJsonBody()
+}
+
+ClassMethod ReadJsonStream(stream) As %DynamicObject [ Private ]
+{
     Set payload = ""
     Try {
-        If $IsObject(%request) && $IsObject(%request.Content) {
-            Do %request.Content.Rewind()
+        If $IsObject(stream) {
+            Do stream.Rewind()
             Set json = ""
-            While '%request.Content.AtEnd {
-                Set json = json _ %request.Content.Read(32000)
+            While 'stream.AtEnd {
+                Set json = json _ stream.Read(32000)
             }
             If json '= "" {
                 Set payload = {}.%FromJSON(json)

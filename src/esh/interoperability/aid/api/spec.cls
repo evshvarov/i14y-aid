@@ -218,12 +218,24 @@ XData OpenAPI [ MimeType = application/json ]
         "operationId": "EnableMonitorInteropMetrics",
         "parameters": [
           {
-            "name": "settings",
-            "in": "body",
+            "name": "enableSAM",
+            "in": "query",
             "required": false,
-            "schema": {
-              "$ref": "#/definitions/MonitorInteropEnableRequest"
-            }
+            "type": "boolean",
+            "default": true
+          },
+          {
+            "name": "enableActivityStats",
+            "in": "query",
+            "required": false,
+            "type": "boolean",
+            "default": false
+          },
+          {
+            "name": "productionName",
+            "in": "query",
+            "required": false,
+            "type": "string"
           }
         ],
         "responses": {
