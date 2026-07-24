@@ -1433,6 +1433,61 @@ ClassMethod StopProduction(productionName As %VarString, timeout As %Integer = 1
     return result
 }
 
+ClassMethod UpdateProduction(productionName As %VarString, timeout As %Integer = 10, force As %Boolean = 0) As %DynamicObject
+{
+    Set result = ..NewActionResult(productionName, "update")
+    If '..IsValidClassName(productionName) {
+        Do result.%Set("errorCode", "INVALID_PRODUCTION_NAME")
+        return result
+    }
+    If '..ClassExtends(productionName, "Ens.Production") {
+        Do result.%Set("errorCode", "PRODUCTION_NOT_FOUND")
+        return result
+    }
+
+    Set before = ..GetRuntimeStatus(productionName)
+    Set result.runtime = before
+    If before.isRunning '= 1 {
+        Do result.%Set("errorCode", "PRODUCTION_NOT_ACTIVE")
+        Set result.metrics = ..BuildProductionRuntimeMetrics(result)
+        return result
+    }
+    If before.currentProduction '= productionName {
+        Do result.%Set("errorCode", "PRODUCTION_NOT_ACTIVE")
+        Set result.metrics = ..BuildProductionRuntimeMetrics(result)
+        return result
+    }
+
+    Set reason = ""
+    Set needsUpdate = ##class(Ens.Director).ProductionNeedsUpdate(.reason, 0)
+    Set result.needsUpdate = needsUpdate
+    Set result.updateReason = reason
+    If 'needsUpdate {
+        Set result.changed = 0
+        Set result.metrics = ..BuildProductionRuntimeMetrics(result)
+        return result
+    }
+
+    New $ROLES
+    Do ..EnableRuntimeControlRole()
+    Set sc = ##class(Ens.Director).UpdateProduction(..NormalizeInteger(timeout, 10), +force)
+    If $$$ISERR(sc) {
+        Do result.%Set("errorCode", "UPDATE_FAILED")
+        Do result.%Set("statusText", $System.Status.GetErrorText(sc))
+        Set result.runtime = ..GetRuntimeStatus(productionName)
+        Set result.metrics = ..BuildProductionRuntimeMetrics(result)
+        return result
+    }
+
+    Set result.changed = 1
+    Set result.runtime = ..GetRuntimeStatus(productionName)
+    Set afterReason = ""
+    Set result.needsUpdate = ##class(Ens.Director).ProductionNeedsUpdate(.afterReason, 0)
+    Set result.updateReason = afterReason
+    Set result.metrics = ..BuildProductionRuntimeMetrics(result)
+    return result
+}
+
 ClassMethod ListMessages(productionName As %VarString = "", limit As %Integer = 50, offset As %Integer = 0, sourceConfigName As %VarString = "", targetConfigName As %VarString = "", messageBodyClassName As %VarString = "", sessionId As %VarString = "", errorsOnly As %Boolean = 0, startDate As %VarString = "", endDate As %VarString = "", status As %VarString = "", messageId As %VarString = "", sourceOrTarget As %VarString = "") As %DynamicObject
 {
     Set result = ..NewListResult()

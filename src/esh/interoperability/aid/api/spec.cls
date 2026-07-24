@@ -2137,6 +2137,67 @@ XData OpenAPI [ MimeType = application/json ]
           }
         }
       }
+    },
+    "/productions/{productionName}/update": {
+      "post": {
+        "summary": "Apply pending production definition changes to the running production",
+        "operationId": "UpdateProduction",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 10
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "type": "boolean",
+            "default": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Production update result",
+            "schema": {
+              "$ref": "#/definitions/ProductionActionResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Production conflict",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Update failed",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {
@@ -6604,6 +6665,12 @@ XData OpenAPI [ MimeType = application/json ]
         },
         "changed": {
           "type": "boolean"
+        },
+        "needsUpdate": {
+          "type": "boolean"
+        },
+        "updateReason": {
+          "type": "string"
         },
         "runtime": {
           "$ref": "#/definitions/ProductionRuntime"

@@ -22,7 +22,7 @@ ClassMethod Health() As %DynamicObject
     Set result = {}
     Set result.status = "ok"
     Set result.module = "esh-i14y-aid"
-    Set result.version = "0.2.23"
+    Set result.version = "0.2.24"
     Set result.namespace = $Namespace
     Set result.capabilities = ##class(esh.interoperability.aid.service.ProductionDiscovery).Capabilities()
     return result
@@ -309,6 +309,13 @@ ClassMethod StartProduction(productionName As %String) As %DynamicObject
 ClassMethod StopProduction(productionName As %String, timeout As %Integer = 10, force As %Boolean = 0) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).StopProduction(productionName, timeout, force)
+    return ..HandleProductionActionResult(result)
+}
+
+/// Apply pending production definition changes to the running production
+ClassMethod UpdateProduction(productionName As %String, timeout As %Integer = 10, force As %Boolean = 0) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).UpdateProduction(productionName, timeout, force)
     return ..HandleProductionActionResult(result)
 }
 
@@ -874,6 +881,9 @@ ClassMethod HandleProductionActionResult(result As %DynamicObject) As %DynamicOb
         }
         If result.errorCode = "STOP_FAILED" {
             return ..Error(500, "STOP_FAILED", result.%Get("statusText"))
+        }
+        If result.errorCode = "UPDATE_FAILED" {
+            return ..Error(500, "UPDATE_FAILED", result.%Get("statusText"))
         }
     }
     return result
