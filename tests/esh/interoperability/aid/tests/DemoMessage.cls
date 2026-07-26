@@ -5,4 +5,6 @@ Property EventType As %VarString;
 
 Property PatientId As %VarString;
 
+Property ResultJSON As %Stream.GlobalCharacter;
+
 }

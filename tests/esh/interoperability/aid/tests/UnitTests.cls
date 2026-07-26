@@ -357,6 +357,8 @@ Method CreateRuntimeMessage(sourceConfigName As %VarString, targetConfigName As 
     Set body = ##class(esh.interoperability.aid.tests.DemoMessage).%New()
     Set body.EventType = "ADT"
     Set body.PatientId = "MRN123"
+    Set body.ResultJSON = ##class(%Stream.GlobalCharacter).%New()
+    Do body.ResultJSON.Write("{""status"":""ok"",""items"":[{""resourceType"":""sleep"",""created"":0}]}")
     Set sc = body.%Save()
     If $$$ISERR(sc) {
         Do result.%Set("errorCode", "BODY_SAVE_FAILED")
@@ -1203,10 +1205,10 @@ Method TestGetMessagePayloadPreview()
     Do $$$AssertEquals(metadata.restricted, 0, "Payload metadata should not be restricted by default")
     Do $$$AssertEquals(metadata.restrictionReason, "", "Payload metadata should not require preview by default")
     Do $$$AssertTrue($IsObject(metadata.metadata.fields), "Payload metadata fields must be an array")
-    Do $$$AssertEquals(metadata.metadata.fields.%Size(), 2, "Payload metadata field count mismatch")
+    Do $$$AssertEquals(metadata.metadata.fields.%Size(), 3, "Payload metadata field count mismatch")
     Do $$$AssertTrue($IsObject(metadata.metrics), "Payload metadata should include metrics")
     If $IsObject(metadata.metrics) {
-        Do $$$AssertEquals(metadata.metrics.fieldCount, 2, "Payload metadata metrics field count mismatch")
+        Do $$$AssertEquals(metadata.metrics.fieldCount, 3, "Payload metadata metrics field count mismatch")
         Do $$$AssertEquals(metadata.metrics.warningCount, 0, "Payload metadata metrics warning count mismatch")
         Do $$$AssertTrue(metadata.metrics.evidenceCount > 0, "Payload metadata metrics evidence count should be populated")
     }
@@ -1258,9 +1260,17 @@ Method TestGetMessagePayloadPreview()
     Do $$$AssertEquals(raw.redacted, 1, "Payload raw should report redacted")
     Do $$$AssertTrue(raw.bodyText["<EventType>ADT</EventType>", "Payload raw XML should include EventType")
     Do $$$AssertTrue(raw.bodyText["<PatientId>[redacted]</PatientId>", "Payload raw XML should redact PatientId")
+    Do $$$AssertTrue(raw.bodyText["<ResultJSON>{&quot;status&quot;:&quot;ok&quot;", "Payload raw XML should include stream field content")
     Do $$$AssertTrue($IsObject(raw.bodyJson), "Payload raw should include bodyJson fallback object")
     Do $$$AssertEquals(raw.bodyJson.EventType, "ADT", "Payload raw bodyJson EventType mismatch")
     Do $$$AssertEquals(raw.bodyJson.PatientId, "[redacted]", "Payload raw bodyJson PatientId should be redacted")
+    Do $$$AssertTrue(raw.bodyJson.ResultJSON["""resourceType"":""sleep""", "Payload raw bodyJson should include stream field content")
+
+    Do ..InitRequestResponse()
+    Set rawJson = ##class(esh.interoperability.aid.api.impl).GetProductionMessagePayloadRaw("esh.interoperability.aid.tests.DemoProduction", fixture.messageId, "json", 1)
+    Do $$$AssertEquals(rawJson.format, "json", "Payload raw JSON format mismatch")
+    Do $$$AssertTrue(rawJson.bodyText["""ResultJSON"":", "Payload raw JSON text should include stream field")
+    Do $$$AssertTrue(rawJson.bodyJson.ResultJSON["""status"":""ok""", "Payload raw JSON object should include stream field")
 
     Set restore = {"runtimeMessageAnalysisEnabled":1,"payloadInspectionEnabled":0,"payloadMetadataEnabled":1,"messageResendEnabled":0,"maxMessagesReturned":100,"maxTraceDepth":50,"defaultMessageLookbackDays":7,"fieldRedactionPatterns":"patient,ssn,mrn,dob,address,phone,email","classExclusions":"","productionExclusions":"","sourceCodeInferenceEnabled":0,"explanationVerbosity":"normal","aiProviderEnabled":0,"aiSummaryEnabled":0,"aiProvider":"openai","aiModel":"gpt-4o-mini","aiEndpoint":"https://api.openai.com/v1/chat/completions","clearOpenAIApiKey":1}
     Set restored = ##class(esh.interoperability.aid.api.impl).UpdateSettings(restore)

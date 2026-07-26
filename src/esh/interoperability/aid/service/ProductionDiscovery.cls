@@ -6081,7 +6081,7 @@ ClassMethod SetPayloadRawFromPreviewFields(result As %DynamicObject, body As %Re
 {
     Set fields = []
     Set evidence = []
-    Do ..AddPayloadPreviewFields(body, bodyClassName, redactionPatterns, fields, evidence)
+    Do ..AddPayloadRawFields(body, bodyClassName, redactionPatterns, fields, evidence)
     Set object = {}
     For index = 0:1:fields.%Size()-1 {
         Set field = fields.%Get(index)
@@ -6099,6 +6099,55 @@ ClassMethod SetPayloadRawFromPreviewFields(result As %DynamicObject, body As %Re
     }
     For index = 0:1:evidence.%Size()-1 {
         Do result.evidence.%Push(evidence.%Get(index))
+    }
+    return
+}
+
+ClassMethod AddPayloadRawFields(body As %RegisteredObject, bodyClassName As %VarString, redactionPatterns As %VarString, fields As %DynamicArray, evidence As %DynamicArray) [ Private ]
+{
+    Set stmt = ##class(%SQL.Statement).%New()
+    Set sql = "SELECT Name, Type, Collection FROM %Dictionary.CompiledProperty WHERE Parent = ? ORDER BY Name"
+    Set sc = stmt.%Prepare(sql)
+    If $$$ISERR(sc) {
+        return
+    }
+    Set rset = stmt.%Execute(bodyClassName)
+    If rset.%SQLCODE < 0 {
+        return
+    }
+
+    While rset.%Next() {
+        Set propertyName = rset.%Get("Name")
+        Set propertyType = rset.%Get("Type")
+        Set collection = rset.%Get("Collection")
+        Continue:(propertyName = "")
+        Continue:($Extract(propertyName, 1) = "%")
+        Continue:(collection '= "")
+        Continue:('..IsPreviewScalarType(propertyType))&&('..IsCharacterStreamType(propertyType))
+
+        Set field = {}
+        Set field.name = propertyName
+        Set field.type = propertyType
+        Set field.redacted = ..ShouldRedactField(propertyName, redactionPatterns)
+        Set field.stream = ..IsCharacterStreamType(propertyType)
+        Set field.value = ""
+        If field.redacted {
+            Set field.value = "[redacted]"
+        } ElseIf field.stream {
+            Try {
+                Set field.value = ..ReadCharacterStream($Property(body, propertyName))
+            } Catch ex {
+                Set field.value = "[unavailable]"
+            }
+        } Else {
+            Try {
+                Set field.value = ..NormalizeRawValue($Property(body, propertyName))
+            } Catch ex {
+                Set field.value = "[unavailable]"
+            }
+        }
+        Do fields.%Push(field)
+        Do evidence.%Push(..NewEvidence("payload-property", bodyClassName, propertyName, "Type", propertyType, "observed"))
     }
     return
 }
@@ -6181,6 +6230,17 @@ ClassMethod IsPreviewScalarType(propertyType As %VarString) As %Boolean [ Privat
     return 0
 }
 
+ClassMethod IsCharacterStreamType(propertyType As %VarString) As %Boolean [ Private ]
+{
+    If (propertyType = "%Stream.GlobalCharacter") || (propertyType = "%Stream.FileCharacter") || (propertyType = "%Stream.TmpCharacter") {
+        return 1
+    }
+    If (propertyType = "%Library.GlobalCharacterStream") || (propertyType = "%Library.FileCharacterStream") || (propertyType = "%Library.TmpCharacterStream") {
+        return 1
+    }
+    return 0
+}
+
 ClassMethod ShouldRedactField(fieldName As %VarString, redactionPatterns As %VarString) As %Boolean [ Private ]
 {
     Set normalizedField = $ZConvert(fieldName, "L")
@@ -6192,6 +6252,28 @@ ClassMethod ShouldRedactField(fieldName As %VarString, redactionPatterns As %Var
         }
     }
     return 0
+}
+
+ClassMethod ReadCharacterStream(stream As %RegisteredObject) As %VarString [ Private ]
+{
+    If '$IsObject(stream) {
+        return ""
+    }
+    Set text = ""
+    Try {
+        Do stream.Rewind()
+        While 'stream.AtEnd {
+            Set text = text_stream.Read(32767)
+        }
+    } Catch ex {
+        return "[unavailable]"
+    }
+    return text
+}
+
+ClassMethod NormalizeRawValue(value As %String) As %VarString [ Private ]
+{
+    return ""_value
 }
 
 ClassMethod NormalizePreviewValue(value As %String) As %VarString [ Private ]
