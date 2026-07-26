@@ -2032,6 +2032,109 @@ ClassMethod GetProductionMessagePayloadPreview(productionName As %VarString, mes
     return result
 }
 
+ClassMethod GetMessagePayloadRaw(messageId As %Integer, format As %VarString = "xml", redact As %Boolean = 1) As %DynamicObject
+{
+    Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
+    Set metadataResult = ..GetMessagePayloadMetadata(messageId)
+    If metadataResult.%IsDefined("errorCode") {
+        return metadataResult
+    }
+
+    Set result = {}
+    Set result.namespace = metadataResult.namespace
+    Set result.messageId = messageId
+    Set result.message = metadataResult.message
+    Set result.metadata = metadataResult.metadata
+    Set result.messageBodyClassName = metadataResult.messageBodyClassName
+    Set result.resolvedMessageBodyClassName = metadataResult.resolvedMessageBodyClassName
+    Set result.messageBodyId = metadataResult.messageBodyId
+    Set result.bodyReferenceAvailable = metadataResult.bodyReferenceAvailable
+    Set result.payloadReturned = 0
+    Set result.bodyContentReturned = 0
+    Set result.runtimeMessageAnalysisEnabled = metadataResult.runtimeMessageAnalysisEnabled
+    Set result.payloadInspectionEnabled = metadataResult.payloadInspectionEnabled
+    Set result.payloadInspectionSupported = 1
+    Set result.requestedFormat = $ZConvert($ZStrip($Get(format, "xml"), "<>W"), "L")
+    If (result.requestedFormat '= "json") && (result.requestedFormat '= "xml") {
+        Set result.requestedFormat = "xml"
+    }
+    Set result.format = result.requestedFormat
+    Set result.redacted = ..NormalizeBoolean(redact, 1)
+    Set result.bodyText = ""
+    Set result.bodyJson = {}
+    Set result.restricted = 1
+    Set result.restrictionReason = metadataResult.restrictionReason
+    Set result.warnings = metadataResult.warnings
+    Set result.evidence = metadataResult.evidence
+
+    If 'result.payloadInspectionEnabled {
+        Set result.payloadInspectionSupported = 0
+        Do ..AddPayloadMetrics(result)
+        return result
+    }
+    Set result.warnings = []
+    If 'result.bodyReferenceAvailable {
+        Set result.restrictionReason = "PAYLOAD_BODY_REFERENCE_MISSING"
+        Do result.warnings.%Push(..NewWarning("PAYLOAD_BODY_REFERENCE_MISSING", "Message body class or ID is missing."))
+        Do ..AddPayloadMetrics(result)
+        return result
+    }
+    Set lookupClassName = $Select(result.resolvedMessageBodyClassName'="":result.resolvedMessageBodyClassName,1:result.messageBodyClassName)
+    If '..ClassExists(lookupClassName) {
+        Set result.restrictionReason = "PAYLOAD_BODY_CLASS_NOT_FOUND"
+        Do result.warnings.%Push(..NewWarning("PAYLOAD_BODY_CLASS_NOT_FOUND", "Message body class "_result.messageBodyClassName_" was not found."))
+        Do ..AddPayloadMetrics(result)
+        return result
+    }
+
+    Set body = ""
+    Try {
+        Set body = $classmethod(lookupClassName, "%OpenId", result.messageBodyId)
+    } Catch ex {
+        Set body = ""
+    }
+    If '$IsObject(body) {
+        Set result.restrictionReason = "PAYLOAD_BODY_OPEN_FAILED"
+        Do result.warnings.%Push(..NewWarning("PAYLOAD_BODY_OPEN_FAILED", "Message body could not be opened for raw serialization."))
+        Do ..AddPayloadMetrics(result)
+        return result
+    }
+
+    If 'result.redacted, result.requestedFormat = "xml" {
+        Set xmlText = ""
+        Set sc = ..TrySerializePayloadXML(body, .xmlText)
+        If $$$ISOK(sc), xmlText '= "" {
+            Set result.bodyText = xmlText
+        } Else {
+            Do result.warnings.%Push(..NewWarning("PAYLOAD_RAW_XML_EXPORT_UNAVAILABLE", "Message body XML export was unavailable; scalar payload fallback was returned."))
+            Do ..SetPayloadRawFromPreviewFields(result, body, lookupClassName, "")
+        }
+    } Else {
+        Set redactionPatterns = $Select(result.redacted:settings.fieldRedactionPatterns,1:"")
+        Do ..SetPayloadRawFromPreviewFields(result, body, lookupClassName, redactionPatterns)
+    }
+
+    Set result.payloadReturned = 1
+    Set result.bodyContentReturned = 1
+    Set result.restricted = 0
+    Set result.restrictionReason = ""
+    Do result.evidence.%Push(..NewEvidence("payload-raw", lookupClassName, result.messageBodyId, "format", result.format, "observed"))
+    Do ..AddPayloadMetrics(result)
+    return result
+}
+
+ClassMethod GetProductionMessagePayloadRaw(productionName As %VarString, messageId As %Integer, format As %VarString = "xml", redact As %Boolean = 1) As %DynamicObject
+{
+    Set scoped = ..GetProductionMessage(productionName, messageId)
+    If scoped.%IsDefined("errorCode") {
+        return scoped
+    }
+
+    Set result = ..GetMessagePayloadRaw(messageId, format, redact)
+    Do result.%Set("productionName", productionName)
+    return result
+}
+
 ClassMethod GetMessageTrace(messageId As %Integer) As %DynamicObject
 {
     Set settings = ##class(esh.interoperability.aid.config.Settings).Current()
@@ -5972,6 +6075,93 @@ ClassMethod AddPayloadPreviewFields(body As %RegisteredObject, bodyClassName As 
         Do evidence.%Push(..NewEvidence("payload-property", bodyClassName, propertyName, "Type", propertyType, "observed"))
     }
     return
+}
+
+ClassMethod SetPayloadRawFromPreviewFields(result As %DynamicObject, body As %RegisteredObject, bodyClassName As %VarString, redactionPatterns As %VarString) [ Private ]
+{
+    Set fields = []
+    Set evidence = []
+    Do ..AddPayloadPreviewFields(body, bodyClassName, redactionPatterns, fields, evidence)
+    Set object = {}
+    For index = 0:1:fields.%Size()-1 {
+        Set field = fields.%Get(index)
+        If $IsObject(field) {
+            Do object.%Set(field.name, field.value)
+        }
+    }
+    Set result.bodyJson = object
+    If result.requestedFormat = "json" {
+        Set result.format = "json"
+        Set result.bodyText = object.%ToJSON()
+    } Else {
+        Set result.format = "xml"
+        Set result.bodyText = ..PayloadFieldsToXML(bodyClassName, fields)
+    }
+    For index = 0:1:evidence.%Size()-1 {
+        Do result.evidence.%Push(evidence.%Get(index))
+    }
+    return
+}
+
+ClassMethod TrySerializePayloadXML(body As %RegisteredObject, Output xmlText As %String) As %Status [ Private ]
+{
+    Set xmlText = ""
+    Try {
+        Set sc = body.XMLExportToString(.xmlText)
+        If $$$ISERR(sc) {
+            return sc
+        }
+    } Catch ex {
+        return ex.AsStatus()
+    }
+    return $$$OK
+}
+
+ClassMethod PayloadFieldsToXML(bodyClassName As %VarString, fields As %DynamicArray) As %VarString [ Private ]
+{
+    Set rootName = $Piece(bodyClassName, ".", $Length(bodyClassName, "."))
+    If rootName = "" {
+        Set rootName = "Payload"
+    }
+    Set xml = "<"_..XMLName(rootName)_">"
+    For index = 0:1:fields.%Size()-1 {
+        Set field = fields.%Get(index)
+        If $IsObject(field) {
+            Set name = ..XMLName(field.name)
+            Set xml = xml_"<"_name_">"_..EscapeXML(field.value)_"</"_name_">"
+        }
+    }
+    Set xml = xml_"</"_..XMLName(rootName)_">"
+    return xml
+}
+
+ClassMethod XMLName(name As %VarString) As %VarString [ Private ]
+{
+    Set text = $ZStrip($Get(name), "<>W")
+    If text = "" {
+        return "Value"
+    }
+    For index = 1:1:$Length(text) {
+        Set char = $Extract(text, index)
+        If char'?1AN {
+            Set $Extract(text, index) = "_"
+        }
+    }
+    If $Extract(text, 1)'?1A {
+        Set text = "Value_"_text
+    }
+    return text
+}
+
+ClassMethod EscapeXML(value As %VarString) As %VarString [ Private ]
+{
+    Set text = $Get(value)
+    Set text = $Replace(text, "&", "&amp;")
+    Set text = $Replace(text, "<", "&lt;")
+    Set text = $Replace(text, ">", "&gt;")
+    Set text = $Replace(text, """", "&quot;")
+    Set text = $Replace(text, "'", "&apos;")
+    return text
 }
 
 ClassMethod IsPreviewScalarType(propertyType As %VarString) As %Boolean [ Private ]

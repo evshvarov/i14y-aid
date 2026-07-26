@@ -966,6 +966,63 @@
         }
       }
     },
+    "/productions/{productionName}/messages/{messageId}/payload/raw": {
+      "get": {
+        "summary": "Get production-scoped serialized payload body for a message",
+        "operationId": "GetProductionMessagePayloadRaw",
+        "parameters": [
+          {
+            "name": "productionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "default": "xml",
+            "description": "Preferred body format. Supported values: xml, json."
+          },
+          {
+            "name": "redact",
+            "in": "query",
+            "required": false,
+            "type": "boolean",
+            "default": true,
+            "description": "Apply configured field redaction patterns when possible."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Production-scoped serialized payload body",
+            "schema": {
+              "$ref": "#/definitions/MessagePayloadRawResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message or production not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/productions/{productionName}/messages/{messageId}/trace": {
       "get": {
         "summary": "Get production-scoped runtime trace for a message header",
@@ -1280,6 +1337,57 @@
             "description": "Redacted payload preview",
             "schema": {
               "$ref": "#/definitions/MessagePayloadPreviewResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/messages/{messageId}/payload/raw": {
+      "get": {
+        "summary": "Get serialized payload body for a message",
+        "operationId": "GetMessagePayloadRaw",
+        "parameters": [
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "default": "xml",
+            "description": "Preferred body format. Supported values: xml, json."
+          },
+          {
+            "name": "redact",
+            "in": "query",
+            "required": false,
+            "type": "boolean",
+            "default": true,
+            "description": "Apply configured field redaction patterns when possible."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Serialized payload body",
+            "schema": {
+              "$ref": "#/definitions/MessagePayloadRawResponse"
             }
           },
           "400": {
@@ -4131,6 +4239,90 @@
           "items": {
             "$ref": "#/definitions/PayloadPreviewField"
           }
+        },
+        "metrics": {
+          "$ref": "#/definitions/PayloadMetrics"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Warning"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      }
+    },
+    "MessagePayloadRawResponse": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "messageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "productionName": {
+          "type": "string"
+        },
+        "message": {
+          "$ref": "#/definitions/MessageHeader"
+        },
+        "metadata": {
+          "$ref": "#/definitions/PayloadMetadata"
+        },
+        "messageBodyClassName": {
+          "type": "string"
+        },
+        "resolvedMessageBodyClassName": {
+          "type": "string"
+        },
+        "messageBodyId": {
+          "type": "string"
+        },
+        "bodyReferenceAvailable": {
+          "type": "boolean"
+        },
+        "payloadReturned": {
+          "type": "boolean"
+        },
+        "bodyContentReturned": {
+          "type": "boolean"
+        },
+        "runtimeMessageAnalysisEnabled": {
+          "type": "boolean"
+        },
+        "payloadInspectionEnabled": {
+          "type": "boolean"
+        },
+        "payloadInspectionSupported": {
+          "type": "boolean"
+        },
+        "format": {
+          "type": "string"
+        },
+        "requestedFormat": {
+          "type": "string"
+        },
+        "redacted": {
+          "type": "boolean"
+        },
+        "bodyText": {
+          "type": "string"
+        },
+        "bodyJson": {
+          "type": "object"
+        },
+        "restricted": {
+          "type": "boolean"
+        },
+        "restrictionReason": {
+          "type": "string"
         },
         "metrics": {
           "$ref": "#/definitions/PayloadMetrics"

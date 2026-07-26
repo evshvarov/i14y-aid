@@ -22,7 +22,7 @@ ClassMethod Health() As %DynamicObject
     Set result = {}
     Set result.status = "ok"
     Set result.module = "esh-i14y-aid"
-    Set result.version = "0.2.25"
+    Set result.version = "0.2.26"
     Set result.namespace = $Namespace
     Set result.capabilities = ##class(esh.interoperability.aid.service.ProductionDiscovery).Capabilities()
     return result
@@ -622,6 +622,20 @@ ClassMethod GetMessagePayloadPreview(messageId As %Integer) As %DynamicObject
 ClassMethod GetProductionMessagePayloadPreview(productionName As %String, messageId As %Integer) As %DynamicObject
 {
     Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionMessagePayloadPreview(productionName, messageId)
+    return ..HandleRuntimeResult(result)
+}
+
+/// Get serialized payload body for a message
+ClassMethod GetMessagePayloadRaw(messageId As %Integer, format As %String = "xml", redact As %Boolean = 1) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetMessagePayloadRaw(messageId, format, redact)
+    return ..HandleRuntimeResult(result)
+}
+
+/// Get production-scoped serialized payload body for a message
+ClassMethod GetProductionMessagePayloadRaw(productionName As %String, messageId As %Integer, format As %String = "xml", redact As %Boolean = 1) As %DynamicObject
+{
+    Set result = ##class(esh.interoperability.aid.service.ProductionDiscovery).GetProductionMessagePayloadRaw(productionName, messageId, format, redact)
     return ..HandleRuntimeResult(result)
 }
 
