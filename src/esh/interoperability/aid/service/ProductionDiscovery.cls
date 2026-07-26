@@ -2062,6 +2062,7 @@ ClassMethod GetMessagePayloadRaw(messageId As %Integer, format As %VarString = "
     Set result.redacted = ..NormalizeBoolean(redact, 1)
     Set result.bodyText = ""
     Set result.bodyJson = {}
+    Set result.bodyJsonRaw = {}
     Set result.restricted = 1
     Set result.restrictionReason = metadataResult.restrictionReason
     Set result.warnings = metadataResult.warnings
@@ -6083,13 +6084,20 @@ ClassMethod SetPayloadRawFromPreviewFields(result As %DynamicObject, body As %Re
     Set evidence = []
     Do ..AddPayloadRawFields(body, bodyClassName, redactionPatterns, fields, evidence)
     Set object = {}
+    Set rawObject = {}
     For index = 0:1:fields.%Size()-1 {
         Set field = fields.%Get(index)
         If $IsObject(field) {
-            Do object.%Set(field.name, field.value)
+            Do rawObject.%Set(field.name, field.value)
+            If field.stream, ..TryParseJSONText(field.value, .parsedValue) {
+                Do object.%Set(field.name, parsedValue)
+            } Else {
+                Do object.%Set(field.name, field.value)
+            }
         }
     }
     Set result.bodyJson = object
+    Set result.bodyJsonRaw = rawObject
     If result.requestedFormat = "json" {
         Set result.format = "json"
         Set result.bodyText = object.%ToJSON()
@@ -6101,6 +6109,29 @@ ClassMethod SetPayloadRawFromPreviewFields(result As %DynamicObject, body As %Re
         Do result.evidence.%Push(evidence.%Get(index))
     }
     return
+}
+
+ClassMethod TryParseJSONText(value As %VarString, Output parsedValue) As %Boolean [ Private ]
+{
+    Set parsedValue = ""
+    Set text = $ZStrip($Get(value), "<>W")
+    If text = "" {
+        return 0
+    }
+    Set first = $Extract(text, 1)
+    Try {
+        If first = "{" {
+            Set parsedValue = {}.%FromJSON(text)
+            return 1
+        }
+        If first = "[" {
+            Set parsedValue = [].%FromJSON(text)
+            return 1
+        }
+    } Catch ex {
+        Set parsedValue = ""
+    }
+    return 0
 }
 
 ClassMethod AddPayloadRawFields(body As %RegisteredObject, bodyClassName As %VarString, redactionPatterns As %VarString, fields As %DynamicArray, evidence As %DynamicArray) [ Private ]

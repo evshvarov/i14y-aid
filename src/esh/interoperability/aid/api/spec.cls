@@ -4327,6 +4327,10 @@ XData OpenAPI [ MimeType = application/json ]
         "bodyJson": {
           "type": "object"
         },
+        "bodyJsonRaw": {
+          "type": "object",
+          "description": "Raw JSON object with stream fields preserved as strings."
+        },
         "restricted": {
           "type": "boolean"
         },
